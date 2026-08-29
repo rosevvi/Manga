@@ -1,0 +1,85 @@
+.app-language-selector {
+  position: relative;
+}
+
+.app-language-button {
+  min-width: 72px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #ddd9e2;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.app-language-button:hover,
+.app-language-button[aria-expanded='true'] {
+  border-color: rgba(169, 91, 242, 0.45);
+  background: rgba(143, 67, 223, 0.1);
+}
+
+.app-language-button > svg:last-child {
+  transition: transform 160ms ease;
+}
+
+.app-language-button > svg:last-child.open {
+  transform: rotate(180deg);
+}
+
+.app-language-selector.compact .app-language-button {
+  min-width: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #c4c0c9;
+}
+
+.app-language-menu {
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  z-index: 120;
+  width: 148px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  background: rgba(13, 12, 16, 0.985);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.58);
+}
+
+.app-language-menu button {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #aaa5af;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.app-language-menu button:hover,
+.app-language-menu button.active {
+  background: rgba(145, 66, 228, 0.11);
+  color: #f0ebf4;
+}
+
+.app-language-menu button svg {
+  color: #a85af4;
+}
+
+@media (max-width: 580px) {
+  .app-language-selector.compact .app-language-button span {
+    display: none;
+  }
+}

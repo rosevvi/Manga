@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.ExternalLoginSessionMapper">
+
+    <resultMap id="externalLoginSessionResultMap" type="com.manga.entity.ExternalLoginSession">
+        <id property="id" column="id"/>
+        <result property="loginToken" column="login_token"/>
+        <result property="provider" column="provider"
+                javaType="com.manga.common.enums.ExternalIdentityProvider"/>
+        <result property="providerSceneKey" column="provider_scene_key"/>
+        <result property="providerTicket" column="provider_ticket"/>
+        <result property="providerQrUrl" column="provider_qr_url"/>
+        <result property="status" column="status" javaType="com.manga.common.enums.ExternalLoginStatus"/>
+        <result property="userId" column="user_id"/>
+        <result property="expiresAt" column="expires_at"/>
+        <result property="consumedAt" column="consumed_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+    </resultMap>
+
+    <select id="findByLoginToken" resultMap="externalLoginSessionResultMap">
+        SELECT id, login_token, provider, provider_scene_key, provider_ticket, provider_qr_url,
+               status, user_id, expires_at, consumed_at, created_at, updated_at, created_by, updated_by
+        FROM manga_external_login_session
+        WHERE login_token = #{loginToken}
+    </select>
+
+    <select id="countWaitingByScene" resultType="long">
+        SELECT COUNT(*)
+        FROM manga_external_login_session
+        WHERE provider = #{provider}
+          AND provider_scene_key = #{sceneKey}
+          AND status = #{status}
+          AND expires_at &gt; CURRENT_TIMESTAMP
+    </select>
+
+    <update id="confirmByScene">
+        UPDATE manga_external_login_session
+        SET status = #{confirmedStatus},
+            user_id = #{userId},
+            updated_by = #{actor}
+        WHERE provider = #{provider}
+          AND provider_scene_key = #{sceneKey}
+          AND status = #{waitingStatus}
+          AND expires_at &gt; CURRENT_TIMESTAMP
+    </update>
+
+    <update id="consumeConfirmed">
+        UPDATE manga_external_login_session
+        SET status = #{consumedStatus},
+            consumed_at = CURRENT_TIMESTAMP,
+            updated_by = #{actor}
+        WHERE login_token = #{loginToken}
+          AND status = #{confirmedStatus}
+    </update>
+
+    <update id="expireWaiting">
+        UPDATE manga_external_login_session
+        SET status = #{expiredStatus},
+            updated_by = #{actor}
+        WHERE login_token = #{loginToken}
+          AND status = #{waitingStatus}
+          AND expires_at &lt;= CURRENT_TIMESTAMP
+    </update>
+</mapper>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.UserMapper">
+
+    <resultMap id="userWithRolesResultMap" type="com.manga.entity.UserAccount">
+        <id property="id" column="user_id"/>
+        <result property="username" column="username"/>
+        <result property="passwordHash" column="password_hash"/>
+        <result property="displayName" column="display_name"/>
+        <result property="status" column="status" javaType="com.manga.common.enums.UserStatus"/>
+        <result property="registrationSource" column="registration_source"
+                javaType="com.manga.common.enums.RegistrationSource"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="roleCodes" column="role_codes"/>
+    </resultMap>
+
+    <sql id="userWithRolesColumns">
+        SELECT u.id AS user_id,
+               u.username,
+               u.password_hash,
+               u.display_name,
+               u.status,
+               u.registration_source,
+               u.created_at,
+               u.updated_at,
+               u.created_by,
+               u.updated_by,
+               GROUP_CONCAT(r.code) AS role_codes
+        FROM manga_user u
+        LEFT JOIN manga_user_role ur ON ur.user_id = u.id
+        LEFT JOIN manga_role r ON r.id = ur.role_id
+    </sql>
+
+    <sql id="userGroupBy">
+        GROUP BY u.id,
+                 u.username,
+                 u.password_hash,
+                 u.display_name,
+                 u.status,
+                 u.registration_source,
+                 u.created_at,
+                 u.updated_at,
+                 u.created_by,
+                 u.updated_by
+    </sql>
+
+    <select id="findByUsername" resultMap="userWithRolesResultMap">
+        <include refid="userWithRolesColumns"/>
+        WHERE u.username = #{username}
+        <include refid="userGroupBy"/>
+    </select>
+
+    <select id="findById" resultMap="userWithRolesResultMap">
+        <include refid="userWithRolesColumns"/>
+        WHERE u.id = #{userId}
+        <include refid="userGroupBy"/>
+    </select>
+
+    <select id="findAllWithRoles" resultMap="userWithRolesResultMap">
+        <include refid="userWithRolesColumns"/>
+        <include refid="userGroupBy"/>
+        ORDER BY u.id
+    </select>
+
+    <update id="updateDisplayName">
+        UPDATE manga_user
+        SET display_name = #{displayName},
+            updated_by = #{actor}
+        WHERE id = #{userId}
+    </update>
+
+    <update id="updatePasswordHash">
+        UPDATE manga_user
+        SET password_hash = #{passwordHash},
+            updated_by = #{actor}
+        WHERE id = #{userId}
+    </update>
+</mapper>

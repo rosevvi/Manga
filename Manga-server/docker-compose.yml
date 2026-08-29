@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  mysql:
+    # MySQL 仅作为项目中间件运行，应用由 Dockerfile 单独启动。
+    image: ${MANGA_MYSQL_IMAGE:-mysql:8.4}
+    container_name: ${MANGA_MYSQL_CONTAINER_NAME:-mysql-server}
+    restart: always
+    environment:
+      # 密码从 .env 读取，提交到仓库的示例值保持为空。
+      MYSQL_ROOT_PASSWORD: ${MANGA_DB_PASSWORD:-}
+      MYSQL_DATABASE: ${MANGA_DB_NAME:-Manga}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${MANGA_DB_PORT:-63376}:3306"
+    volumes:
+      - ./docker/mysql/data:/var/lib/mysql
+      - ./docker/mysql/conf:/etc/mysql/conf.d:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: ${MANGA_MYSQL_HEALTH_INTERVAL:-10s}
+      timeout: ${MANGA_MYSQL_HEALTH_TIMEOUT:-5s}
+      retries: ${MANGA_MYSQL_HEALTH_RETRIES:-10}
+      start_period: ${MANGA_MYSQL_HEALTH_START_PERIOD:-30s}
+    networks:
+      - mysql-network
+
+networks:
+  mysql-network:
+    name: manga-mysql-network
+    driver: bridge

@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:manga;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+
+manga:
+  ai:
+    secrets:
+      encryption-key: manga-test-ai-encryption-key
+  auth:
+    storage:
+      external-login-session: jdbc
+  security:
+    jwt:
+      secret: manga-test-jwt-secret-must-be-at-least-32-bytes
+    initial-admin:
+      password: Manga-test-admin-password
+
+wx:
+  gzh:
+    app-id: test-app-id
+    secret: test-app-secret
+    token: test-callback-token
+    api-base-url: https://api.weixin.qq.com
+    qr-code-base-url: https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=
+    scene-prefix: manga_test_
+    qr-login-ttl: 5m
+    poll-interval: 1s

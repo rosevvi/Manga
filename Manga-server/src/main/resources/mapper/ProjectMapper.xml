@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.ProjectMapper">
+
+    <resultMap id="projectSummaryResultMap" type="com.manga.entity.MangaProject">
+        <id property="id" column="id"/>
+        <result property="ownerUserId" column="owner_user_id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="coverUrl" column="cover_url"/>
+        <result property="genre" column="genre"/>
+        <result property="status" column="status" javaType="com.manga.common.enums.ProjectStatus"/>
+        <result property="shotCount" column="shot_count"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+    </resultMap>
+
+    <sql id="projectSummaryColumns">
+        SELECT p.id,
+               p.owner_user_id,
+               p.name,
+               p.description,
+               p.cover_url,
+               p.genre,
+               p.status,
+               p.created_at,
+               p.updated_at,
+               p.created_by,
+               p.updated_by,
+               COUNT(s.id) AS shot_count
+        FROM manga_project p
+        LEFT JOIN manga_storyboard_shot s ON s.project_id = p.id
+    </sql>
+
+    <sql id="projectSummaryGroupBy">
+        GROUP BY p.id,
+                 p.owner_user_id,
+                 p.name,
+                 p.description,
+                 p.cover_url,
+                 p.genre,
+                 p.status,
+                 p.created_at,
+                 p.updated_at,
+                 p.created_by,
+                 p.updated_by
+    </sql>
+
+    <select id="findAllOwnedBy" resultMap="projectSummaryResultMap">
+        <include refid="projectSummaryColumns"/>
+        WHERE p.owner_user_id = #{ownerUserId}
+        <include refid="projectSummaryGroupBy"/>
+        ORDER BY p.updated_at DESC, p.id DESC
+    </select>
+
+    <select id="findOwnedById" resultMap="projectSummaryResultMap">
+        <include refid="projectSummaryColumns"/>
+        WHERE p.id = #{projectId}
+          AND p.owner_user_id = #{ownerUserId}
+        <include refid="projectSummaryGroupBy"/>
+    </select>
+
+    <update id="updateOwned">
+        UPDATE manga_project
+        SET name = #{project.name},
+            description = #{project.description},
+            cover_url = #{project.coverUrl},
+            genre = #{project.genre},
+            status = #{project.status},
+            updated_by = #{project.updatedBy}
+        WHERE id = #{project.id}
+          AND owner_user_id = #{ownerUserId}
+    </update>
+</mapper>

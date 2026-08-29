@@ -1,0 +1,108 @@
+spring:
+  config:
+    # 将项目根目录下不提交仓库的 .env 按 properties 格式加载。
+    import: optional:file:.env[.properties]
+  application:
+    name: manga-server
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:manga.sql
+  threads:
+    virtual:
+      enabled: true
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: Asia/Shanghai
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.manga.entity
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+manga:
+  ai:
+    secrets:
+      # 生产环境建议使用独立密钥；未单独配置时复用现有 JWT 密钥以便本地启动。
+      encryption-key: ${MANGA_AI_SECRET_ENCRYPTION_KEY:${MANGA_JWT_SECRET:}}
+  async:
+    core-pool-size: ${MANGA_ASYNC_CORE_POOL_SIZE:4}
+    max-pool-size: ${MANGA_ASYNC_MAX_POOL_SIZE:16}
+    queue-capacity: ${MANGA_ASYNC_QUEUE_CAPACITY:200}
+    keep-alive: ${MANGA_ASYNC_KEEP_ALIVE:60s}
+    await-termination: ${MANGA_ASYNC_AWAIT_TERMINATION:30s}
+    thread-name-prefix: ${MANGA_ASYNC_THREAD_NAME_PREFIX:manga-async-}
+  auth:
+    storage:
+      external-login-session: ${MANGA_EXTERNAL_LOGIN_SESSION_STORE:redis}
+  redis:
+    key-prefix: ${MANGA_REDIS_KEY_PREFIX:manga}
+    external-login-expired-retention: ${MANGA_REDIS_EXTERNAL_LOGIN_EXPIRED_RETENTION:10m}
+  security:
+    allowed-origins: ${MANGA_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+    cors-max-age: ${MANGA_CORS_MAX_AGE:1h}
+    jwt:
+      secret: ${MANGA_JWT_SECRET:}
+      issuer: ${MANGA_JWT_ISSUER:manga-server}
+      access-token-ttl: ${MANGA_ACCESS_TOKEN_TTL:2h}
+      guest-token-ttl: ${MANGA_GUEST_TOKEN_TTL:30m}
+    initial-admin:
+      username: ${MANGA_INITIAL_ADMIN_USERNAME:admin}
+      password: ${MANGA_INITIAL_ADMIN_PASSWORD:}
+      display-name: ${MANGA_INITIAL_ADMIN_DISPLAY_NAME:Manga Administrator}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: ${spring.application.name}
+    description: Manga platform backend service
+    version: '@project.version@'
+
+logging:
+  file:
+    name: ${MANGA_LOG_FILE:logs/manga-server.log}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [traceId=%X{traceId:-}] %logger{40} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [traceId=%X{traceId:-}] %logger{40} - %msg%n"
+  logback:
+    rollingpolicy:
+      max-file-size: ${MANGA_LOG_MAX_FILE_SIZE:20MB}
+      max-history: ${MANGA_LOG_MAX_HISTORY:30}
+      total-size-cap: ${MANGA_LOG_TOTAL_SIZE_CAP:1GB}
+  level:
+    root: INFO
+    com.manga: INFO
+
+wx:
+  gzh:
+    app-id: ${MANGA_WECHAT_GZH_APP_ID:}
+    secret: ${MANGA_WECHAT_GZH_SECRET:}
+    token: ${MANGA_WECHAT_GZH_TOKEN:}
+    api-base-url: ${MANGA_WECHAT_API_BASE_URL:https://api.weixin.qq.com}
+    qr-code-base-url: ${MANGA_WECHAT_QR_CODE_BASE_URL:https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=}
+    scene-prefix: ${MANGA_WECHAT_SCENE_PREFIX:manga_login_}
+    qr-login-ttl: ${MANGA_WECHAT_QR_LOGIN_TTL:5m}
+    poll-interval: ${MANGA_WECHAT_POLL_INTERVAL:2s}

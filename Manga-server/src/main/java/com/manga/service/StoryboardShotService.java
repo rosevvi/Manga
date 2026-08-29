@@ -1,0 +1,145 @@
+package com.manga.service;
+
+import com.manga.common.enums.ProjectResponseCode;
+import com.manga.common.enums.StoryboardShotStatus;
+import com.manga.common.exception.BusinessException;
+import com.manga.common.security.SecurityUtils;
+import com.manga.dto.StoryboardShotCreateRequest;
+import com.manga.dto.StoryboardShotOrderRequest;
+import com.manga.dto.StoryboardShotResponse;
+import com.manga.dto.StoryboardShotUpdateRequest;
+import com.manga.entity.StoryboardShot;
+import com.manga.repository.StoryboardShotRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashSet;
+import java.util.List;
+
+import static com.manga.common.constant.StoryboardConstants.SHOT_NUMBER_FORMAT;
+
+/** 提供项目内分镜镜头的编辑、删除与批量排序能力。 */
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class StoryboardShotService {
+
+    private final StoryboardShotRepository storyboardShotRepository;
+    private final ProjectService projectService;
+
+    public List<StoryboardShotResponse> findAll(long projectId) {
+        requireProject(projectId);
+        return storyboardShotRepository.findAllByProjectId(projectId).stream().map(this::toResponse).toList();
+    }
+
+    @Transactional
+    public StoryboardShotResponse create(long projectId, StoryboardShotCreateRequest request) {
+        requireProject(projectId);
+        String actor = SecurityUtils.requireCurrentUsername();
+        int sortOrder = storyboardShotRepository.nextSortOrder(projectId);
+        StoryboardShot shot = StoryboardShot.builder()
+                .projectId(projectId)
+                .sortOrder(sortOrder)
+                .shotNumber(SHOT_NUMBER_FORMAT.formatted(sortOrder))
+                .title(request.title().trim())
+                .sceneName(normalize(request.sceneName()))
+                .shotType(normalize(request.shotType()))
+                .cameraMovement(normalize(request.cameraMovement()))
+                .durationSeconds(request.durationSeconds() == null ? 0 : request.durationSeconds())
+                .content(normalize(request.content()))
+                .dialogue(normalize(request.dialogue()))
+                .soundEffect(normalize(request.soundEffect()))
+                .imageUrl(normalize(request.imageUrl()))
+                .notes(normalize(request.notes()))
+                .status(request.status() == null ? StoryboardShotStatus.DRAFT : request.status())
+                .createdBy(actor)
+                .updatedBy(actor)
+                .build();
+        storyboardShotRepository.create(shot);
+        log.info("Storyboard shot created projectId={} shotId={} sortOrder={}",
+                projectId, shot.getId(), sortOrder);
+        return toResponse(requireShot(projectId, shot.getId()));
+    }
+
+    @Transactional
+    public StoryboardShotResponse update(
+            long projectId, long shotId, StoryboardShotUpdateRequest request) {
+        requireProject(projectId);
+        StoryboardShot current = requireShot(projectId, shotId);
+        StoryboardShot shot = StoryboardShot.builder()
+                .id(shotId)
+                .title(request.title().trim())
+                .sceneName(normalize(request.sceneName()))
+                .shotType(normalize(request.shotType()))
+                .cameraMovement(normalize(request.cameraMovement()))
+                .durationSeconds(request.durationSeconds() == null ? 0 : request.durationSeconds())
+                .content(normalize(request.content()))
+                .dialogue(normalize(request.dialogue()))
+                .soundEffect(normalize(request.soundEffect()))
+                .imageUrl(normalize(request.imageUrl()))
+                .notes(normalize(request.notes()))
+                .status(request.status() == null ? current.getStatus() : request.status())
+                .updatedBy(SecurityUtils.requireCurrentUsername())
+                .build();
+        storyboardShotRepository.update(shot, projectId);
+        log.info("Storyboard shot updated projectId={} shotId={} status={}",
+                projectId, shotId, shot.getStatus());
+        return toResponse(requireShot(projectId, shotId));
+    }
+
+    @Transactional
+    public void delete(long projectId, long shotId) {
+        requireProject(projectId);
+        requireShot(projectId, shotId);
+        storyboardShotRepository.delete(shotId);
+        List<Long> remainingIds = storyboardShotRepository.findAllByProjectId(projectId).stream()
+                .map(StoryboardShot::getId)
+                .toList();
+        if (!remainingIds.isEmpty()) {
+            storyboardShotRepository.updateOrder(projectId, remainingIds, SecurityUtils.requireCurrentUsername());
+        }
+        log.info("Storyboard shot deleted projectId={} shotId={}", projectId, shotId);
+    }
+
+    @Transactional
+    public List<StoryboardShotResponse> reorder(long projectId, StoryboardShotOrderRequest request) {
+        requireProject(projectId);
+        List<Long> currentIds = storyboardShotRepository.findAllByProjectId(projectId).stream()
+                .map(StoryboardShot::getId)
+                .toList();
+        List<Long> requestedIds = request.shotIds();
+        boolean containsDuplicates = new HashSet<>(requestedIds).size() != requestedIds.size();
+        if (containsDuplicates || currentIds.size() != requestedIds.size()
+                || !new HashSet<>(currentIds).equals(new HashSet<>(requestedIds))) {
+            throw new BusinessException(ProjectResponseCode.STORYBOARD_ORDER_INVALID);
+        }
+        storyboardShotRepository.updateOrder(projectId, requestedIds, SecurityUtils.requireCurrentUsername());
+        log.info("Storyboard order updated projectId={} shotCount={}", projectId, requestedIds.size());
+        return storyboardShotRepository.findAllByProjectId(projectId).stream().map(this::toResponse).toList();
+    }
+
+    private void requireProject(long projectId) {
+        projectService.requireOwnedProject(projectId, SecurityUtils.requireCurrentUserId());
+    }
+
+    private StoryboardShot requireShot(long projectId, long shotId) {
+        return storyboardShotRepository.findByProjectAndId(projectId, shotId)
+                .orElseThrow(() -> new BusinessException(
+                        ProjectResponseCode.STORYBOARD_SHOT_NOT_FOUND, HttpStatus.NOT_FOUND));
+    }
+
+    private StoryboardShotResponse toResponse(StoryboardShot shot) {
+        return new StoryboardShotResponse(
+                shot.getId(), shot.getProjectId(), shot.getSortOrder(), shot.getShotNumber(), shot.getTitle(),
+                shot.getSceneName(), shot.getShotType(), shot.getCameraMovement(), shot.getDurationSeconds(),
+                shot.getContent(), shot.getDialogue(), shot.getSoundEffect(), shot.getImageUrl(), shot.getNotes(),
+                shot.getStatus(), shot.getCreatedAt(), shot.getUpdatedAt());
+    }
+
+    private String normalize(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+}

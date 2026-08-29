@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.RoleMapper">
+
+    <resultMap id="roleResultMap" type="com.manga.entity.Role">
+        <id property="id" column="id"/>
+        <result property="code" column="code" javaType="com.manga.common.enums.UserRole"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+    </resultMap>
+
+    <select id="findAllRoles" resultMap="roleResultMap">
+        SELECT id, code, name, description, created_at, updated_at, created_by, updated_by
+        FROM manga_role
+        ORDER BY id
+    </select>
+
+    <insert id="insertIfAbsent">
+        INSERT INTO manga_role (code, name, description, created_by, updated_by)
+        SELECT #{roleCode}, #{roleName}, #{roleDescription}, #{actor}, #{actor}
+        WHERE NOT EXISTS (
+            SELECT 1 FROM manga_role WHERE code = #{roleCode}
+        )
+    </insert>
+
+    <delete id="deleteUserRoles">
+        DELETE FROM manga_user_role WHERE user_id = #{userId}
+    </delete>
+
+    <insert id="insertUserRoles">
+        INSERT INTO manga_user_role (user_id, role_id, created_by, updated_by)
+        SELECT #{userId}, id, #{actor}, #{actor}
+        FROM manga_role
+        WHERE code IN
+        <foreach collection="roles" item="role" open="(" separator="," close=")">
+            #{role}
+        </foreach>
+    </insert>
+</mapper>

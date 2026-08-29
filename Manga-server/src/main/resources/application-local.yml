@@ -1,0 +1,20 @@
+# 本地开发配置只声明连接方式，密码等私密值统一由项目根目录的 .env 提供。
+spring:
+  datasource:
+    url: "${MANGA_DB_URL:jdbc:mysql://${MANGA_DB_HOST:localhost}:${MANGA_DB_PORT:63376}/${MANGA_DB_NAME:Manga}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true}"
+    username: ${MANGA_DB_USERNAME:root}
+    password: ${MANGA_DB_PASSWORD:}
+    hikari:
+      pool-name: MangaHikariPool
+      minimum-idle: ${MANGA_DB_POOL_MIN_IDLE:2}
+      maximum-pool-size: ${MANGA_DB_POOL_MAX_SIZE:10}
+      connection-timeout: ${MANGA_DB_CONNECTION_TIMEOUT_MS:30000}
+      validation-timeout: ${MANGA_DB_VALIDATION_TIMEOUT_MS:5000}
+  data:
+    redis:
+      host: ${MANGA_REDIS_HOST:localhost}
+      port: ${MANGA_REDIS_PORT:6379}
+      password: ${MANGA_REDIS_PASSWORD:}
+      database: ${MANGA_REDIS_DATABASE:0}
+      connect-timeout: ${MANGA_REDIS_CONNECT_TIMEOUT:5s}
+      timeout: ${MANGA_REDIS_TIMEOUT:3s}

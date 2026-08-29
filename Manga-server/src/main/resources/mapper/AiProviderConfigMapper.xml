@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.AiProviderConfigMapper">
+
+    <resultMap id="aiProviderConfigResultMap" type="com.manga.entity.AiProviderConfig">
+        <id property="id" column="id"/>
+        <result property="ownerUserId" column="owner_user_id"/>
+        <result property="name" column="name"/>
+        <result property="providerType" column="provider_type" javaType="com.manga.common.enums.AiProviderType"/>
+        <result property="baseUrl" column="base_url"/>
+        <result property="defaultModel" column="default_model"/>
+        <result property="apiKeyCiphertext" column="api_key_ciphertext"/>
+        <result property="apiKeyHint" column="api_key_hint"/>
+        <result property="enabled" column="enabled"/>
+        <result property="defaultConfig" column="default_config"/>
+        <result property="remark" column="remark"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+    </resultMap>
+
+    <sql id="allColumns">
+        id, owner_user_id, name, provider_type, base_url, default_model,
+        api_key_ciphertext, api_key_hint, enabled, default_config, remark,
+        created_at, updated_at, created_by, updated_by
+    </sql>
+
+    <select id="findAllOwnedBy" resultMap="aiProviderConfigResultMap">
+        SELECT <include refid="allColumns"/>
+        FROM manga_ai_provider_config
+        WHERE owner_user_id = #{ownerUserId}
+        ORDER BY default_config DESC, enabled DESC, updated_at DESC, id DESC
+    </select>
+
+    <select id="findOwnedById" resultMap="aiProviderConfigResultMap">
+        SELECT <include refid="allColumns"/>
+        FROM manga_ai_provider_config
+        WHERE id = #{configId}
+          AND owner_user_id = #{ownerUserId}
+    </select>
+
+    <select id="findDefaultOwnedBy" resultMap="aiProviderConfigResultMap">
+        SELECT <include refid="allColumns"/>
+        FROM manga_ai_provider_config
+        WHERE owner_user_id = #{ownerUserId}
+          AND default_config = TRUE
+          AND enabled = TRUE
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="countOwnedByName" resultType="int">
+        SELECT COUNT(*)
+        FROM manga_ai_provider_config
+        WHERE owner_user_id = #{ownerUserId}
+          AND name = #{name}
+        <if test="excludedConfigId != null">
+          AND id != #{excludedConfigId}
+        </if>
+    </select>
+
+    <update id="updateOwned">
+        UPDATE manga_ai_provider_config
+        SET name = #{config.name},
+            provider_type = #{config.providerType},
+            base_url = #{config.baseUrl},
+            default_model = #{config.defaultModel},
+            api_key_ciphertext = #{config.apiKeyCiphertext},
+            api_key_hint = #{config.apiKeyHint},
+            enabled = #{config.enabled},
+            default_config = #{config.defaultConfig},
+            remark = #{config.remark},
+            updated_by = #{config.updatedBy}
+        WHERE id = #{config.id}
+          AND owner_user_id = #{ownerUserId}
+    </update>
+
+    <update id="clearDefault">
+        UPDATE manga_ai_provider_config
+        SET default_config = FALSE,
+            updated_by = #{actor}
+        WHERE owner_user_id = #{ownerUserId}
+          AND default_config = TRUE
+    </update>
+
+    <update id="setDefault">
+        UPDATE manga_ai_provider_config
+        SET default_config = TRUE,
+            enabled = TRUE,
+            updated_by = #{actor}
+        WHERE id = #{configId}
+          AND owner_user_id = #{ownerUserId}
+    </update>
+</mapper>

@@ -1,0 +1,595 @@
+.user-account-menu {
+  position: relative;
+}
+
+.dashboard-profile {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  color: #c4c0c9;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.dashboard-profile .profile-chevron {
+  color: #8d47dc;
+  transform: rotate(90deg);
+  transition: transform 160ms ease;
+}
+
+.dashboard-profile .profile-chevron.open {
+  transform: rotate(-90deg);
+}
+
+.account-dropdown {
+  position: absolute;
+  top: 45px;
+  right: 0;
+  width: 310px;
+  padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(13, 12, 16, 0.985);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65);
+}
+
+.account-dropdown-header {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.account-dropdown-header img {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.account-dropdown-header div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.account-dropdown-header strong {
+  overflow: hidden;
+  color: #f2eff5;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-dropdown-header div span {
+  color: #817d87;
+  font-size: 9px;
+}
+
+.account-role {
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: rgba(137, 63, 230, 0.15);
+  color: #b86cff;
+  font-size: 8px;
+}
+
+.account-menu-list {
+  display: grid;
+  gap: 2px;
+  padding: 7px 0;
+}
+
+.account-menu-list > button {
+  width: 100%;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: transparent;
+  color: #aaa5af;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-menu-list > button:hover {
+  background: rgba(255, 255, 255, 0.055);
+  color: #f2eef5;
+}
+
+.account-menu-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(138, 69, 222, 0.11);
+  color: #a75bfa;
+}
+
+.account-menu-list > button > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+}
+
+.account-menu-list strong {
+  color: #dcd8e0;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.account-menu-list small {
+  color: #76727c;
+  font-size: 8px;
+}
+
+.account-logout {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 13px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07) !important;
+  background: transparent;
+  color: #df777f;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.account-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.76);
+  backdrop-filter: blur(8px);
+}
+
+.account-modal {
+  width: min(100%, 570px);
+  max-height: min(820px, calc(100vh - 48px));
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(111, 44, 196, 0.13), transparent 32%),
+    #0d0c10;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.72);
+}
+
+.account-modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(13, 12, 16, 0.94);
+  backdrop-filter: blur(14px);
+}
+
+.account-modal-header div {
+  display: grid;
+  gap: 6px;
+}
+
+.account-modal-header span {
+  color: #9b55ee;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+.account-modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.account-modal-header button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.055);
+  color: #b8b3bd;
+  cursor: pointer;
+}
+
+.account-panel-form {
+  display: grid;
+  padding: 23px 24px 25px;
+}
+
+.profile-summary-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 22px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.profile-summary-card img {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-summary-card div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.profile-summary-card strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-summary-card div span {
+  color: #7f7a85;
+  font-size: 9px;
+}
+
+.profile-summary-card > span {
+  padding: 5px 7px;
+  border-radius: 5px;
+  background: rgba(54, 193, 126, 0.11);
+  color: #64d99e;
+  font-size: 8px;
+}
+
+.account-panel-form > label {
+  margin: 0 0 7px;
+  color: #aaa5af;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.account-panel-form > input {
+  width: 100%;
+  height: 42px;
+  margin-bottom: 16px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  outline: 0;
+  background: rgba(255, 255, 255, 0.035);
+  color: #f1edf4;
+  font: inherit;
+  font-size: 11px;
+}
+
+.account-panel-form > input:focus {
+  border-color: rgba(163, 84, 244, 0.65);
+  box-shadow: 0 0 0 3px rgba(140, 63, 220, 0.1);
+}
+
+.account-panel-form > input:disabled {
+  color: #77737d;
+  cursor: not-allowed;
+}
+
+.account-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 2px;
+}
+
+.account-detail-grid > div {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.account-detail-grid span {
+  color: #77727d;
+  font-size: 8px;
+}
+
+.account-detail-grid strong {
+  overflow: hidden;
+  color: #c9c4ce;
+  font-size: 9px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 22px;
+}
+
+.account-form-actions button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 15px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #c3bec8;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.account-form-actions button[type='submit'] {
+  background: linear-gradient(100deg, #561cf2, #9d3ce7);
+  color: #fff;
+}
+
+.account-form-actions button:disabled {
+  opacity: 0.58;
+  cursor: wait;
+}
+
+.account-feedback {
+  margin: 13px 0 0;
+  padding: 10px 12px;
+  border-radius: 7px;
+  font-size: 9px;
+}
+
+.account-feedback.success {
+  background: rgba(60, 190, 127, 0.1);
+  color: #6edda7;
+}
+
+.account-feedback.error {
+  background: rgba(224, 80, 94, 0.1);
+  color: #ef858e;
+}
+
+.security-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 22px;
+  padding: 14px;
+  border: 1px solid rgba(152, 80, 232, 0.13);
+  border-radius: 9px;
+  background: rgba(133, 64, 214, 0.07);
+  color: #a85aef;
+}
+
+.security-notice div {
+  display: grid;
+  gap: 5px;
+}
+
+.security-notice strong {
+  color: #e0dbe4;
+  font-size: 11px;
+}
+
+.security-notice p {
+  margin: 0;
+  color: #8d8892;
+  font-size: 9px;
+}
+
+.account-settings-list {
+  display: grid;
+  gap: 10px;
+  padding: 23px 24px 25px;
+}
+
+.preference-card {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 11px;
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.023);
+  color: #a459ed;
+}
+
+.preference-card div {
+  display: grid;
+  gap: 5px;
+}
+
+.preference-card strong {
+  color: #ded9e2;
+  font-size: 10px;
+}
+
+.preference-card p {
+  margin: 0;
+  color: #7d7882;
+  font-size: 8px;
+}
+
+.preference-card > span {
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #bdb8c2;
+  font-size: 8px;
+}
+
+.preference-toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: #28242e;
+  cursor: pointer;
+}
+
+.preference-toggle span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 50%;
+  background: #aaa5af;
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.preference-toggle.enabled {
+  background: #6d2fd1;
+}
+
+.preference-toggle.enabled span {
+  background: #fff;
+  transform: translateX(16px);
+}
+
+.billing-panel,
+.help-panel {
+  display: grid;
+  justify-items: center;
+  padding: 42px 34px;
+  text-align: center;
+}
+
+.billing-plan-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(144, 62, 231, 0.14);
+  color: #a957f3;
+}
+
+.billing-panel > p {
+  margin: 18px 0 8px;
+  color: #9250d8;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 1.7px;
+}
+
+.billing-panel h3,
+.help-panel h3 {
+  margin: 0;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 28px;
+}
+
+.billing-panel > span:not(.billing-plan-icon) {
+  margin-top: 9px;
+  color: #88838d;
+  font-size: 9px;
+}
+
+.billing-progress {
+  width: min(100%, 360px);
+  height: 5px;
+  margin: 24px 0;
+  border-radius: 999px;
+  background: #29242f;
+  overflow: hidden;
+}
+
+.billing-progress span {
+  width: 62.4%;
+  height: 100%;
+  display: block;
+  background: linear-gradient(90deg, #5d21f3, #aa40ed);
+}
+
+.billing-panel button,
+.help-panel button {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: linear-gradient(100deg, #561cf2, #9d3ce7);
+  color: #fff;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.help-panel > svg {
+  color: #a856f1;
+}
+
+.help-panel p {
+  max-width: 390px;
+  margin: 14px 0 24px;
+  color: #8f8994;
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+.help-panel div {
+  display: flex;
+  gap: 9px;
+}
+
+.help-panel button:last-child {
+  background: rgba(255, 255, 255, 0.065);
+  color: #d0cad5;
+}
+
+@media (max-width: 580px) {
+  .account-dropdown {
+    position: fixed;
+    top: 62px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+
+  .account-modal-backdrop {
+    align-items: center;
+    padding: 12px;
+  }
+
+  .account-modal {
+    width: 100%;
+    max-height: calc(100vh - 24px);
+    border-radius: 17px;
+  }
+
+  .account-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-modal-header,
+  .account-panel-form,
+  .account-settings-list {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+}
