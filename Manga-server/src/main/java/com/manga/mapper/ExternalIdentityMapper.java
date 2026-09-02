@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.Param;
  */
 public interface ExternalIdentityMapper extends BaseMapper<ExternalIdentity> {
 
+    /** 按外部身份查询关联用户 ID。 */
     Long findUserId(
             @Param("provider") ExternalIdentityProvider provider,
             @Param("providerUserId") String providerUserId);

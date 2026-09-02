@@ -5,8 +5,10 @@ package com.manga.common.constant;
  */
 public final class SecurityExpressionConstants {
 
+    /** 管理员方法鉴权表达式。 */
     public static final String HAS_ADMIN_ROLE = "hasRole('ADMIN')";
 
+    /** 禁止实例化常量类。 */
     private SecurityExpressionConstants() {
     }
 }

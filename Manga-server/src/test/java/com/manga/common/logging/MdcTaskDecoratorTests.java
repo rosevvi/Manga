@@ -16,11 +16,13 @@ class MdcTaskDecoratorTests {
 
     private final MdcTaskDecorator taskDecorator = new MdcTaskDecorator();
 
+    /** 清理测试线程中的 MDC 上下文。 */
     @AfterEach
     void clearMdc() {
         MDC.clear();
     }
 
+    /** 验证异步任务传播 traceId 并恢复工作线程上下文。 */
     @Test
     void shouldPropagateTraceIdAndRestoreWorkerContext() {
         MDC.put(LoggingConstants.TRACE_ID_MDC_KEY, "request-trace-id");

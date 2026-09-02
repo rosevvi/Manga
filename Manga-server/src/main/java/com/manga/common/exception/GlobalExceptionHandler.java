@@ -9,12 +9,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+
+import static com.manga.common.constant.MediaUploadConstants.UPLOAD_REQUEST_TOO_LARGE;
 
 /**
  * 将控制器抛出的异常转换为统一接口响应。
@@ -68,6 +71,16 @@ public class GlobalExceptionHandler {
         log.warn("Access denied by method security");
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.failure(CommonResponseCode.FORBIDDEN));
+    }
+
+    /**
+     * 将超出限制的文件上传转换为统一参数错误。
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException exception) {
+        log.warn("File upload exceeded max size");
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(CommonResponseCode.VALIDATION_ERROR, UPLOAD_REQUEST_TOO_LARGE));
     }
 
     /**

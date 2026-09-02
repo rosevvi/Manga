@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
  * 接收当前用户可自行维护的基础资料。
  */
 public record UpdateCurrentUserRequest(
+        /** 用户显示名称。 */
         @NotBlank(message = ValidationConstants.DISPLAY_NAME_REQUIRED)
         @Size(
                 min = ValidationConstants.DISPLAY_NAME_MIN_LENGTH,

@@ -28,6 +28,7 @@ import java.time.Duration;
 @Slf4j
 public class DefaultWechatOfficialAccountClient implements WechatOfficialAccountClient {
 
+    /** 微信 access_token 到期前的主动刷新余量。 */
     private static final Duration ACCESS_TOKEN_REFRESH_MARGIN = Duration.ofMinutes(1);
 
     private final RestClient restClient;
@@ -36,6 +37,7 @@ public class DefaultWechatOfficialAccountClient implements WechatOfficialAccount
     private final StringRedisTemplate redisTemplate;
     private final RedisKeyFactory redisKeyFactory;
 
+    /** 初始化微信公众号客户端及接口地址。 */
     public DefaultWechatOfficialAccountClient(
             RestClient.Builder restClientBuilder,
             ObjectMapper objectMapper,
@@ -89,6 +91,7 @@ public class DefaultWechatOfficialAccountClient implements WechatOfficialAccount
         }
     }
 
+    /** 获取并缓存微信公众号 access_token。 */
     private synchronized String accessToken() {
         try {
             String cacheKey = redisKeyFactory.wechatAccessToken(properties.appId());
@@ -124,6 +127,7 @@ public class DefaultWechatOfficialAccountClient implements WechatOfficialAccount
         }
     }
 
+    /** 校验微信公众号接口配置。 */
     private void validateConfiguration() {
         if (!StringUtils.hasText(properties.appId())
                 || !StringUtils.hasText(properties.secret())
@@ -133,6 +137,7 @@ public class DefaultWechatOfficialAccountClient implements WechatOfficialAccount
         }
     }
 
+    /** 构造微信公众号接口异常。 */
     private WechatApiException apiError(String operation, Integer errorCode, String errorMessage) {
         return new WechatApiException(ExceptionMessageConstants.WECHAT_API_OPERATION_FAILED_TEMPLATE.formatted(
                 operation,
@@ -141,7 +146,7 @@ public class DefaultWechatOfficialAccountClient implements WechatOfficialAccount
         ));
     }
 
-    /** Serializes WeChat request payloads before sending them over the public API. */
+    /** 序列化发送到微信接口的请求正文。 */
     private String serializeRequest(Object request) {
         try {
             return objectMapper.writeValueAsString(request);
@@ -152,35 +157,53 @@ public class DefaultWechatOfficialAccountClient implements WechatOfficialAccount
 
     /** 描述稳定版 access_token 响应。 */
     private record AccessTokenApiResponse(
+            /** 微信公众号 access_token。 */
             @JsonProperty("access_token") String accessToken,
+            /** access_token 有效期，单位为秒。 */
             @JsonProperty("expires_in") long expiresIn,
+            /** 微信公众号接口错误码。 */
             @JsonProperty("errcode") Integer errorCode,
+            /** 微信公众号接口错误描述。 */
             @JsonProperty("errmsg") String errorMessage
     ) {
     }
 
     /** 描述临时二维码创建请求。 */
     private record QrCodeRequest(
+            /** 临时二维码有效期，单位为秒。 */
             @JsonProperty("expire_seconds") long expiresIn,
+            /** 微信公众号二维码动作名称。 */
             @JsonProperty("action_name") String actionName,
+            /** 微信公众号二维码动作参数。 */
             @JsonProperty("action_info") QrActionInfo actionInfo
     ) {
     }
 
     /** 包装二维码场景参数。 */
-    private record QrActionInfo(QrScene scene) {
+    private record QrActionInfo(
+            /** 微信公众号二维码场景参数。 */
+            QrScene scene
+    ) {
     }
 
     /** 保存二维码字符串场景值。 */
-    private record QrScene(@JsonProperty("scene_str") String sceneKey) {
+    private record QrScene(
+            /** 微信公众号二维码场景值。 */
+            @JsonProperty("scene_str") String sceneKey
+    ) {
     }
 
     /** 描述临时二维码创建响应。 */
     private record QrCodeApiResponse(
+            /** 微信公众号二维码票据。 */
             String ticket,
+            /** 临时二维码有效期，单位为秒。 */
             @JsonProperty("expire_seconds") long expiresIn,
+            /** 微信公众号返回的二维码内容地址。 */
             String url,
+            /** 微信公众号接口错误码。 */
             @JsonProperty("errcode") Integer errorCode,
+            /** 微信公众号接口错误描述。 */
             @JsonProperty("errmsg") String errorMessage
     ) {
     }

@@ -51,18 +51,9 @@ public class UserController {
     @PutMapping("/me")
     public ApiResponse<CurrentUserResponse> updateCurrentUser(
             @Valid @RequestBody UpdateCurrentUserRequest request) {
-        log.info(
-                "[UserController#updateCurrentUser] request subject={} displayName={}",
-                SecurityUtils.getCurrentUsername(),
-                request.displayName()
-        );
+        log.info("[UserController#updateCurrentUser] request subject={} displayName={}", SecurityUtils.getCurrentUsername(), request.displayName());
         CurrentUserResponse result = userService.updateCurrentUser(request);
-        log.info(
-                "[UserController#updateCurrentUser] response userId={} displayName={} roles={}",
-                result.id(),
-                result.displayName(),
-                result.roles()
-        );
+        log.info("[UserController#updateCurrentUser] response userId={} displayName={} roles={}", result.id(), result.displayName(), result.roles());
         return ApiResponse.success(result);
     }
 
@@ -99,18 +90,9 @@ public class UserController {
     public ApiResponse<UserSummaryResponse> replaceRoles(
             @PathVariable long userId,
             @Valid @RequestBody UpdateUserRolesRequest request) {
-        log.info(
-                "[UserController#replaceRoles] request userId={} actor={} roles={}",
-                userId,
-                SecurityUtils.getCurrentUsername(),
-                request.roleCodes()
-        );
+        log.info("[UserController#replaceRoles] request userId={} actor={} roles={}", userId, SecurityUtils.getCurrentUsername(), request.roleCodes());
         UserSummaryResponse result = userService.replaceRoles(userId, request);
-        log.info(
-                "[UserController#replaceRoles] response userId={} roles={}",
-                result.id(),
-                result.roles()
-        );
+        log.info("[UserController#replaceRoles] response userId={} roles={}", result.id(), result.roles());
         return ApiResponse.success(result);
     }
 }

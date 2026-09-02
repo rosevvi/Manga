@@ -1,7 +1,9 @@
 spring:
   config:
-    # 将项目根目录下不提交仓库的 .env 按 properties 格式加载。
-    import: optional:file:.env[.properties]
+    # 兼容从后端目录或仓库根目录启动，加载不提交仓库的本地 .env。
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:Manga-server/.env[.properties]
   application:
     name: manga-server
   profiles:
@@ -10,6 +12,10 @@ spring:
     init:
       mode: always
       schema-locations: classpath:manga.sql
+  servlet:
+    multipart:
+      max-file-size: ${MANGA_UPLOAD_MAX_IMAGE_SIZE:8MB}
+      max-request-size: ${MANGA_UPLOAD_MAX_REQUEST_SIZE:9MB}
   threads:
     virtual:
       enabled: true
@@ -47,6 +53,19 @@ manga:
   auth:
     storage:
       external-login-session: ${MANGA_EXTERNAL_LOGIN_SESSION_STORE:redis}
+  upload:
+    directory: ${MANGA_UPLOAD_DIR:uploads}
+    public-path: ${MANGA_UPLOAD_PUBLIC_PATH:/uploads}
+    max-image-size: ${MANGA_UPLOAD_MAX_IMAGE_SIZE:8MB}
+  storage:
+    aliyun-oss:
+      enabled: ${MANGA_OSS_ENABLED:false}
+      endpoint: ${MANGA_OSS_ENDPOINT:}
+      bucket-name: ${MANGA_OSS_BUCKET_NAME:manga-ai}
+      access-key-id: ${MANGA_OSS_ACCESS_KEY_ID:}
+      access-key-secret: ${MANGA_OSS_ACCESS_KEY_SECRET:}
+      object-prefix: ${MANGA_OSS_OBJECT_PREFIX:mannga}
+      public-domain: ${MANGA_OSS_PUBLIC_DOMAIN:}
   redis:
     key-prefix: ${MANGA_REDIS_KEY_PREFIX:manga}
     external-login-expired-retention: ${MANGA_REDIS_EXTERNAL_LOGIN_EXPIRED_RETENTION:10m}

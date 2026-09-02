@@ -34,6 +34,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
     private final JwtDecoder jwtDecoder;
     private final SecurityErrorResponseWriter errorResponseWriter;
 
+    /** 解析 Bearer Token 并建立认证上下文。 */
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -68,6 +69,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    /** 将 JWT 声明转换为认证用户。 */
     private AuthenticatedUser toPrincipal(Jwt jwt) {
         if (!StringUtils.hasText(jwt.getSubject())) {
             throw new IllegalArgumentException(ExceptionMessageConstants.JWT_SUBJECT_REQUIRED);
@@ -86,6 +88,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 roles);
     }
 
+    /** 返回统一的未认证响应。 */
     private void reject(HttpServletRequest request, HttpServletResponse response, String reason) throws IOException {
         log.warn("Token authentication rejected path={} reason={}", request.getRequestURI(), reason);
         errorResponseWriter.write(response, HttpServletResponse.SC_UNAUTHORIZED, CommonResponseCode.UNAUTHORIZED);

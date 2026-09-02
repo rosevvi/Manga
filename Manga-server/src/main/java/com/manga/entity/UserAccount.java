@@ -27,20 +27,31 @@ import java.util.Set;
 @TableName("manga_user")
 public class UserAccount {
 
+    /** 用户账号主键。 */
     @TableId(type = IdType.AUTO)
     private Long id;
+    /** 用户名。 */
     private String username;
+    /** BCrypt 密码摘要。 */
     @ToString.Exclude
     private String passwordHash;
+    /** 用户显示名称。 */
     private String displayName;
+    /** 用户账号状态。 */
     private UserStatus status;
+    /** 账号注册来源。 */
     private RegistrationSource registrationSource;
+    /** 当前用户角色集合。 */
     @TableField(exist = false)
     @Builder.Default
     private Set<UserRole> roles = EnumSet.noneOf(UserRole.class);
+    /** 创建时间。 */
     private LocalDateTime createdAt;
+    /** 最后更新时间。 */
     private LocalDateTime updatedAt;
+    /** 创建人标识。 */
     private String createdBy;
+    /** 最后更新人标识。 */
     private String updatedBy;
 
     /**

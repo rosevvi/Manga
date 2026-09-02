@@ -82,9 +82,9 @@ docker run --rm `
 
 ## 数据库初始化
 
-用户、角色和外部登录表定义在 `src/main/resources/manga.sql`。应用启动时会幂等执行该文件，因此连接 DBeaver 中的 `Manga` 库后会自动建表；也可以直接在 DBeaver 中打开并执行该文件。
+全部业务表定义在 `src/main/resources/manga.sql`。应用启动时会幂等执行该文件，因此连接 DBeaver 中的 `Manga` 库后会自动建表；也可以直接在 DBeaver 中打开并执行该文件。
 
-所有表和字段均带中文注释，每张表统一包含 `created_at`、`updated_at`、`created_by`、`updated_by`。旧版表结构升级时执行一次 `manga-audit-migration.sql`；增加微信登录时执行一次 `manga-wechat-login-migration.sql`；增加项目与分镜时执行 `manga-project-storyboard-migration.sql`；增加 AI 服务配置时执行 `manga-ai-provider-config-migration.sql`；需要幂等刷新注释时执行 `manga-comments-refresh.sql`。
+所有表和字段均带中文注释，每张表统一包含 `created_at`、`updated_at`、`created_by`、`updated_by`。项目仅保留 `manga.sql` 作为数据库初始化脚本，后续结构调整直接同步维护该初始化脚本。
 
 首次启动还会初始化 `GUEST`、`USER`、`ADMIN` 三个角色，并创建：
 
@@ -162,6 +162,27 @@ Redis 连接项定义在 `application-local.yml` 的 `spring.data.redis` 下，�
 - 微信扫码登录会话：通过 Redis TTL 自动清理，轮询不再反复查询 MySQL；确认、消费和过期使用 Lua 脚本保证原子状态迁移。
 
 Manga 访问令牌继续使用无状态 JWT。当前没有退出登录、强制下线或令牌撤销需求，因此不把每个 JWT 重复保存到 Redis，避免所有鉴权请求额外访问一次 Redis；增加撤销需求时再接入 `jti` 黑名单或会话注册表。
+
+## 阿里云 OSS 存储
+
+图片上传支持本地磁盘和阿里云 OSS 两种策略。OSS 凭据只从 `.env` 或操作系统环境变量读取，不写入数据库；填写以下配置并将 `MANGA_OSS_ENABLED` 改为 `true` 后，上传接口会优先使用 OSS：
+
+```properties
+MANGA_OSS_ENABLED=true
+MANGA_OSS_ENDPOINT=
+MANGA_OSS_ACCESS_KEY_ID=
+MANGA_OSS_ACCESS_KEY_SECRET=
+MANGA_OSS_BUCKET_NAME=manga-ai
+MANGA_OSS_OBJECT_PREFIX=mannga
+MANGA_OSS_PUBLIC_DOMAIN=
+```
+
+- `MANGA_OSS_ENDPOINT` 填写 Bucket 所在地域的外网 Endpoint，例如控制台“概览”页面显示的地域节点，不要包含 Bucket 名称。
+- AccessKey 建议使用 RAM 用户并仅授予 `manga-ai/mannga/*` 所需的对象上传权限，不要使用阿里云主账号 AccessKey。
+- `MANGA_OSS_PUBLIC_DOMAIN` 可留空；留空时返回 `https://manga-ai.<Endpoint>/mannga/...`。配置 CDN 或自定义域名后填写该域名即可。
+- 当前项目需要浏览器长期访问封面图和画风参考图，因此 Bucket 对象需要具备公开读取能力，或通过可公开访问的 CDN/自定义域名提供读取能力。
+
+默认对象键格式为 `mannga/images/<UUID>.<扩展名>`。切回本地存储只需将 `MANGA_OSS_ENABLED` 改为 `false`。
 
 ## AI 服务配置
 

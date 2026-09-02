@@ -75,6 +75,33 @@ CREATE TABLE IF NOT EXISTS manga_external_login_session (
     CONSTRAINT fk_manga_external_login_user FOREIGN KEY (user_id) REFERENCES manga_user (id) ON DELETE SET NULL
 ) COMMENT = '外部扫码登录会话表';
 
+CREATE TABLE IF NOT EXISTS manga_storage_config (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '存储配置主键',
+    name VARCHAR(128) NOT NULL COMMENT '配置名称',
+    type VARCHAR(32) NOT NULL COMMENT '存储策略类型：local',
+    base_path VARCHAR(512) NULL COMMENT '本地磁盘保存根目录',
+    public_path VARCHAR(512) NULL COMMENT '站内公开访问路径前缀',
+    custom_domain VARCHAR(512) NULL COMMENT '公网或 CDN 访问域名',
+    enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT '配置是否启用',
+    default_config BOOLEAN NOT NULL DEFAULT FALSE COMMENT '是否为默认存储配置',
+    remark VARCHAR(500) NULL COMMENT '配置用途或注意事项',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
+    created_by VARCHAR(64) NOT NULL COMMENT '创建人标识',
+    updated_by VARCHAR(64) NOT NULL COMMENT '最后修改人标识',
+    PRIMARY KEY (id),
+    CONSTRAINT uk_manga_storage_config_name UNIQUE (name),
+    INDEX idx_manga_storage_config_default (default_config, enabled)
+) COMMENT = '媒体存储配置表';
+
+INSERT INTO manga_storage_config (
+    name, type, base_path, public_path, enabled, default_config, remark, created_by, updated_by
+)
+SELECT '本地上传存储', 'local', 'uploads', '/uploads', TRUE, TRUE, '默认保存封面图、画风参考图等用户上传图片', 'SYSTEM', 'SYSTEM'
+WHERE NOT EXISTS (
+    SELECT 1 FROM manga_storage_config WHERE default_config = TRUE
+);
+
 CREATE TABLE IF NOT EXISTS manga_project (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '项目主键',
     owner_user_id BIGINT NOT NULL COMMENT '项目所有者用户主键',
@@ -82,7 +109,13 @@ CREATE TABLE IF NOT EXISTS manga_project (
     description VARCHAR(1000) NULL COMMENT '项目简介',
     cover_url VARCHAR(1024) NULL COMMENT '项目封面地址',
     genre VARCHAR(64) NULL COMMENT '作品类型',
+    aspect_ratio VARCHAR(20) NOT NULL DEFAULT '16:9' COMMENT '项目默认画面比例',
+    visibility_scope VARCHAR(20) NOT NULL DEFAULT 'PRIVATE' COMMENT '项目可见范围',
     status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' COMMENT '项目状态',
+    art_style VARCHAR(64) NULL COMMENT '画风预设标识或 custom',
+    art_style_description VARCHAR(2000) NULL COMMENT '自定义画风中文描述',
+    art_style_image_prompt VARCHAR(2000) NULL COMMENT '自定义画风图片生成提示词',
+    art_style_image_url VARCHAR(1024) NULL COMMENT '画风参考图片地址',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
     created_by VARCHAR(64) NOT NULL COMMENT '创建人标识',
@@ -91,6 +124,22 @@ CREATE TABLE IF NOT EXISTS manga_project (
     INDEX idx_manga_project_owner_updated (owner_user_id, updated_at),
     CONSTRAINT fk_manga_project_owner FOREIGN KEY (owner_user_id) REFERENCES manga_user (id) ON DELETE CASCADE
 ) COMMENT = '漫剧创作项目表';
+
+CREATE TABLE IF NOT EXISTS manga_project_member (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '项目成员主键',
+    project_id BIGINT NOT NULL COMMENT '所属项目主键',
+    user_id BIGINT NOT NULL COMMENT '成员用户主键',
+    role VARCHAR(20) NOT NULL DEFAULT 'MEMBER' COMMENT '项目成员角色',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
+    created_by VARCHAR(64) NOT NULL COMMENT '创建人标识',
+    updated_by VARCHAR(64) NOT NULL COMMENT '最后修改人标识',
+    PRIMARY KEY (id),
+    CONSTRAINT uk_manga_project_member_user UNIQUE (project_id, user_id),
+    INDEX idx_manga_project_member_user (user_id, project_id),
+    CONSTRAINT fk_manga_project_member_project FOREIGN KEY (project_id) REFERENCES manga_project (id) ON DELETE CASCADE,
+    CONSTRAINT fk_manga_project_member_user FOREIGN KEY (user_id) REFERENCES manga_user (id) ON DELETE CASCADE
+) COMMENT = '项目协作成员表';
 
 CREATE TABLE IF NOT EXISTS manga_storyboard_shot (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '分镜镜头主键',
@@ -127,6 +176,12 @@ CREATE TABLE IF NOT EXISTS manga_ai_provider_config (
     default_model VARCHAR(160) NULL COMMENT '未来调用时默认使用的模型编码',
     api_key_ciphertext TEXT NULL COMMENT 'AES-GCM 加密后的 API Key 密文',
     api_key_hint VARCHAR(32) NULL COMMENT '用于界面确认的 API Key 脱敏摘要',
+    proxy_type VARCHAR(16) NOT NULL DEFAULT 'NONE' COMMENT '出站代理类型：NONE、HTTP、SOCKS5',
+    proxy_host VARCHAR(255) NULL COMMENT '出站代理主机',
+    proxy_port INT NULL COMMENT '出站代理端口',
+    proxy_username VARCHAR(255) NULL COMMENT '出站代理认证用户名',
+    proxy_password_ciphertext TEXT NULL COMMENT 'AES-GCM 加密后的代理密码密文',
+    proxy_password_hint VARCHAR(32) NULL COMMENT '用于界面确认的代理密码脱敏摘要',
     enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT '配置是否允许用于 AI 调用',
     default_config BOOLEAN NOT NULL DEFAULT FALSE COMMENT '是否为用户当前默认配置',
     remark VARCHAR(500) NULL COMMENT '配置用途或注意事项',

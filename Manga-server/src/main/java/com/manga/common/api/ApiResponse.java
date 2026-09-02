@@ -52,6 +52,7 @@ public record ApiResponse<T>(
         return failure(responseCode, responseCode.message(), data);
     }
 
+    /** 构造失败响应并保留可选响应数据。 */
     private static <T> ApiResponse<T> failure(ResponseCode responseCode, String message, T data) {
         return new ApiResponse<>(false, responseCode.code(), message, data, Instant.now());
     }

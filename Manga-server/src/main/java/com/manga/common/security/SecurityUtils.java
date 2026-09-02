@@ -53,6 +53,7 @@ public final class SecurityUtils {
         return user.userId();
     }
 
+    /** 禁止实例化安全工具类。 */
     private SecurityUtils() {
     }
 }

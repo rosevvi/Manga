@@ -22,16 +22,25 @@ import java.time.LocalDateTime;
 @TableName("manga_user_identity")
 public class ExternalIdentity {
 
+    /** 外部身份主键。 */
     @TableId(type = IdType.AUTO)
     private Long id;
+    /** 关联用户主键。 */
     private Long userId;
+    /** 外部身份提供方。 */
     private ExternalIdentityProvider provider;
+    /** 外部身份用户标识。 */
     @ToString.Exclude
     private String providerUserId;
+    /** 外部身份 UnionID。 */
     @ToString.Exclude
     private String providerUnionId;
+    /** 创建时间。 */
     private LocalDateTime createdAt;
+    /** 最后更新时间。 */
     private LocalDateTime updatedAt;
+    /** 创建人标识。 */
     private String createdBy;
+    /** 最后更新人标识。 */
     private String updatedBy;
 }

@@ -17,8 +17,11 @@ import java.io.StringReader;
 @Component
 public class WechatCallbackParser {
 
+    /** 禁止 XML 文档声明 DOCTYPE 的解析器特性。 */
     private static final String DISALLOW_DOCTYPE_FEATURE = "http://apache.org/xml/features/disallow-doctype-decl";
+    /** 禁止解析外部通用实体的解析器特性。 */
     private static final String EXTERNAL_GENERAL_ENTITIES_FEATURE = "http://xml.org/sax/features/external-general-entities";
+    /** 禁止解析外部参数实体的解析器特性。 */
     private static final String EXTERNAL_PARAMETER_ENTITIES_FEATURE = "http://xml.org/sax/features/external-parameter-entities";
 
     /**
@@ -47,6 +50,7 @@ public class WechatCallbackParser {
         }
     }
 
+    /** 读取 XML 指定节点文本。 */
     private String text(Element root, String tagName) {
         var nodes = root.getElementsByTagName(tagName);
         return nodes.getLength() == 0 ? null : nodes.item(0).getTextContent();

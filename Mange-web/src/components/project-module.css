@@ -285,6 +285,31 @@
   line-height: 1.65;
 }
 
+.project-module-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 13px;
+}
+
+.project-module-meta span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 26px;
+  padding: 0 7px;
+  overflow: hidden;
+  border: 1px solid #28232d;
+  border-radius: 6px;
+  color: #9f97a6;
+  background: #151218;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .project-module-footer,
 .storyboard-card footer {
   display: flex;
@@ -353,6 +378,10 @@
   width: min(780px, 100%);
 }
 
+.workspace-modal.project-editor {
+  width: min(790px, 100%);
+}
+
 .workspace-modal > header,
 .workspace-modal > footer {
   display: flex;
@@ -372,6 +401,14 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin: 22px 0;
+}
+
+.project-editor .workspace-form-grid {
+  max-height: min(68vh, 720px);
+  padding-right: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .workspace-field {
@@ -403,6 +440,18 @@
   font: inherit;
 }
 
+.workspace-field-error {
+  display: block;
+  margin-top: -1px;
+  padding: 7px 9px;
+  border: 1px solid rgba(235, 89, 127, 0.24);
+  border-radius: 6px;
+  color: #f0a2b6;
+  background: rgba(111, 25, 50, 0.14);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
 .workspace-field input,
 .workspace-field select,
 .storyboard-toolbar select {
@@ -410,10 +459,215 @@
   padding: 0 11px;
 }
 
+.workspace-field select,
+.storyboard-toolbar select {
+  appearance: none;
+  padding-right: 34px;
+  background-color: #0e0c10;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #8f849a 50%),
+    linear-gradient(135deg, #8f849a 50%, transparent 50%);
+  background-position:
+    calc(100% - 17px) 17px,
+    calc(100% - 12px) 17px;
+  background-repeat: no-repeat;
+  background-size: 5px 5px, 5px 5px;
+  cursor: pointer;
+}
+
+.workspace-field select:hover,
+.storyboard-toolbar select:hover {
+  border-color: #49335d;
+  background-color: rgba(20, 17, 24, 0.98);
+}
+
 .workspace-field textarea {
   min-height: 74px;
   padding: 10px 11px;
   resize: vertical;
+}
+
+.project-editor-section {
+  display: grid;
+  gap: 12px;
+}
+
+.project-editor-section-heading,
+.project-editor-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-editor-section-heading {
+  justify-content: space-between;
+}
+
+.project-editor-section-title {
+  color: #aaa3ae;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.project-choice-row,
+.project-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.project-choice,
+.project-segmented button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid #2c2730;
+  border-radius: 6px;
+  color: #9d96a2;
+  background: #131116;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.project-choice:hover,
+.project-segmented button:hover {
+  color: #d7cde0;
+  border-color: #49335d;
+}
+
+.project-choice.active,
+.project-segmented button.active {
+  color: #f2ebff;
+  border-color: rgba(150, 98, 255, 0.52);
+  background: rgba(104, 62, 178, 0.3);
+}
+
+.project-segmented {
+  padding: 3px;
+  border: 1px solid #2b2630;
+  border-radius: 8px;
+  background: #100e13;
+}
+
+.project-segmented button {
+  min-height: 27px;
+  border: 0;
+  background: transparent;
+}
+
+.project-segmented button.active {
+  background: #1b1621;
+}
+
+.project-ratio-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.project-ratio {
+  display: grid;
+  min-height: 58px;
+  padding: 8px 6px;
+  place-items: center;
+  border: 1px solid #2c2730;
+  border-radius: 7px;
+  color: #9d96a2;
+  background: #131116;
+  cursor: pointer;
+}
+
+.project-ratio strong {
+  color: #ede8f1;
+  font-size: 13px;
+}
+
+.project-ratio span {
+  color: #7f7785;
+  font-size: 9px;
+}
+
+.project-ratio.active {
+  border-color: rgba(83, 161, 226, 0.55);
+  background: rgba(31, 81, 126, 0.28);
+}
+
+.project-style-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.project-style-loading {
+  grid-column: 1 / -1;
+  display: grid;
+  min-height: 90px;
+  place-items: center;
+  color: #88818d;
+  font-size: 11px;
+}
+
+.project-style-card {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #2b2630;
+  border-radius: 7px;
+  color: #a9a1ae;
+  background: #131116;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.project-style-card:hover {
+  transform: translateY(-2px);
+  border-color: #49335d;
+}
+
+.project-style-card.active {
+  border-color: rgba(150, 98, 255, 0.55);
+  background: rgba(101, 55, 169, 0.22);
+}
+
+.project-style-card strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-style-thumb {
+  position: relative;
+  display: grid;
+  aspect-ratio: 1;
+  width: 100%;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 6px;
+  color: #686170;
+  background: #0e0c10;
+}
+
+.project-style-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.project-custom-style {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.project-image-field {
+  align-content: start;
 }
 
 .workspace-field input:focus,
@@ -577,8 +831,20 @@
 
   .project-module-grid,
   .storyboard-grid,
-  .workspace-form-grid {
+  .workspace-form-grid,
+  .project-custom-style {
     grid-template-columns: 1fr;
+  }
+
+  .project-module-meta,
+  .project-ratio-grid,
+  .project-style-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-editor-section-heading {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .workspace-field.field-wide {

@@ -45,6 +45,7 @@ function StoryboardModule({ accessToken, projects, selectedProjectId, onSelectPr
   const [editingShot, setEditingShot] = useState(undefined)
   const [form, setForm] = useState(EMPTY_SHOT)
   const [saving, setSaving] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({})
 
   const projectId = selectedProjectId ?? projects[0]?.id ?? null
   const selectedProject = useMemo(
@@ -76,6 +77,7 @@ function StoryboardModule({ accessToken, projects, selectedProjectId, onSelectPr
     setEditingShot(null)
     setForm(EMPTY_SHOT)
     setError('')
+    setFieldErrors({})
   }
 
   const openEdit = (shot) => {
@@ -94,12 +96,31 @@ function StoryboardModule({ accessToken, projects, selectedProjectId, onSelectPr
       status: shot.status,
     })
     setError('')
+    setFieldErrors({})
   }
 
-  const closeEditor = () => setEditingShot(undefined)
+  const closeEditor = () => {
+    setEditingShot(undefined)
+    setFieldErrors({})
+  }
+
+  const updateForm = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }))
+    setFieldErrors((current) => {
+      if (!current[field]) return current
+      const next = { ...current }
+      delete next[field]
+      return next
+    })
+  }
 
   const submitShot = async (event) => {
     event.preventDefault()
+    const nextFieldErrors = validateStoryboardForm(form, translate)
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
+      return
+    }
     setSaving(true)
     setError('')
     try {
@@ -232,7 +253,7 @@ function StoryboardModule({ accessToken, projects, selectedProjectId, onSelectPr
 
       {editingShot !== undefined && (
         <div className="workspace-modal-backdrop" role="presentation" onMouseDown={closeEditor}>
-          <form className="workspace-modal storyboard-editor" onSubmit={submitShot} onMouseDown={(event) => event.stopPropagation()}>
+          <form className="workspace-modal storyboard-editor" onSubmit={submitShot} noValidate onMouseDown={(event) => event.stopPropagation()}>
             <header>
               <div>
                 <span className="workspace-eyebrow">{translate('storyboards.editorEyebrow')}</span>
@@ -241,7 +262,11 @@ function StoryboardModule({ accessToken, projects, selectedProjectId, onSelectPr
               <button type="button" aria-label={translate('common.close')} onClick={closeEditor}><X size={19} /></button>
             </header>
             <div className="workspace-form-grid">
-              <label className="workspace-field field-wide"><span>{translate('storyboards.field.title')}</span><input required maxLength={PROJECT_LIMITS.shotTitle} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
+              <label className="workspace-field field-wide">
+                <span>{translate('storyboards.field.title')}</span>
+                <input maxLength={PROJECT_LIMITS.shotTitle} value={form.title} onChange={(event) => updateForm('title', event.target.value)} />
+                {fieldErrors.title && <small className="workspace-field-error">{fieldErrors.title}</small>}
+              </label>
               <label className="workspace-field"><span>{translate('storyboards.field.scene')}</span><input maxLength={PROJECT_LIMITS.shotSceneName} value={form.sceneName} onChange={(event) => setForm({ ...form, sceneName: event.target.value })} /></label>
               <label className="workspace-field"><span>{translate('storyboards.field.status')}</span><select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>{Object.values(STORYBOARD_SHOT_STATUS).map((status) => <option key={status} value={status}>{translate(`shotStatus.${status}`)}</option>)}</select></label>
               <label className="workspace-field"><span>{translate('storyboards.field.shotType')}</span><input maxLength={PROJECT_LIMITS.shotType} value={form.shotType} onChange={(event) => setForm({ ...form, shotType: event.target.value })} /></label>
@@ -260,6 +285,14 @@ function StoryboardModule({ accessToken, projects, selectedProjectId, onSelectPr
       )}
     </section>
   )
+}
+
+function validateStoryboardForm(form, translate) {
+  const errors = {}
+  if (!form.title.trim()) {
+    errors.title = translate('common.fieldRequired')
+  }
+  return errors
 }
 
 export default StoryboardModule

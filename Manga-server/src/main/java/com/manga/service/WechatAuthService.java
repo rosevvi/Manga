@@ -168,11 +168,13 @@ public class WechatAuthService {
         }
     }
 
+    /** 查询或创建微信身份对应用户。 */
     private long findOrCreateWechatUser(String openId) {
         return identityRepository.findUserId(ExternalIdentityProvider.WECHAT_OFFICIAL_ACCOUNT, openId)
                 .orElseGet(() -> createWechatUser(openId));
     }
 
+    /** 创建微信登录用户及外部身份。 */
     private long createWechatUser(String openId) {
         String actor = AuditConstants.WECHAT_OFFICIAL_ACCOUNT_ACTOR;
         long userId = userRepository.create(
@@ -195,6 +197,7 @@ public class WechatAuthService {
         return userId;
     }
 
+    /** 根据微信 OpenID 生成唯一用户名。 */
     private String createWechatUsername(String openId) {
         try {
             byte[] hash = MessageDigest.getInstance(WechatConstants.SHA_256_ALGORITHM)
@@ -210,11 +213,13 @@ public class WechatAuthService {
         }
     }
 
+    /** 生成微信用户默认显示名称。 */
     private String createWechatDisplayName(String openId) {
         int start = Math.max(0, openId.length() - WechatConstants.DISPLAY_NAME_SUFFIX_LENGTH);
         return WechatConstants.WECHAT_DISPLAY_NAME_PREFIX + openId.substring(start);
     }
 
+    /** 生成微信扫码登录场景值。 */
     private String createSceneKey() {
         String randomPart = UUID.randomUUID().toString().replace("-", "");
         String prefix = properties.scenePrefix();
@@ -225,6 +230,7 @@ public class WechatAuthService {
         return prefix + randomPart;
     }
 
+    /** 规范微信回调中的场景值。 */
     private String normalizeSceneKey(String eventKey) {
         if (!StringUtils.hasText(eventKey)) {
             return null;
@@ -234,6 +240,7 @@ public class WechatAuthService {
                 : eventKey;
     }
 
+    /** 校验微信扫码登录配置。 */
     private void validateConfiguration() {
         if (!StringUtils.hasText(properties.appId())
                 || !StringUtils.hasText(properties.secret())
@@ -248,6 +255,7 @@ public class WechatAuthService {
         }
     }
 
+    /** 构造微信扫码登录状态响应。 */
     private WechatQrLoginStatusResponse statusResponse(
             ExternalLoginStatus status,
             long expiresIn,

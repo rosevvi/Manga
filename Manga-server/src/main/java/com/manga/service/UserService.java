@@ -78,6 +78,7 @@ public class UserService {
         log.info("Password changed userId={} actor={}", user.getId(), authenticatedUser.username());
     }
 
+    /** 构造游客用户资料响应。 */
     private CurrentUserResponse guestResponse(AuthenticatedUser user) {
         return new CurrentUserResponse(
                 user.userId(),
@@ -92,6 +93,7 @@ public class UserService {
         );
     }
 
+    /** 查询当前认证用户账号。 */
     private UserAccount findCurrentAccount(AuthenticatedUser authenticatedUser) {
         if (authenticatedUser.guest()) {
             throw new BusinessException(AuthResponseCode.GUEST_PROFILE_READ_ONLY, HttpStatus.FORBIDDEN);
@@ -103,6 +105,7 @@ public class UserService {
                 .orElseThrow(() -> new BusinessException(AuthResponseCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
     }
 
+    /** 将账号转换为当前用户响应。 */
     private CurrentUserResponse toCurrentUser(UserAccount user) {
         return new CurrentUserResponse(
                 user.getId(),
@@ -138,6 +141,7 @@ public class UserService {
         return toSummary(userRepository.findById(user.getId()).orElseThrow());
     }
 
+    /** 解析并校验管理员可分配角色。 */
     private Set<UserRole> parseAssignableRoles(Set<String> roleCodes) {
         EnumSet<UserRole> roles = EnumSet.noneOf(UserRole.class);
         try {
@@ -154,6 +158,7 @@ public class UserService {
         return roles;
     }
 
+    /** 将账号转换为管理员用户摘要。 */
     private UserSummaryResponse toSummary(UserAccount user) {
         return new UserSummaryResponse(
                 user.getId(),

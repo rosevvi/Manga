@@ -24,10 +24,12 @@ import java.util.Base64;
 @RequiredArgsConstructor
 public class AesGcmSecretCipher implements SecretCipher {
 
+    /** 生成 AES-GCM 随机 IV 的安全随机数源。 */
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final AiSecretProperties secretProperties;
 
+    /** 使用 AES-GCM 加密敏感文本。 */
     @Override
     public String encrypt(String plaintext) {
         if (plaintext == null) {
@@ -49,6 +51,7 @@ public class AesGcmSecretCipher implements SecretCipher {
         }
     }
 
+    /** 解密 AES-GCM 密文。 */
     @Override
     public String decrypt(String ciphertext) {
         if (ciphertext == null) {
@@ -80,6 +83,7 @@ public class AesGcmSecretCipher implements SecretCipher {
         }
     }
 
+    /** 解析并校验 AES 加密密钥。 */
     private SecretKeySpec encryptionKey() throws GeneralSecurityException {
         String configuredKey = secretProperties.encryptionKey();
         if (configuredKey == null || configuredKey.isBlank()) {

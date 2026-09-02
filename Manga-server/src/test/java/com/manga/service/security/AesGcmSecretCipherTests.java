@@ -14,6 +14,7 @@ class AesGcmSecretCipherTests {
     private static final String ENCRYPTION_KEY = "manga-test-ai-encryption-key-with-enough-entropy";
     private static final String API_KEY = "sk-test-sensitive-value";
 
+    /** 验证随机 IV 加密结果不同且均可正确解密。 */
     @Test
     void shouldEncryptWithRandomIvAndDecrypt() {
         SecretCipher cipher = new AesGcmSecretCipher(new AiSecretProperties(ENCRYPTION_KEY));
@@ -27,6 +28,7 @@ class AesGcmSecretCipherTests {
         assertThat(cipher.decrypt(secondCiphertext)).isEqualTo(API_KEY);
     }
 
+    /** 验证缺少服务端密钥时拒绝执行加密。 */
     @Test
     void shouldRejectEncryptionWhenServerKeyIsMissing() {
         SecretCipher cipher = new AesGcmSecretCipher(new AiSecretProperties(""));

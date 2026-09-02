@@ -27,6 +27,7 @@ public class AsyncConfig implements AsyncConfigurer {
     private final AsyncExecutorProperties properties;
     private final MdcTaskDecorator taskDecorator;
 
+    /** 创建携带 MDC 上下文的应用线程池。 */
     @Bean(name = {AsyncConstants.APPLICATION_TASK_EXECUTOR, AsyncConstants.TASK_EXECUTOR})
     public ThreadPoolTaskExecutor applicationTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -43,11 +44,13 @@ public class AsyncConfig implements AsyncConfigurer {
         return executor;
     }
 
+    /** 返回 Spring 异步任务执行器。 */
     @Override
     public Executor getAsyncExecutor() {
         return applicationTaskExecutor();
     }
 
+    /** 返回异步任务未捕获异常处理器。 */
     @Override
     public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
         return (throwable, method, parameters) -> log.error(

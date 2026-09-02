@@ -5,10 +5,12 @@ package com.manga.integration.wechat;
  */
 public class WechatApiException extends RuntimeException {
 
+    /** 构造微信公众号接口调用异常。 */
     public WechatApiException(String message) {
         super(message);
     }
 
+    /** 构造微信公众号接口调用异常。 */
     public WechatApiException(String message, Throwable cause) {
         super(message, cause);
     }

@@ -30,11 +30,13 @@ public class StoryboardShotService {
     private final StoryboardShotRepository storyboardShotRepository;
     private final ProjectService projectService;
 
+    /** 查询项目分镜镜头列表。 */
     public List<StoryboardShotResponse> findAll(long projectId) {
         requireProject(projectId);
         return storyboardShotRepository.findAllByProjectId(projectId).stream().map(this::toResponse).toList();
     }
 
+    /** 创建项目分镜镜头。 */
     @Transactional
     public StoryboardShotResponse create(long projectId, StoryboardShotCreateRequest request) {
         requireProject(projectId);
@@ -64,6 +66,7 @@ public class StoryboardShotService {
         return toResponse(requireShot(projectId, shot.getId()));
     }
 
+    /** 更新项目分镜镜头。 */
     @Transactional
     public StoryboardShotResponse update(
             long projectId, long shotId, StoryboardShotUpdateRequest request) {
@@ -90,6 +93,7 @@ public class StoryboardShotService {
         return toResponse(requireShot(projectId, shotId));
     }
 
+    /** 删除项目分镜镜头并整理顺序。 */
     @Transactional
     public void delete(long projectId, long shotId) {
         requireProject(projectId);
@@ -104,6 +108,7 @@ public class StoryboardShotService {
         log.info("Storyboard shot deleted projectId={} shotId={}", projectId, shotId);
     }
 
+    /** 校验并批量调整分镜镜头顺序。 */
     @Transactional
     public List<StoryboardShotResponse> reorder(long projectId, StoryboardShotOrderRequest request) {
         requireProject(projectId);
@@ -121,16 +126,19 @@ public class StoryboardShotService {
         return storyboardShotRepository.findAllByProjectId(projectId).stream().map(this::toResponse).toList();
     }
 
+    /** 校验当前用户可访问目标项目。 */
     private void requireProject(long projectId) {
         projectService.requireOwnedProject(projectId, SecurityUtils.requireCurrentUserId());
     }
 
+    /** 查询并校验项目内的分镜镜头。 */
     private StoryboardShot requireShot(long projectId, long shotId) {
         return storyboardShotRepository.findByProjectAndId(projectId, shotId)
                 .orElseThrow(() -> new BusinessException(
                         ProjectResponseCode.STORYBOARD_SHOT_NOT_FOUND, HttpStatus.NOT_FOUND));
     }
 
+    /** 将分镜镜头转换为响应对象。 */
     private StoryboardShotResponse toResponse(StoryboardShot shot) {
         return new StoryboardShotResponse(
                 shot.getId(), shot.getProjectId(), shot.getSortOrder(), shot.getShotNumber(), shot.getTitle(),
@@ -139,6 +147,7 @@ public class StoryboardShotService {
                 shot.getStatus(), shot.getCreatedAt(), shot.getUpdatedAt());
     }
 
+    /** 去除字符串首尾空白并处理空值。 */
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }

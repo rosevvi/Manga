@@ -30,6 +30,7 @@ public class StoryboardShotController {
 
     private final StoryboardShotService storyboardShotService;
 
+    /** 查询项目分镜镜头列表。 */
     @GetMapping("/{projectId}/storyboard-shots")
     public ApiResponse<List<StoryboardShotResponse>> findAll(@PathVariable long projectId) {
         log.info("[StoryboardShotController#findAll] request projectId={} subject={}",
@@ -39,6 +40,7 @@ public class StoryboardShotController {
         return ApiResponse.success(result);
     }
 
+    /** 创建项目分镜镜头。 */
     @PostMapping("/{projectId}/storyboard-shots")
     public ApiResponse<StoryboardShotResponse> create(
             @PathVariable long projectId,
@@ -51,6 +53,7 @@ public class StoryboardShotController {
         return ApiResponse.success(result);
     }
 
+    /** 更新项目分镜镜头。 */
     @PutMapping("/{projectId}/storyboard-shots/{shotId}")
     public ApiResponse<StoryboardShotResponse> update(
             @PathVariable long projectId,
@@ -64,6 +67,7 @@ public class StoryboardShotController {
         return ApiResponse.success(result);
     }
 
+    /** 删除项目分镜镜头。 */
     @DeleteMapping("/{projectId}/storyboard-shots/{shotId}")
     public ApiResponse<Void> delete(@PathVariable long projectId, @PathVariable long shotId) {
         log.info("[StoryboardShotController#delete] request projectId={} shotId={} subject={}",
@@ -74,6 +78,7 @@ public class StoryboardShotController {
         return ApiResponse.success(null);
     }
 
+    /** 批量调整项目分镜镜头顺序。 */
     @PutMapping("/{projectId}/storyboard-shots/order")
     public ApiResponse<List<StoryboardShotResponse>> reorder(
             @PathVariable long projectId,

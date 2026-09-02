@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class TraceIdFilter extends OncePerRequestFilter {
 
+    /** 为请求建立 traceId 并记录完成摘要。 */
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -57,11 +58,13 @@ public class TraceIdFilter extends OncePerRequestFilter {
         }
     }
 
+    /** 允许异步调度继续经过链路过滤器。 */
     @Override
     protected boolean shouldNotFilterAsyncDispatch() {
         return false;
     }
 
+    /** 校验请求 traceId，不合法时生成新值。 */
     private String resolveTraceId(HttpServletRequest request) {
         Object existingTraceId = request.getAttribute(LoggingConstants.TRACE_ID_REQUEST_ATTRIBUTE);
         if (existingTraceId instanceof String traceId) {
@@ -79,6 +82,7 @@ public class TraceIdFilter extends OncePerRequestFilter {
         return generatedTraceId;
     }
 
+    /** 记录请求完成状态与耗时。 */
     private void logCompletion(HttpServletRequest request, int status, long durationMillis) {
         String method = request.getMethod();
         String path = request.getRequestURI();

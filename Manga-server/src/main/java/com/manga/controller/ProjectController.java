@@ -2,6 +2,8 @@ package com.manga.controller;
 
 import com.manga.common.api.ApiResponse;
 import com.manga.common.security.SecurityUtils;
+import com.manga.dto.ArtStylePresetResponse;
+import com.manga.dto.ProjectMemberResponse;
 import com.manga.dto.ProjectCreateRequest;
 import com.manga.dto.ProjectResponse;
 import com.manga.dto.ProjectUpdateRequest;
@@ -29,6 +31,7 @@ public class ProjectController {
 
     private final ProjectService projectService;
 
+    /** 查询当前用户可访问的项目列表。 */
     @GetMapping
     public ApiResponse<List<ProjectResponse>> findAll() {
         log.info("[ProjectController#findAll] request subject={}", SecurityUtils.getCurrentUsername());
@@ -37,6 +40,16 @@ public class ProjectController {
         return ApiResponse.success(result);
     }
 
+    /** 查询项目可选画风预设。 */
+    @GetMapping("/presets/art-styles")
+    public ApiResponse<List<ArtStylePresetResponse>> findArtStylePresets() {
+        log.info("[ProjectController#findArtStylePresets] request subject={}", SecurityUtils.getCurrentUsername());
+        List<ArtStylePresetResponse> result = projectService.findArtStylePresets();
+        log.info("[ProjectController#findArtStylePresets] response count={}", result.size());
+        return ApiResponse.success(result);
+    }
+
+    /** 查询当前用户可访问的项目详情。 */
     @GetMapping("/{projectId}")
     public ApiResponse<ProjectResponse> findById(@PathVariable long projectId) {
         log.info("[ProjectController#findById] request projectId={} subject={}",
@@ -47,6 +60,17 @@ public class ProjectController {
         return ApiResponse.success(result);
     }
 
+    /** 查询项目成员列表。 */
+    @GetMapping("/{projectId}/members")
+    public ApiResponse<List<ProjectMemberResponse>> findMembers(@PathVariable long projectId) {
+        log.info("[ProjectController#findMembers] request projectId={} subject={}",
+                projectId, SecurityUtils.getCurrentUsername());
+        List<ProjectMemberResponse> result = projectService.findMembers(projectId);
+        log.info("[ProjectController#findMembers] response projectId={} count={}", projectId, result.size());
+        return ApiResponse.success(result);
+    }
+
+    /** 创建项目。 */
     @PostMapping
     public ApiResponse<ProjectResponse> create(
             @Valid @RequestBody ProjectCreateRequest request) {
@@ -57,6 +81,7 @@ public class ProjectController {
         return ApiResponse.success(result);
     }
 
+    /** 更新项目。 */
     @PutMapping("/{projectId}")
     public ApiResponse<ProjectResponse> update(
             @PathVariable long projectId,
@@ -69,6 +94,7 @@ public class ProjectController {
         return ApiResponse.success(result);
     }
 
+    /** 删除项目。 */
     @DeleteMapping("/{projectId}")
     public ApiResponse<Void> delete(@PathVariable long projectId) {
         log.info("[ProjectController#delete] request projectId={} subject={}",

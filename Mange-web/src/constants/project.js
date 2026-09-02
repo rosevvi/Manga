@@ -1,6 +1,8 @@
 /** 项目与分镜接口、状态及表单限制。 */
 export const PROJECT_ENDPOINTS = Object.freeze({
   projects: '/projects',
+  artStylePresets: '/projects/presets/art-styles',
+  imageUploads: '/uploads/images',
 })
 
 export const PROJECT_STATUS = Object.freeze({
@@ -16,11 +18,33 @@ export const STORYBOARD_SHOT_STATUS = Object.freeze({
   COMPLETED: 'COMPLETED',
 })
 
+export const PROJECT_VISIBILITY_SCOPE = Object.freeze({
+  PUBLIC: 'PUBLIC',
+  PRIVATE: 'PRIVATE',
+  TEAM: 'TEAM',
+})
+
+export const PROJECT_TYPES = Object.freeze(['漫剧', '短剧', '动画', '宣传片', 'MV'])
+
+export const PROJECT_ASPECT_RATIOS = Object.freeze([
+  { value: '16:9', labelKey: 'projects.aspectRatio.16_9', descriptionKey: 'projects.aspectRatio.landscape' },
+  { value: '9:16', labelKey: 'projects.aspectRatio.9_16', descriptionKey: 'projects.aspectRatio.vertical' },
+  { value: '1:1', labelKey: 'projects.aspectRatio.1_1', descriptionKey: 'projects.aspectRatio.square' },
+  { value: '4:3', labelKey: 'projects.aspectRatio.4_3', descriptionKey: 'projects.aspectRatio.classic' },
+])
+
+export const CUSTOM_ART_STYLE = 'custom'
+
 export const PROJECT_LIMITS = Object.freeze({
   name: 120,
   description: 1000,
   coverUrl: 1024,
   genre: 64,
+  aspectRatio: 20,
+  artStyle: 64,
+  artStyleDescription: 2000,
+  artStyleImagePrompt: 2000,
+  artStyleImageUrl: 1024,
   shotTitle: 120,
   shotSceneName: 120,
   shotType: 32,
@@ -35,6 +59,10 @@ export const PROJECT_LIMITS = Object.freeze({
 
 export function projectEndpoint(projectId) {
   return `${PROJECT_ENDPOINTS.projects}/${encodeURIComponent(projectId)}`
+}
+
+export function projectMembersEndpoint(projectId) {
+  return `${projectEndpoint(projectId)}/members`
 }
 
 export function storyboardShotsEndpoint(projectId) {

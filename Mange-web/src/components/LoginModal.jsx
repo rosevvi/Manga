@@ -15,6 +15,7 @@ function LoginModal({ onClose, onAuthenticated }) {
   const [credentials, setCredentials] = useState(EMPTY_CREDENTIALS)
   const [loadingMode, setLoadingMode] = useState(null)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
   const [wechatSession, setWechatSession] = useState(null)
   const [wechatStatus, setWechatStatus] = useState(null)
 
@@ -60,11 +61,22 @@ function LoginModal({ onClose, onAuthenticated }) {
   const updateCredential = (event) => {
     const { name, value } = event.target
     setCredentials((current) => ({ ...current, [name]: value }))
+    setFieldErrors((current) => {
+      if (!current[name]) return current
+      const next = { ...current }
+      delete next[name]
+      return next
+    })
   }
 
   /** 提交正式账号登录，并将令牌交给页面保存。 */
   const submitLogin = async (event) => {
     event.preventDefault()
+    const nextFieldErrors = validateLoginForm(credentials, translate)
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
+      return
+    }
     setError('')
     setLoadingMode(LOGIN_MODE.account)
     try {
@@ -137,7 +149,7 @@ function LoginModal({ onClose, onAuthenticated }) {
 
         {view === LOGIN_VIEW.PASSWORD ? (
           <>
-            <form className="login-form" onSubmit={submitLogin}>
+            <form className="login-form" onSubmit={submitLogin} noValidate>
               <label htmlFor="login-username">{translate('login.username')}</label>
               <input
                 id="login-username"
@@ -147,8 +159,8 @@ function LoginModal({ onClose, onAuthenticated }) {
                 maxLength={AUTH_CONFIG.usernameMaxLength}
                 value={credentials.username}
                 onChange={updateCredential}
-                required
               />
+              {fieldErrors.username && <small className="login-field-error">{fieldErrors.username}</small>}
               <label htmlFor="login-password">{translate('login.password')}</label>
               <input
                 id="login-password"
@@ -158,8 +170,8 @@ function LoginModal({ onClose, onAuthenticated }) {
                 maxLength={AUTH_CONFIG.passwordMaxLength}
                 value={credentials.password}
                 onChange={updateCredential}
-                required
               />
+              {fieldErrors.password && <small className="login-field-error">{fieldErrors.password}</small>}
 
               {error && <p className="login-error" role="alert">{error}</p>}
 
@@ -209,6 +221,17 @@ function LoginModal({ onClose, onAuthenticated }) {
       </section>
     </div>
   )
+}
+
+function validateLoginForm(credentials, translate) {
+  const errors = {}
+  if (!credentials.username.trim()) {
+    errors.username = translate('common.fieldRequired')
+  }
+  if (!credentials.password) {
+    errors.password = translate('common.fieldRequired')
+  }
+  return errors
 }
 
 export default LoginModal

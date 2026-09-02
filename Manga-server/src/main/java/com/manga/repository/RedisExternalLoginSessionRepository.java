@@ -33,20 +33,34 @@ import java.util.Optional;
 )
 public class RedisExternalLoginSessionRepository implements ExternalLoginSessionRepository {
 
+    /** 登录令牌哈希字段名。 */
     private static final String LOGIN_TOKEN_FIELD = "loginToken";
+    /** 身份提供方哈希字段名。 */
     private static final String PROVIDER_FIELD = "provider";
+    /** 登录场景哈希字段名。 */
     private static final String SCENE_KEY_FIELD = "providerSceneKey";
+    /** 二维码票据哈希字段名。 */
     private static final String PROVIDER_TICKET_FIELD = "providerTicket";
+    /** 二维码地址哈希字段名。 */
     private static final String QR_URL_FIELD = "providerQrUrl";
+    /** 登录状态哈希字段名。 */
     private static final String STATUS_FIELD = "status";
+    /** 确认用户主键哈希字段名。 */
     private static final String USER_ID_FIELD = "userId";
+    /** 会话过期时间哈希字段名。 */
     private static final String EXPIRES_AT_FIELD = "expiresAt";
+    /** 会话消费时间哈希字段名。 */
     private static final String CONSUMED_AT_FIELD = "consumedAt";
+    /** 会话创建时间哈希字段名。 */
     private static final String CREATED_AT_FIELD = "createdAt";
+    /** 会话更新时间哈希字段名。 */
     private static final String UPDATED_AT_FIELD = "updatedAt";
+    /** 会话创建人哈希字段名。 */
     private static final String CREATED_BY_FIELD = "createdBy";
+    /** 会话更新人哈希字段名。 */
     private static final String UPDATED_BY_FIELD = "updatedBy";
 
+    /** 原子确认等待中登录会话的 Lua 脚本。 */
     private static final RedisScript<Long> CONFIRM_SESSION_SCRIPT = RedisScript.of("""
             local status = redis.call('HGET', KEYS[1], ARGV[1])
             local expiresAt = redis.call('HGET', KEYS[1], ARGV[2])
@@ -61,6 +75,7 @@ public class RedisExternalLoginSessionRepository implements ExternalLoginSession
             return 1
             """, Long.class);
 
+    /** 原子消费已确认登录会话的 Lua 脚本。 */
     private static final RedisScript<Long> CONSUME_SESSION_SCRIPT = RedisScript.of("""
             local status = redis.call('HGET', KEYS[1], ARGV[1])
             if status ~= ARGV[2] then
@@ -74,6 +89,7 @@ public class RedisExternalLoginSessionRepository implements ExternalLoginSession
             return 1
             """, Long.class);
 
+    /** 原子标记等待中登录会话过期的 Lua 脚本。 */
     private static final RedisScript<Long> EXPIRE_SESSION_SCRIPT = RedisScript.of("""
             local status = redis.call('HGET', KEYS[1], ARGV[1])
             local expiresAt = redis.call('HGET', KEYS[1], ARGV[2])
@@ -91,6 +107,7 @@ public class RedisExternalLoginSessionRepository implements ExternalLoginSession
     private final RedisKeyFactory keyFactory;
     private final MangaRedisProperties redisProperties;
 
+    /** 创建外部登录会话。 */
     @Override
     public void create(
             String loginToken,
@@ -127,6 +144,7 @@ public class RedisExternalLoginSessionRepository implements ExternalLoginSession
         redisTemplate.opsForValue().set(tokenKey, sceneKey, storageTime);
     }
 
+    /** 按登录令牌查询外部登录会话。 */
     @Override
     public Optional<ExternalLoginSession> findByLoginToken(String loginToken) {
         String tokenKey = keyFactory.wechatLoginToken(loginToken);
@@ -142,6 +160,7 @@ public class RedisExternalLoginSessionRepository implements ExternalLoginSession
         return Optional.of(toSession(values));
     }
 
+    /** 判断登录场景是否仍在等待确认。 */
     @Override
     public boolean isWaitingScene(String sceneKey) {
         Map<Object, Object> values = redisTemplate.opsForHash().entries(keyFactory.wechatLoginScene(sceneKey));
@@ -152,6 +171,7 @@ public class RedisExternalLoginSessionRepository implements ExternalLoginSession
                 && parseEpochMillis(values, EXPIRES_AT_FIELD).isAfter(LocalDateTime.now());
     }
 
+    /** 确认指定场景的外部登录会话。 */
     @Override
     public boolean confirmByScene(String sceneKey, long userId, String actor) {
         long now = System.currentTimeMillis();
@@ -172,6 +192,7 @@ public class RedisExternalLoginSessionRepository implements ExternalLoginSession
         return Long.valueOf(1L).equals(updated);
     }
 
+    /** 消费已确认的外部登录会话。 */
     @Override
     public boolean consumeConfirmed(String loginToken, String actor) {
         String sceneKey = redisTemplate.opsForValue().get(keyFactory.wechatLoginToken(loginToken));
@@ -194,6 +215,7 @@ public class RedisExternalLoginSessionRepository implements ExternalLoginSession
         return Long.valueOf(1L).equals(updated);
     }
 
+    /** 将等待中的外部登录会话标记为过期。 */
     @Override
     public void expireWaiting(String loginToken, String actor) {
         String sceneKey = redisTemplate.opsForValue().get(keyFactory.wechatLoginToken(loginToken));
@@ -214,6 +236,7 @@ public class RedisExternalLoginSessionRepository implements ExternalLoginSession
         );
     }
 
+    /** 将 Redis 字段转换为登录会话。 */
     private ExternalLoginSession toSession(Map<Object, Object> values) {
         return ExternalLoginSession.builder()
                 .loginToken(value(values, LOGIN_TOKEN_FIELD))
@@ -232,15 +255,18 @@ public class RedisExternalLoginSessionRepository implements ExternalLoginSession
                 .build();
     }
 
+    /** 将时间转换为毫秒时间戳文本。 */
     private String epochMillis(LocalDateTime dateTime) {
         return Long.toString(dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
     }
 
+    /** 解析必填毫秒时间戳。 */
     private LocalDateTime parseEpochMillis(Map<Object, Object> values, String field) {
         long epochMillis = Long.parseLong(value(values, field));
         return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneId.systemDefault());
     }
 
+    /** 解析可选毫秒时间戳。 */
     private LocalDateTime optionalEpochMillis(Map<Object, Object> values, String field) {
         String rawValue = value(values, field);
         return rawValue == null ? null : LocalDateTime.ofInstant(
@@ -249,11 +275,13 @@ public class RedisExternalLoginSessionRepository implements ExternalLoginSession
         );
     }
 
+    /** 解析可选长整数。 */
     private Long optionalLong(Map<Object, Object> values, String field) {
         String rawValue = value(values, field);
         return rawValue == null ? null : Long.valueOf(rawValue);
     }
 
+    /** 读取 Redis 字段文本。 */
     private String value(Map<Object, Object> values, String field) {
         Object rawValue = values.get(field);
         return rawValue == null ? null : rawValue.toString();

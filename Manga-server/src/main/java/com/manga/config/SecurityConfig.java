@@ -48,6 +48,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/guest",
                                 "/api/v1/auth/wechat/**",
+                                "/uploads/**",
                                 "/actuator/health",
                                 "/actuator/info",
                                 "/error"

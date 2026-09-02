@@ -11,7 +11,13 @@
         <result property="description" column="description"/>
         <result property="coverUrl" column="cover_url"/>
         <result property="genre" column="genre"/>
+        <result property="aspectRatio" column="aspect_ratio"/>
+        <result property="visibilityScope" column="visibility_scope" javaType="com.manga.common.enums.ProjectVisibilityScope"/>
         <result property="status" column="status" javaType="com.manga.common.enums.ProjectStatus"/>
+        <result property="artStyle" column="art_style"/>
+        <result property="artStyleDescription" column="art_style_description"/>
+        <result property="artStyleImagePrompt" column="art_style_image_prompt"/>
+        <result property="artStyleImageUrl" column="art_style_image_url"/>
         <result property="shotCount" column="shot_count"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
@@ -26,12 +32,18 @@
                p.description,
                p.cover_url,
                p.genre,
+               p.aspect_ratio,
+               p.visibility_scope,
                p.status,
+               p.art_style,
+               p.art_style_description,
+               p.art_style_image_prompt,
+               p.art_style_image_url,
                p.created_at,
                p.updated_at,
                p.created_by,
                p.updated_by,
-               COUNT(s.id) AS shot_count
+               COUNT(DISTINCT s.id) AS shot_count
         FROM manga_project p
         LEFT JOIN manga_storyboard_shot s ON s.project_id = p.id
     </sql>
@@ -43,7 +55,13 @@
                  p.description,
                  p.cover_url,
                  p.genre,
+                 p.aspect_ratio,
+                 p.visibility_scope,
                  p.status,
+                 p.art_style,
+                 p.art_style_description,
+                 p.art_style_image_prompt,
+                 p.art_style_image_url,
                  p.created_at,
                  p.updated_at,
                  p.created_by,
@@ -57,10 +75,27 @@
         ORDER BY p.updated_at DESC, p.id DESC
     </select>
 
+    <select id="findAllAccessibleBy" resultMap="projectSummaryResultMap">
+        <include refid="projectSummaryColumns"/>
+        LEFT JOIN manga_project_member pm ON pm.project_id = p.id
+        WHERE p.owner_user_id = #{userId}
+           OR pm.user_id = #{userId}
+        <include refid="projectSummaryGroupBy"/>
+        ORDER BY p.updated_at DESC, p.id DESC
+    </select>
+
     <select id="findOwnedById" resultMap="projectSummaryResultMap">
         <include refid="projectSummaryColumns"/>
         WHERE p.id = #{projectId}
           AND p.owner_user_id = #{ownerUserId}
+        <include refid="projectSummaryGroupBy"/>
+    </select>
+
+    <select id="findAccessibleById" resultMap="projectSummaryResultMap">
+        <include refid="projectSummaryColumns"/>
+        LEFT JOIN manga_project_member pm ON pm.project_id = p.id
+        WHERE p.id = #{projectId}
+          AND (p.owner_user_id = #{userId} OR pm.user_id = #{userId})
         <include refid="projectSummaryGroupBy"/>
     </select>
 
@@ -70,7 +105,13 @@
             description = #{project.description},
             cover_url = #{project.coverUrl},
             genre = #{project.genre},
+            aspect_ratio = #{project.aspectRatio},
+            visibility_scope = #{project.visibilityScope},
             status = #{project.status},
+            art_style = #{project.artStyle},
+            art_style_description = #{project.artStyleDescription},
+            art_style_image_prompt = #{project.artStyleImagePrompt},
+            art_style_image_url = #{project.artStyleImageUrl},
             updated_by = #{project.updatedBy}
         WHERE id = #{project.id}
           AND owner_user_id = #{ownerUserId}

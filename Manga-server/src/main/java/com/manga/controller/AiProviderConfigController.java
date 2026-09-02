@@ -2,9 +2,12 @@ package com.manga.controller;
 
 import com.manga.common.api.ApiResponse;
 import com.manga.common.security.SecurityUtils;
+import com.manga.dto.AiProviderConnectionTestRequest;
+import com.manga.dto.AiProviderConnectionTestResponse;
 import com.manga.dto.AiProviderConfigCreateRequest;
 import com.manga.dto.AiProviderConfigResponse;
 import com.manga.dto.AiProviderConfigUpdateRequest;
+import com.manga.dto.AiProviderOptionResponse;
 import com.manga.service.AiProviderConfigService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +32,17 @@ public class AiProviderConfigController {
 
     private final AiProviderConfigService configService;
 
+    /** 查询可选 AI 服务商元数据。 */
+    @GetMapping("/providers")
+    public ApiResponse<List<AiProviderOptionResponse>> findProviderOptions() {
+        log.info("[AiProviderConfigController#findProviderOptions] request subject={}",
+                SecurityUtils.getCurrentUsername());
+        List<AiProviderOptionResponse> result = configService.findProviderOptions();
+        log.info("[AiProviderConfigController#findProviderOptions] response count={}", result.size());
+        return ApiResponse.success(result);
+    }
+
+    /** 查询当前用户的 AI 服务配置。 */
     @GetMapping
     public ApiResponse<List<AiProviderConfigResponse>> findAll() {
         log.info("[AiProviderConfigController#findAll] request subject={}", SecurityUtils.getCurrentUsername());
@@ -37,6 +51,7 @@ public class AiProviderConfigController {
         return ApiResponse.success(result);
     }
 
+    /** 创建当前用户的 AI 服务配置。 */
     @PostMapping
     public ApiResponse<AiProviderConfigResponse> create(
             @Valid @RequestBody AiProviderConfigCreateRequest request) {
@@ -48,6 +63,7 @@ public class AiProviderConfigController {
         return ApiResponse.success(result);
     }
 
+    /** 更新当前用户的 AI 服务配置。 */
     @PutMapping("/{configId}")
     public ApiResponse<AiProviderConfigResponse> update(
             @PathVariable long configId,
@@ -61,6 +77,7 @@ public class AiProviderConfigController {
         return ApiResponse.success(result);
     }
 
+    /** 删除当前用户的 AI 服务配置。 */
     @DeleteMapping("/{configId}")
     public ApiResponse<Void> delete(@PathVariable long configId) {
         log.info("[AiProviderConfigController#delete] request configId={} subject={}",
@@ -70,6 +87,7 @@ public class AiProviderConfigController {
         return ApiResponse.success(null);
     }
 
+    /** 设置当前用户的默认 AI 服务配置。 */
     @PutMapping("/{configId}/default")
     public ApiResponse<AiProviderConfigResponse> setDefault(@PathVariable long configId) {
         log.info("[AiProviderConfigController#setDefault] request configId={} subject={}",
@@ -80,6 +98,30 @@ public class AiProviderConfigController {
         return ApiResponse.success(result);
     }
 
+    /** 检测 AI 服务连接并返回安全摘要。 */
+    @PostMapping("/{configId}/test-connection")
+    public ApiResponse<AiProviderConnectionTestResponse> testConnection(@PathVariable long configId) {
+        log.info("[AiProviderConfigController#testConnection] request configId={} subject={}",
+                configId, SecurityUtils.getCurrentUsername());
+        AiProviderConnectionTestResponse result = configService.testConnection(configId);
+        log.info("[AiProviderConfigController#testConnection] response configId={} reachable={} httpStatus={} durationMs={}",
+                configId, result.reachable(), result.httpStatus(), result.durationMillis());
+        return ApiResponse.success(result);
+    }
+
+    /** 检测 AI 服务连接并返回安全摘要。 */
+    @PostMapping("/test-connection")
+    public ApiResponse<AiProviderConnectionTestResponse> testConnection(
+            @Valid @RequestBody AiProviderConnectionTestRequest request) {
+        log.info("[AiProviderConfigController#testConnectionDraft] request subject={} configId={} provider={} keyPresent={}",
+                SecurityUtils.getCurrentUsername(), request.configId(), request.providerType(), hasText(request.apiKey()));
+        AiProviderConnectionTestResponse result = configService.testConnection(request);
+        log.info("[AiProviderConfigController#testConnectionDraft] response reachable={} httpStatus={} durationMs={}",
+                result.reachable(), result.httpStatus(), result.durationMillis());
+        return ApiResponse.success(result);
+    }
+
+    /** 判断字符串是否包含有效文本。 */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }

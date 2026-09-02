@@ -21,13 +21,21 @@ import java.time.LocalDateTime;
 @TableName("manga_role")
 public class Role {
 
+    /** 角色主键。 */
     @TableId(type = IdType.AUTO)
     private Long id;
+    /** 稳定业务编码。 */
     private UserRole code;
+    /** 角色名称。 */
     private String name;
+    /** 角色描述。 */
     private String description;
+    /** 创建时间。 */
     private LocalDateTime createdAt;
+    /** 最后更新时间。 */
     private LocalDateTime updatedAt;
+    /** 创建人标识。 */
     private String createdBy;
+    /** 最后更新人标识。 */
     private String updatedBy;
 }

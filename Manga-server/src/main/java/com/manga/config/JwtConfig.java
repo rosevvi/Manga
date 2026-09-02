@@ -26,15 +26,18 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 public class JwtConfig {
 
+    /** JWT HMAC SHA-256 签名算法名称。 */
     private static final String HMAC_SHA_256 = "HmacSHA256";
 
     private final MangaSecurityProperties securityProperties;
 
+    /** 创建 JWT 编码器。 */
     @Bean
     JwtEncoder jwtEncoder() {
         return new NimbusJwtEncoder(new ImmutableSecret<>(jwtSecretKey()));
     }
 
+    /** 创建 JWT 解码器。 */
     @Bean
     JwtDecoder jwtDecoder() {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKey())
@@ -47,6 +50,7 @@ public class JwtConfig {
         return decoder;
     }
 
+    /** 解析并校验 JWT 签名密钥。 */
     private SecretKey jwtSecretKey() {
         byte[] secretBytes = securityProperties.jwt().secret().getBytes(StandardCharsets.UTF_8);
         if (secretBytes.length < SecurityConstants.JWT_MIN_SECRET_BYTES) {

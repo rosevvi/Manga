@@ -13,6 +13,12 @@
         <result property="defaultModel" column="default_model"/>
         <result property="apiKeyCiphertext" column="api_key_ciphertext"/>
         <result property="apiKeyHint" column="api_key_hint"/>
+        <result property="proxyType" column="proxy_type" javaType="com.manga.common.enums.AiProxyType"/>
+        <result property="proxyHost" column="proxy_host"/>
+        <result property="proxyPort" column="proxy_port"/>
+        <result property="proxyUsername" column="proxy_username"/>
+        <result property="proxyPasswordCiphertext" column="proxy_password_ciphertext"/>
+        <result property="proxyPasswordHint" column="proxy_password_hint"/>
         <result property="enabled" column="enabled"/>
         <result property="defaultConfig" column="default_config"/>
         <result property="remark" column="remark"/>
@@ -24,7 +30,9 @@
 
     <sql id="allColumns">
         id, owner_user_id, name, provider_type, base_url, default_model,
-        api_key_ciphertext, api_key_hint, enabled, default_config, remark,
+        api_key_ciphertext, api_key_hint, proxy_type, proxy_host, proxy_port,
+        proxy_username, proxy_password_ciphertext, proxy_password_hint,
+        enabled, default_config, remark,
         created_at, updated_at, created_by, updated_by
     </sql>
 
@@ -70,6 +78,12 @@
             default_model = #{config.defaultModel},
             api_key_ciphertext = #{config.apiKeyCiphertext},
             api_key_hint = #{config.apiKeyHint},
+            proxy_type = #{config.proxyType},
+            proxy_host = #{config.proxyHost},
+            proxy_port = #{config.proxyPort},
+            proxy_username = #{config.proxyUsername},
+            proxy_password_ciphertext = #{config.proxyPasswordCiphertext},
+            proxy_password_hint = #{config.proxyPasswordHint},
             enabled = #{config.enabled},
             default_config = #{config.defaultConfig},
             remark = #{config.remark},

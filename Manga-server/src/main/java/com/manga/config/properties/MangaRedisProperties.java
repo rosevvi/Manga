@@ -9,7 +9,9 @@ import java.time.Duration;
  */
 @ConfigurationProperties(prefix = "manga.redis")
 public record MangaRedisProperties(
+        /** Manga Redis 键前缀。 */
         String keyPrefix,
+        /** 外部登录会话过期后的保留时长。 */
         Duration externalLoginExpiredRetention
 ) {
 }

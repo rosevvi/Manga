@@ -40,6 +40,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -248,18 +249,18 @@ class SecurityIntegrationTests {
         MvcResult shotCreate = mockMvc.perform(post(STORYBOARD_SHOTS_ENDPOINT, projectId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(token))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(java.util.Map.of(
-                                "title", "Opening shot",
-                                "sceneName", "Rooftop",
-                                "shotType", "WIDE",
-                                "cameraMovement", "PAN",
-                                "durationSeconds", 8,
-                                "content", "The city wakes under a crimson sky.",
-                                "dialogue", "We begin.",
-                                "soundEffect", "Wind",
-                                "imageUrl", "https://example.com/shot.png",
-                                "notes", "Establish the setting.",
-                                "status", "DRAFT"
+                        .content(objectMapper.writeValueAsString(Map.ofEntries(
+                                Map.entry("title", "Opening shot"),
+                                Map.entry("sceneName", "Rooftop"),
+                                Map.entry("shotType", "WIDE"),
+                                Map.entry("cameraMovement", "PAN"),
+                                Map.entry("durationSeconds", 8),
+                                Map.entry("content", "The city wakes under a crimson sky."),
+                                Map.entry("dialogue", "We begin."),
+                                Map.entry("soundEffect", "Wind"),
+                                Map.entry("imageUrl", "https://example.com/shot.png"),
+                                Map.entry("notes", "Establish the setting."),
+                                Map.entry("status", "DRAFT")
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.projectId").value(projectId))
@@ -274,18 +275,18 @@ class SecurityIntegrationTests {
         mockMvc.perform(put(STORYBOARD_SHOT_BY_ID_ENDPOINT, projectId, shotId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(token))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(java.util.Map.of(
-                                "title", "Updated opening shot",
-                                "sceneName", "Updated rooftop",
-                                "shotType", "MEDIUM",
-                                "cameraMovement", "STATIC",
-                                "durationSeconds", 10,
-                                "content", "The updated opening.",
-                                "dialogue", "We continue.",
-                                "soundEffect", "City ambience",
-                                "imageUrl", "https://example.com/updated-shot.png",
-                                "notes", "Updated notes.",
-                                "status", "READY"
+                        .content(objectMapper.writeValueAsString(Map.ofEntries(
+                                Map.entry("title", "Updated opening shot"),
+                                Map.entry("sceneName", "Updated rooftop"),
+                                Map.entry("shotType", "MEDIUM"),
+                                Map.entry("cameraMovement", "STATIC"),
+                                Map.entry("durationSeconds", 10),
+                                Map.entry("content", "The updated opening."),
+                                Map.entry("dialogue", "We continue."),
+                                Map.entry("soundEffect", "City ambience"),
+                                Map.entry("imageUrl", "https://example.com/updated-shot.png"),
+                                Map.entry("notes", "Updated notes."),
+                                Map.entry("status", "READY")
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.title").value("Updated opening shot"))
@@ -516,6 +517,7 @@ class SecurityIntegrationTests {
                 ).isEqualTo(challenge));
     }
 
+    /** 登录管理员账号并返回访问令牌。 */
     private String loginAsAdministrator() throws Exception {
         MvcResult result = mockMvc.perform(post(LOGIN_ENDPOINT)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -527,19 +529,23 @@ class SecurityIntegrationTests {
         return accessToken(result);
     }
 
+    /** 构造账号密码登录请求正文。 */
     private String loginPayload(String username, String password) throws Exception {
         return objectMapper.writeValueAsString(java.util.Map.of("username", username, "password", password));
     }
 
+    /** 从登录响应中读取访问令牌。 */
     private String accessToken(MvcResult result) throws Exception {
         JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
         return response.path("data").path("accessToken").asText();
     }
 
+    /** 构造 Bearer 认证请求头。 */
     private String bearer(String token) {
         return SecurityConstants.TOKEN_TYPE + " " + token;
     }
 
+    /** 断言指定认证信息无法访问受保护接口。 */
     private void assertUnauthorized(String authorization) throws Exception {
         mockMvc.perform(get(CURRENT_USER_ENDPOINT)
                         .header(HttpHeaders.AUTHORIZATION, authorization))
@@ -547,6 +553,7 @@ class SecurityIntegrationTests {
                 .andExpect(jsonPath("$.code").value(CommonResponseCode.UNAUTHORIZED.code()));
     }
 
+    /** 篡改令牌签名以验证签名校验。 */
     private String tamperSignature(String token) {
         int signatureStart = token.lastIndexOf('.') + 1;
         char firstSignatureCharacter = token.charAt(signatureStart);
@@ -554,6 +561,7 @@ class SecurityIntegrationTests {
         return token.substring(0, signatureStart) + replacement + token.substring(signatureStart + 1);
     }
 
+    /** 构造已经过期的管理员令牌。 */
     private String expiredToken() {
         Instant expiresAt = Instant.now().minusSeconds(60);
         JwtClaimsSet claims = JwtClaimsSet.builder()
@@ -570,6 +578,7 @@ class SecurityIntegrationTests {
         return jwtEncoder.encode(JwtEncoderParameters.from(headers, claims)).getTokenValue();
     }
 
+    /** 生成微信公众号回调测试签名。 */
     private String wechatSignature() throws Exception {
         String[] values = {WECHAT_TEST_TOKEN, WECHAT_TEST_TIMESTAMP, WECHAT_TEST_NONCE};
         Arrays.sort(values);

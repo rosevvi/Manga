@@ -11,13 +11,16 @@ import org.apache.ibatis.annotations.Param;
  */
 public interface ExternalLoginSessionMapper extends BaseMapper<ExternalLoginSession> {
 
+    /** 按登录令牌查询外部登录会话。 */
     ExternalLoginSession findByLoginToken(@Param("loginToken") String loginToken);
 
+    /** 统计等待中的登录场景。 */
     long countWaitingByScene(
             @Param("provider") ExternalIdentityProvider provider,
             @Param("sceneKey") String sceneKey,
             @Param("status") ExternalLoginStatus status);
 
+    /** 确认指定场景的外部登录会话。 */
     int confirmByScene(
             @Param("sceneKey") String sceneKey,
             @Param("userId") long userId,
@@ -26,12 +29,14 @@ public interface ExternalLoginSessionMapper extends BaseMapper<ExternalLoginSess
             @Param("waitingStatus") ExternalLoginStatus waitingStatus,
             @Param("confirmedStatus") ExternalLoginStatus confirmedStatus);
 
+    /** 消费已确认的外部登录会话。 */
     int consumeConfirmed(
             @Param("loginToken") String loginToken,
             @Param("actor") String actor,
             @Param("confirmedStatus") ExternalLoginStatus confirmedStatus,
             @Param("consumedStatus") ExternalLoginStatus consumedStatus);
 
+    /** 将等待中的外部登录会话标记为过期。 */
     int expireWaiting(
             @Param("loginToken") String loginToken,
             @Param("actor") String actor,

@@ -12,6 +12,7 @@ import java.util.Map;
 @Component
 public class MdcTaskDecorator implements TaskDecorator {
 
+    /** 复制当前 MDC 上下文并包装异步任务。 */
     @Override
     public Runnable decorate(Runnable runnable) {
         Map<String, String> submittingContext = MDC.getCopyOfContextMap();
@@ -26,6 +27,7 @@ public class MdcTaskDecorator implements TaskDecorator {
         };
     }
 
+    /** 恢复执行线程原有的 MDC 上下文。 */
     private void restore(Map<String, String> context) {
         if (context == null || context.isEmpty()) {
             MDC.clear();

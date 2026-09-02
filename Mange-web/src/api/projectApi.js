@@ -1,4 +1,4 @@
-import { authorizedRequest } from './authorizedApi'
+import { authorizedFormRequest, authorizedRequest } from './authorizedApi'
 import {
   PROJECT_ENDPOINTS,
   projectEndpoint,
@@ -9,6 +9,17 @@ import {
 
 export function getProjects(accessToken) {
   return authorizedRequest(accessToken, PROJECT_ENDPOINTS.projects)
+}
+
+export function getArtStylePresets(accessToken) {
+  return authorizedRequest(accessToken, PROJECT_ENDPOINTS.artStylePresets)
+}
+
+export function uploadProjectImage(accessToken, file, subDir = 'images') {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('subDir', subDir)
+  return authorizedFormRequest(accessToken, PROJECT_ENDPOINTS.imageUploads, formData)
 }
 
 export function createProject(accessToken, project) {

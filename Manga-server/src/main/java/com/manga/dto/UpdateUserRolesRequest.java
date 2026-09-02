@@ -11,6 +11,7 @@ import java.util.Set;
  * 接收管理员替换用户角色的请求参数。
  */
 public record UpdateUserRolesRequest(
+        /** 待分配的角色编码集合。 */
         @NotEmpty(message = ValidationConstants.ROLE_REQUIRED)
         Set<@Pattern(
                 regexp = ValidationConstants.ROLE_CODE_PATTERN,

@@ -77,6 +77,7 @@ public class AuthService {
         return response;
     }
 
+    /** 创建统一的凭据无效异常。 */
     private BusinessException invalidCredentials() {
         return new BusinessException(AuthResponseCode.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
     }

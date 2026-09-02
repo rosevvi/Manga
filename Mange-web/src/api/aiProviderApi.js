@@ -3,7 +3,12 @@ import {
   AI_PROVIDER_ENDPOINTS,
   aiProviderConfigEndpoint,
   aiProviderDefaultEndpoint,
+  aiProviderTestEndpoint,
 } from '../constants/aiProvider'
+
+export function getAiProviderOptions(accessToken) {
+  return authorizedRequest(accessToken, AI_PROVIDER_ENDPOINTS.providers)
+}
 
 export function getAiProviderConfigs(accessToken) {
   return authorizedRequest(accessToken, AI_PROVIDER_ENDPOINTS.configs)
@@ -29,4 +34,15 @@ export function deleteAiProviderConfig(accessToken, configId) {
 
 export function setDefaultAiProviderConfig(accessToken, configId) {
   return authorizedRequest(accessToken, aiProviderDefaultEndpoint(configId), { method: 'PUT' })
+}
+
+export function testAiProviderConnection(accessToken, configId) {
+  return authorizedRequest(accessToken, aiProviderTestEndpoint(configId), { method: 'POST' })
+}
+
+export function testAiProviderDraftConnection(accessToken, config) {
+  return authorizedRequest(accessToken, AI_PROVIDER_ENDPOINTS.testConnection, {
+    method: 'POST',
+    body: JSON.stringify(config),
+  })
 }
