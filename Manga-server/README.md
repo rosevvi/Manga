@@ -150,11 +150,8 @@ Redis 连接项定义在 `application-local.yml` 的 `spring.data.redis` 下，�
 - `MANGA_REDIS_PORT` / Redis 端口
 - `MANGA_REDIS_PASSWORD` / Redis 密码；未启用认证时可留空
 - `MANGA_REDIS_DATABASE` / Redis 数据库编号，默认 `0`
-- `MANGA_REDIS_CONNECT_TIMEOUT` / 建连超时，默认 `5s`
-- `MANGA_REDIS_TIMEOUT` / 命令超时，默认 `3s`
-- `MANGA_REDIS_KEY_PREFIX` / Manga 业务 Key 前缀，默认 `manga`
-- `MANGA_REDIS_EXTERNAL_LOGIN_EXPIRED_RETENTION` / 扫码会话过期后的状态保留时间，默认 `10m`
-- `MANGA_EXTERNAL_LOGIN_SESSION_STORE` / 扫码会话存储策略，默认 `redis`；测试环境可设为 `jdbc`
+
+Redis 建连超时、命令超时、Manga 业务 Key 前缀、扫码会话过期保留时间和会话存储策略使用 `application.yml` 中的固定默认值；测试环境如需切换会话存储策略，应通过对应 Spring 配置文件覆盖。
 
 当前 Redis 用于以下短期、高频或跨实例共享数据：
 
@@ -208,14 +205,9 @@ MANGA_AI_SECRET_ENCRYPTION_KEY=请替换为独立的高强度随机值
 
 后端统一使用 SLF4J 输出日志。每个 HTTP 请求都会复用合法的 `X-Trace-Id` 请求头或生成新的 traceId，并通过同名响应头返回；日志格式会从 MDC 输出该值。前端如需主动传递 traceId，CORS 已允许并暴露该请求头。
 
-日志默认写入控制台和 `logs/manga-server.log`，并按文件大小滚动。以下环境变量可以覆盖默认值：
+日志默认写入控制台和 `logs/manga-server.log`，并按文件大小滚动；文件路径、单文件上限、历史文件数量和总容量上限统一定义在 `application.yml` 中。
 
-- `MANGA_LOG_FILE` / 日志文件路径
-- `MANGA_LOG_MAX_FILE_SIZE` / 单个日志文件上限，默认 `20MB`
-- `MANGA_LOG_MAX_HISTORY` / 历史文件保留数量，默认 `30`
-- `MANGA_LOG_TOTAL_SIZE_CAP` / 日志文件总容量上限，默认 `1GB`
-
-`@Async` 默认使用自定义 `applicationTaskExecutor`。线程池通过 `MdcTaskDecorator` 传播并恢复 MDC，避免异步任务丢失 traceId 或在线程复用时串链。线程池容量可通过 `MANGA_ASYNC_*` 环境变量调整。
+`@Async` 默认使用自定义 `applicationTaskExecutor`。线程池通过 `MdcTaskDecorator` 传播并恢复 MDC，避免异步任务丢失 traceId 或在线程复用时串链。线程池容量和关闭等待时间统一定义在 `application.yml` 中。
 
 ## 示例接口
 

@@ -6,15 +6,15 @@ spring:
     password: ${MANGA_DB_PASSWORD:}
     hikari:
       pool-name: MangaHikariPool
-      minimum-idle: ${MANGA_DB_POOL_MIN_IDLE:2}
-      maximum-pool-size: ${MANGA_DB_POOL_MAX_SIZE:10}
-      connection-timeout: ${MANGA_DB_CONNECTION_TIMEOUT_MS:30000}
-      validation-timeout: ${MANGA_DB_VALIDATION_TIMEOUT_MS:5000}
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 30000
+      validation-timeout: 5000
   data:
     redis:
       host: ${MANGA_REDIS_HOST:localhost}
       port: ${MANGA_REDIS_PORT:6379}
       password: ${MANGA_REDIS_PASSWORD:}
       database: ${MANGA_REDIS_DATABASE:0}
-      connect-timeout: ${MANGA_REDIS_CONNECT_TIMEOUT:5s}
-      timeout: ${MANGA_REDIS_TIMEOUT:3s}
+      connect-timeout: 5s
+      timeout: 3s

@@ -39,20 +39,23 @@ server:
     include-stacktrace: never
 
 manga:
+  external-http:
+    connect-timeout: 10s
+    request-timeout: 30s
   ai:
     secrets:
       # 生产环境建议使用独立密钥；未单独配置时复用现有 JWT 密钥以便本地启动。
       encryption-key: ${MANGA_AI_SECRET_ENCRYPTION_KEY:${MANGA_JWT_SECRET:}}
   async:
-    core-pool-size: ${MANGA_ASYNC_CORE_POOL_SIZE:4}
-    max-pool-size: ${MANGA_ASYNC_MAX_POOL_SIZE:16}
-    queue-capacity: ${MANGA_ASYNC_QUEUE_CAPACITY:200}
-    keep-alive: ${MANGA_ASYNC_KEEP_ALIVE:60s}
-    await-termination: ${MANGA_ASYNC_AWAIT_TERMINATION:30s}
-    thread-name-prefix: ${MANGA_ASYNC_THREAD_NAME_PREFIX:manga-async-}
+    core-pool-size: 4
+    max-pool-size: 16
+    queue-capacity: 200
+    keep-alive: 60s
+    await-termination: 30s
+    thread-name-prefix: manga-async-
   auth:
     storage:
-      external-login-session: ${MANGA_EXTERNAL_LOGIN_SESSION_STORE:redis}
+      external-login-session: redis
   upload:
     directory: ${MANGA_UPLOAD_DIR:uploads}
     public-path: ${MANGA_UPLOAD_PUBLIC_PATH:/uploads}
@@ -67,20 +70,20 @@ manga:
       object-prefix: ${MANGA_OSS_OBJECT_PREFIX:mannga}
       public-domain: ${MANGA_OSS_PUBLIC_DOMAIN:}
   redis:
-    key-prefix: ${MANGA_REDIS_KEY_PREFIX:manga}
-    external-login-expired-retention: ${MANGA_REDIS_EXTERNAL_LOGIN_EXPIRED_RETENTION:10m}
+    key-prefix: manga
+    external-login-expired-retention: 10m
   security:
     allowed-origins: ${MANGA_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
     cors-max-age: ${MANGA_CORS_MAX_AGE:1h}
     jwt:
       secret: ${MANGA_JWT_SECRET:}
-      issuer: ${MANGA_JWT_ISSUER:manga-server}
-      access-token-ttl: ${MANGA_ACCESS_TOKEN_TTL:2h}
-      guest-token-ttl: ${MANGA_GUEST_TOKEN_TTL:30m}
+      issuer: manga-server
+      access-token-ttl: 2h
+      guest-token-ttl: 30m
     initial-admin:
       username: ${MANGA_INITIAL_ADMIN_USERNAME:admin}
       password: ${MANGA_INITIAL_ADMIN_PASSWORD:}
-      display-name: ${MANGA_INITIAL_ADMIN_DISPLAY_NAME:Manga Administrator}
+      display-name: Manga Administrator
 
 management:
   endpoints:
@@ -102,15 +105,15 @@ info:
 
 logging:
   file:
-    name: ${MANGA_LOG_FILE:logs/manga-server.log}
+    name: logs/manga-server.log
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [traceId=%X{traceId:-}] %logger{40} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [traceId=%X{traceId:-}] %logger{40} - %msg%n"
   logback:
     rollingpolicy:
-      max-file-size: ${MANGA_LOG_MAX_FILE_SIZE:20MB}
-      max-history: ${MANGA_LOG_MAX_HISTORY:30}
-      total-size-cap: ${MANGA_LOG_TOTAL_SIZE_CAP:1GB}
+      max-file-size: 20MB
+      max-history: 30
+      total-size-cap: 1GB
   level:
     root: INFO
     com.manga: INFO
@@ -122,6 +125,6 @@ wx:
     token: ${MANGA_WECHAT_GZH_TOKEN:}
     api-base-url: ${MANGA_WECHAT_API_BASE_URL:https://api.weixin.qq.com}
     qr-code-base-url: ${MANGA_WECHAT_QR_CODE_BASE_URL:https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=}
-    scene-prefix: ${MANGA_WECHAT_SCENE_PREFIX:manga_login_}
-    qr-login-ttl: ${MANGA_WECHAT_QR_LOGIN_TTL:5m}
-    poll-interval: ${MANGA_WECHAT_POLL_INTERVAL:2s}
+    scene-prefix: manga_login_
+    qr-login-ttl: 5m
+    poll-interval: 2s

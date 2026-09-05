@@ -18,30 +18,24 @@ import com.manga.dto.AiProviderOptionResponse;
 import com.manga.dto.ResolvedAiProviderConfig;
 import com.manga.entity.AiProviderConfig;
 import com.manga.integration.ai.AiProviderHttpClient;
-import com.manga.integration.ai.AiProviderHttpRequest;
 import com.manga.integration.ai.AiProviderProxySettings;
 import com.manga.repository.AiProviderConfigRepository;
 import com.manga.service.security.SecretCipher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /** 管理用户 AI 接入配置，并在服务端加密保存 API Key。 */
 @Service
@@ -248,7 +242,7 @@ public class AiProviderConfigService {
         AiProviderConfig config = AiProviderConfig.builder()
                 .id(request.configId())
                 .providerType(request.providerType())
-                .baseUrl(request.baseUrl())
+                .baseUrl(normalizeBaseUrl(request.baseUrl()))
                 .defaultModel(normalize(request.defaultModel()))
                 .proxyType(AiProxyType.normalize(request.proxyType()))
                 .proxyHost(normalize(request.proxyHost()))
@@ -265,19 +259,23 @@ public class AiProviderConfigService {
             return connectionResult(false, null, AiProviderConstants.CONNECTION_TEST_API_KEY_REQUIRED, startedAt);
         }
         try {
-            AiProviderHttpRequest request = buildConnectionTestRequest(config, apiKey, proxyPassword);
-            HttpResponse<String> response = aiProviderHttpClient.get(request);
-            boolean reachable = response.statusCode() >= 200 && response.statusCode() < 300;
-            String message = httpStatusMessage(response.statusCode());
+            ResponseEntity<String> response = aiProviderHttpClient.probe(
+                    config.getProviderType(),
+                    normalizeBaseUrl(config.getBaseUrl()),
+                    apiKey,
+                    proxyRuntimeSettings(config, proxyPassword));
+            int statusCode = response.getStatusCode().value();
+            boolean reachable = statusCode >= 200 && statusCode < 300;
+            String message = httpStatusMessage(statusCode);
             if (reachable && shouldCheckModel(config)) {
                 String expectedModel = normalize(config.getDefaultModel());
                 try {
-                    boolean modelExists = containsModel(response.body(), expectedModel);
+                    boolean modelExists = containsModel(response.getBody(), expectedModel);
                     reachable = modelExists;
                     message = modelExists
-                            ? AiProviderConstants.CONNECTION_TEST_MODEL_OK_TEMPLATE.formatted(response.statusCode())
+                            ? AiProviderConstants.CONNECTION_TEST_MODEL_OK_TEMPLATE.formatted(statusCode)
                             : AiProviderConstants.CONNECTION_TEST_MODEL_NOT_FOUND_TEMPLATE.formatted(
-                                    response.statusCode(), expectedModel);
+                                    statusCode, expectedModel);
                 } catch (IOException exception) {
                     reachable = false;
                     message = upstreamResponseMessage(response, AiProviderConstants.CONNECTION_TEST_MODEL_LIST_UNREADABLE);
@@ -285,15 +283,10 @@ public class AiProviderConfigService {
             } else if (!reachable) {
                 message = upstreamResponseMessage(response, null);
             }
-            return connectionResult(
-                    reachable,
-                    response.statusCode(),
-                    message,
-                    startedAt);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            return connectionResult(false, null, AiProviderConstants.CONNECTION_TEST_INTERRUPTED, startedAt);
-        } catch (IllegalArgumentException | IOException exception) {
+            return connectionResult(reachable, statusCode, message, startedAt);
+        } catch (BusinessException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
             log.warn("AI provider connection test failed configId={} provider={}",
                     config.getId(), config.getProviderType());
             return connectionResult(false, null, AiProviderConstants.CONNECTION_TEST_FAILED, startedAt);
@@ -445,145 +438,6 @@ public class AiProviderConfigService {
                 config.getRemark(), config.getCreatedAt(), config.getUpdatedAt());
     }
 
-    /** 构造 AI 服务连接测试请求。 */
-    private AiProviderHttpRequest buildConnectionTestRequest(
-            AiProviderConfig config,
-            String apiKey,
-            String proxyPassword) {
-        URI uri = connectionTestUri(config, apiKey);
-        return AiProviderHttpRequest.get(
-                uri,
-                connectionTestHeaders(config, apiKey),
-                Duration.ofSeconds(AiProviderConstants.CONNECTION_TEST_TIMEOUT_SECONDS),
-                proxyRuntimeSettings(config, proxyPassword));
-    }
-
-    /** 构造连接测试请求头。 */
-    private Map<String, String> connectionTestHeaders(AiProviderConfig config, String apiKey) {
-        Map<String, String> headers = new LinkedHashMap<>();
-        if (apiKey != null && !apiKey.isBlank()) {
-            switch (config.getProviderType()) {
-                case ANTHROPIC -> {
-                    headers.put(AiProviderConstants.ANTHROPIC_API_KEY_HEADER, apiKey);
-                    headers.put(AiProviderConstants.ANTHROPIC_VERSION_HEADER, AiProviderConstants.ANTHROPIC_VERSION);
-                }
-                case CUSTOM, GEMINI, NEWAPI -> {
-                }
-                default -> headers.put(
-                        AiProviderConstants.AUTHORIZATION_HEADER,
-                        AiProviderConstants.BEARER_PREFIX + apiKey);
-            }
-        }
-        return headers;
-    }
-
-    /** 按服务商生成连接测试地址。 */
-    private URI connectionTestUri(AiProviderConfig config, String apiKey) {
-        String baseUrl = normalizeBaseUrl(config.getBaseUrl());
-        return switch (config.getProviderType()) {
-            case OLLAMA -> URI.create(joinUrl(baseUrl, AiProviderConstants.OLLAMA_TAGS_PATH));
-            case COMFYUI -> URI.create(joinUrl(baseUrl, AiProviderConstants.COMFYUI_SYSTEM_STATS_PATH));
-            case DASHSCOPE -> URI.create(joinApiPath(
-                    baseUrl,
-                    AiProviderConstants.DASHSCOPE_API_ROOT_PATH,
-                    AiProviderConstants.OPENAI_MODELS_PATH));
-            case GEMINI -> apiKeyQueryUri(joinApiPath(
-                    baseUrl,
-                    AiProviderConstants.GEMINI_API_ROOT_PATH,
-                    AiProviderConstants.OPENAI_MODELS_PATH), apiKey);
-            case NEWAPI -> apiKeyQueryUri(joinApiPath(
-                    baseUrl,
-                    AiProviderConstants.NEWAPI_API_ROOT_PATH,
-                    AiProviderConstants.NEWAPI_USAGE_STATS_PATH), apiKey);
-            case CUSTOM -> customConnectionTestUri(baseUrl, apiKey);
-            case VOLCENGINE -> URI.create(joinApiPath(
-                    baseUrl,
-                    AiProviderConstants.VOLCENGINE_API_ROOT_PATH,
-                    AiProviderConstants.OPENAI_MODELS_PATH));
-            default -> URI.create(joinApiPath(
-                    baseUrl,
-                    AiProviderConstants.OPENAI_API_ROOT_PATH,
-                    AiProviderConstants.OPENAI_MODELS_PATH));
-        };
-    }
-
-    /** 拼接基础地址与资源路径。 */
-    private String joinUrl(String baseUrl, String path) {
-        String normalizedBaseUrl = baseUrl.replaceAll("/+$", "");
-        return normalizedBaseUrl + path;
-    }
-
-    /** 拼接基础地址、API 根路径和资源路径。 */
-    private String joinApiPath(String baseUrl, String apiRootPath, String resourcePath) {
-        String normalizedBaseUrl = baseUrl.replaceAll("/+$", "");
-        String basePath = URI.create(normalizedBaseUrl).getPath();
-        if (basePath.endsWith(resourcePath)) {
-            return normalizedBaseUrl;
-        }
-        if (basePath.endsWith(apiRootPath)) {
-            return normalizedBaseUrl + resourcePath;
-        }
-        return normalizedBaseUrl + apiRootPath + resourcePath;
-    }
-
-    /** 生成自定义服务连接测试地址。 */
-    private URI customConnectionTestUri(String baseUrl, String apiKey) {
-        return apiKeyQueryUri(baseUrl, apiKey);
-    }
-
-    /** 将 API Key 安全附加到查询参数。 */
-    private URI apiKeyQueryUri(String url, String apiKey) {
-        URI uri = URI.create(url);
-        String normalizedApiKey = normalize(apiKey);
-        if (normalizedApiKey == null) {
-            return uri;
-        }
-        String existingQuery = withoutApiKeyParameter(uri.getRawQuery());
-        String nextQuery = existingQuery == null || existingQuery.isBlank()
-                ? apiKeyQueryParameter(normalizedApiKey)
-                : existingQuery + "&" + apiKeyQueryParameter(normalizedApiKey);
-        return URI.create(uriWithoutQueryAndFragment(uri) + "?" + nextQuery + fragmentSuffix(uri));
-    }
-
-    /** 移除查询参数中的 API Key。 */
-    private String withoutApiKeyParameter(String rawQuery) {
-        if (rawQuery == null || rawQuery.isBlank()) {
-            return null;
-        }
-        return Arrays.stream(rawQuery.split("&"))
-                .filter(parameter -> !AiProviderConstants.API_KEY_QUERY_PARAMETER.equalsIgnoreCase(queryParameterName(parameter)))
-                .collect(Collectors.joining("&"));
-    }
-
-    /** 解析查询参数名称。 */
-    private String queryParameterName(String parameter) {
-        int separatorIndex = parameter.indexOf("=");
-        return separatorIndex < 0 ? parameter : parameter.substring(0, separatorIndex);
-    }
-
-    /** 编码 API Key 查询参数。 */
-    private String apiKeyQueryParameter(String apiKey) {
-        return AiProviderConstants.API_KEY_QUERY_PARAMETER + "="
-                + URLEncoder.encode(apiKey, StandardCharsets.UTF_8);
-    }
-
-    /** 返回不含查询参数和片段的地址。 */
-    private String uriWithoutQueryAndFragment(URI uri) {
-        StringBuilder builder = new StringBuilder()
-                .append(uri.getScheme())
-                .append("://")
-                .append(uri.getRawAuthority());
-        if (uri.getRawPath() != null) {
-            builder.append(uri.getRawPath());
-        }
-        return builder.toString();
-    }
-
-    /** 生成 URI 片段后缀。 */
-    private String fragmentSuffix(URI uri) {
-        return uri.getRawFragment() == null ? "" : "#" + uri.getRawFragment();
-    }
-
     /** 判断连接测试是否需要校验模型。 */
     private boolean shouldCheckModel(AiProviderConfig config) {
         String expectedModel = normalize(config.getDefaultModel());
@@ -652,16 +506,16 @@ public class AiProviderConfigService {
     }
 
     /** 提取上游响应的安全提示信息。 */
-    private String upstreamResponseMessage(HttpResponse<String> response, String fallbackMessage) {
-        String summary = responseBodySummary(response.body());
+    private String upstreamResponseMessage(ResponseEntity<String> response, String fallbackMessage) {
+        String summary = responseBodySummary(response.getBody());
         if (summary == null) {
             summary = fallbackMessage;
         }
         if (summary == null) {
-            return httpStatusMessage(response.statusCode());
+            return httpStatusMessage(response.getStatusCode().value());
         }
         return AiProviderConstants.CONNECTION_TEST_HTTP_STATUS_WITH_BODY_TEMPLATE.formatted(
-                response.statusCode(), summary);
+                response.getStatusCode().value(), summary);
     }
 
     /** 生成 HTTP 状态提示。 */

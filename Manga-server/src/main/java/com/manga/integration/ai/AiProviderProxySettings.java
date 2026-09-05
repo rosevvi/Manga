@@ -1,6 +1,8 @@
 package com.manga.integration.ai;
 
 import com.manga.common.enums.AiProxyType;
+import com.manga.integration.http.ExternalProxySettings;
+import com.manga.integration.http.ExternalProxyType;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
@@ -33,6 +35,20 @@ public record AiProviderProxySettings(
     public Proxy toJavaProxy() {
         Proxy.Type javaType = proxyType == AiProxyType.HTTP ? Proxy.Type.HTTP : Proxy.Type.SOCKS;
         return new Proxy(javaType, new InetSocketAddress(host, port));
+    }
+
+    /** 转换为通用外部 HTTP 代理配置。 */
+    public ExternalProxySettings toExternalProxySettings() {
+        return new ExternalProxySettings(
+                switch (proxyType) {
+                    case HTTP -> ExternalProxyType.HTTP;
+                    case SOCKS5 -> ExternalProxyType.SOCKS5;
+                    default -> ExternalProxyType.NONE;
+                },
+                host,
+                port,
+                username,
+                password);
     }
 
     /** 返回不包含代理密码的日志字符串。 */

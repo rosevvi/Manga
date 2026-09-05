@@ -37,8 +37,8 @@ public final class ExceptionMessageConstants {
     public static final String WECHAT_CREATE_QR_CODE_OPERATION = "create temporary QR code";
     /** 微信公众号获取 access_token 操作名称。 */
     public static final String WECHAT_OBTAIN_ACCESS_TOKEN_OPERATION = "obtain access token";
-    /** 微信请求序列化失败提示。 */
-    public static final String WECHAT_REQUEST_SERIALIZATION_FAILED = "Failed to serialize WeChat API request";
+    /** 微信响应反序列化失败提示。 */
+    public static final String WECHAT_RESPONSE_DESERIALIZATION_FAILED = "Failed to deserialize WeChat API response";
     /** 微信回调正文无效提示。 */
     public static final String WECHAT_CALLBACK_PAYLOAD_INVALID = "Invalid WeChat callback payload";
     /** 项目主键回填失败提示。 */
