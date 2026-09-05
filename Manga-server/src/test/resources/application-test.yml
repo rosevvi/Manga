@@ -5,6 +5,9 @@ spring:
     password:
 
 manga:
+  storage:
+    aliyun-oss:
+      enabled: false
   ai:
     secrets:
       encryption-key: manga-test-ai-encryption-key

@@ -2,7 +2,6 @@ package com.manga.service;
 
 import com.manga.common.constant.StorageConstants;
 import com.manga.config.properties.AliyunOssProperties;
-import com.manga.entity.StorageConfig;
 import com.manga.service.storage.StorageStrategy;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MediaStorageService {
 
-    private final StorageConfigService storageConfigService;
     private final AliyunOssProperties aliyunOssProperties;
     private final List<StorageStrategy> strategies;
     /** 按存储类型索引的策略注册表。 */
@@ -34,30 +32,20 @@ public class MediaStorageService {
 
     /** 保存二进制文件并返回可访问地址。 */
     public String storeBytes(byte[] data, String subDir, String extension) {
-        StorageConfig config = storageConfigService.findDefaultConfig().orElse(null);
-        StorageStrategy strategy = resolveStrategy(config);
-        StorageConfig effectiveConfig = config != null && strategy.getType().equals(config.getType()) ? config : null;
+        StorageStrategy strategy = resolveStrategy();
         log.info("[MediaStorageService#storeBytes] request size={} subDir={} strategy={}",
                 data.length, subDir, strategy.getType());
-        return strategy.storeBytes(data, subDir, extension, effectiveConfig);
+        return strategy.storeBytes(data, subDir, extension);
     }
 
-    /** 按存储配置选择媒体存储策略。 */
-    private StorageStrategy resolveStrategy(StorageConfig config) {
+    /** 按环境变量选择媒体存储策略。 */
+    private StorageStrategy resolveStrategy() {
         if (aliyunOssProperties.enabled()) {
             StorageStrategy aliyunOss = strategyMap.get(StorageConstants.ALIYUN_OSS_TYPE);
             if (aliyunOss == null) {
                 throw new IllegalStateException(StorageConstants.STORAGE_STRATEGY_UNAVAILABLE);
             }
             return aliyunOss;
-        }
-        if (config != null && config.getType() != null && !config.getType().isBlank()) {
-            StorageStrategy configured = strategyMap.get(config.getType());
-            if (configured != null) {
-                return configured;
-            }
-            log.warn("[MediaStorageService#resolveStrategy] strategy missing type={}, fallback={}",
-                    config.getType(), StorageConstants.LOCAL_TYPE);
         }
         StorageStrategy local = strategyMap.get(StorageConstants.LOCAL_TYPE);
         if (local == null) {

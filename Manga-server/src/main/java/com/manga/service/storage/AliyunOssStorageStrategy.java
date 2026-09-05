@@ -6,7 +6,6 @@ import com.aliyun.oss.OSSClientBuilder;
 import com.aliyun.oss.OSSException;
 import com.aliyun.oss.model.ObjectMetadata;
 import com.manga.config.properties.AliyunOssProperties;
-import com.manga.entity.StorageConfig;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,9 +20,9 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import static com.manga.common.constant.StorageConstants.ALIYUN_OSS_TYPE;
 import static com.manga.common.constant.StorageConstants.ALIYUN_OSS_CONFIGURATION_INCOMPLETE;
 import static com.manga.common.constant.StorageConstants.ALIYUN_OSS_ENDPOINT_INVALID;
-import static com.manga.common.constant.StorageConstants.ALIYUN_OSS_TYPE;
 import static com.manga.common.constant.StorageConstants.DEFAULT_UPLOAD_DIRECTORY;
 import static com.manga.common.constant.StorageConstants.STORAGE_FILE_SAVE_FAILED;
 
@@ -48,9 +47,9 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
 
     /** 上传媒体数据并返回浏览器可访问的对象地址。 */
     @Override
-    public String storeBytes(byte[] data, String subDir, String extension, StorageConfig config) {
+    public String storeBytes(byte[] data, String subDir, String extension) {
         requireConfigured();
-        String objectKey = buildObjectKey(config, subDir, extension);
+        String objectKey = buildObjectKey(subDir, extension);
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentLength(data.length);
         metadata.setContentType(resolveContentType(extension));
@@ -60,7 +59,7 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
             ossClient().putObject(properties.bucketName(), objectKey, inputStream, metadata);
             log.info("[AliyunOssStorageStrategy#storeBytes] stored bucket={} key={} size={}",
                     properties.bucketName(), objectKey, data.length);
-            return resolvePublicUrl(config, objectKey);
+            return resolvePublicUrl(objectKey);
         } catch (OSSException exception) {
             log.warn("[AliyunOssStorageStrategy#storeBytes] OSS rejected upload errorCode={} requestId={}",
                     exception.getErrorCode(), exception.getRequestId());
@@ -107,11 +106,8 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
     }
 
     /** 生成包含统一对象前缀和业务子目录的对象键。 */
-    private String buildObjectKey(StorageConfig config, String subDir, String extension) {
-        String configuredPrefix = config != null && ALIYUN_OSS_TYPE.equals(config.getType())
-                ? config.getBasePath()
-                : properties.objectPrefix();
-        String prefix = normalizePath(configuredPrefix, properties.objectPrefix());
+    private String buildObjectKey(String subDir, String extension) {
+        String prefix = normalizePath(properties.objectPrefix(), properties.objectPrefix());
         String directory = normalizePath(subDir, DEFAULT_UPLOAD_DIRECTORY);
         return prefix + "/" + directory + "/" + UUID.randomUUID() + normalizeExtension(extension);
     }
@@ -158,10 +154,8 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
     }
 
     /** 生成自定义域名或 Bucket 默认域名下的公开地址。 */
-    private String resolvePublicUrl(StorageConfig config, String objectKey) {
-        String configuredDomain = config != null && ALIYUN_OSS_TYPE.equals(config.getType())
-                ? config.getCustomDomain()
-                : properties.publicDomain();
+    private String resolvePublicUrl(String objectKey) {
+        String configuredDomain = properties.publicDomain();
         String baseUrl = configuredDomain == null || configuredDomain.isBlank()
                 ? defaultPublicDomain()
                 : normalizeDomain(configuredDomain);

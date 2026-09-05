@@ -1,7 +1,6 @@
 package com.manga.service.storage;
 
 import com.manga.config.properties.MediaUploadProperties;
-import com.manga.entity.StorageConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -31,8 +30,8 @@ public class LocalStorageStrategy implements StorageStrategy {
 
     /** 将媒体二进制数据保存到本地磁盘。 */
     @Override
-    public String storeBytes(byte[] data, String subDir, String extension, StorageConfig config) {
-        Path baseDirectory = resolveBaseDirectory(config);
+    public String storeBytes(byte[] data, String subDir, String extension) {
+        Path baseDirectory = resolveBaseDirectory();
         String filename = UUID.randomUUID() + normalizeExtension(extension);
         Path targetDirectory = baseDirectory.resolve(normalizeSubDir(subDir)).normalize().toAbsolutePath();
         Path targetPath = targetDirectory.resolve(filename).normalize();
@@ -44,27 +43,20 @@ public class LocalStorageStrategy implements StorageStrategy {
             Files.createDirectories(targetDirectory);
             Files.write(targetPath, data);
             log.info("[LocalStorageStrategy#storeBytes] stored path={} size={}", targetPath, data.length);
-            return normalizePublicPath(config) + "/" + normalizeSubDir(subDir) + "/" + filename;
+            return normalizePublicPath() + "/" + normalizeSubDir(subDir) + "/" + filename;
         } catch (IOException exception) {
             throw new IllegalStateException(STORAGE_FILE_SAVE_FAILED, exception);
         }
     }
 
     /** 解析本地存储根目录。 */
-    private Path resolveBaseDirectory(StorageConfig config) {
-        if (config != null && config.getBasePath() != null && !config.getBasePath().isBlank()) {
-            return Path.of(config.getBasePath()).normalize().toAbsolutePath();
-        }
+    private Path resolveBaseDirectory() {
         return uploadProperties.directory().normalize().toAbsolutePath();
     }
 
     /** 规范媒体公开访问路径。 */
-    private String normalizePublicPath(StorageConfig config) {
-        String configured = config != null && config.getCustomDomain() != null && !config.getCustomDomain().isBlank()
-                ? config.getCustomDomain()
-                : config != null && config.getPublicPath() != null && !config.getPublicPath().isBlank()
-                ? config.getPublicPath()
-                : uploadProperties.publicPath();
+    private String normalizePublicPath() {
+        String configured = uploadProperties.publicPath();
         String normalized = configured.trim().replaceAll("/+$", "");
         if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
             return normalized;

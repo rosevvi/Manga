@@ -50,10 +50,7 @@ public class MediaUploadService {
             String path = mediaStorageService.storeBytes(file.getBytes(), normalizeSubDir(subDir), extension);
             String url = toAbsoluteUrl(path, request);
             return new MediaUploadResponse(url, path, file.getOriginalFilename(), file.getSize());
-        } catch (IOException exception) {
-            throw new BusinessException(
-                    CommonResponseCode.INTERNAL_ERROR, UPLOAD_IMAGE_FAILED, HttpStatus.INTERNAL_SERVER_ERROR);
-        } catch (IllegalArgumentException | IllegalStateException exception) {
+        } catch (IOException | IllegalArgumentException | IllegalStateException exception) {
             throw new BusinessException(
                     CommonResponseCode.INTERNAL_ERROR, UPLOAD_IMAGE_FAILED, HttpStatus.INTERNAL_SERVER_ERROR);
         }

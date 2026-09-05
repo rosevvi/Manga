@@ -59,7 +59,7 @@ manga:
     max-image-size: ${MANGA_UPLOAD_MAX_IMAGE_SIZE:8MB}
   storage:
     aliyun-oss:
-      enabled: ${MANGA_OSS_ENABLED:false}
+      enabled: ${MANGA_OSS_ENABLED:true}
       endpoint: ${MANGA_OSS_ENDPOINT:}
       bucket-name: ${MANGA_OSS_BUCKET_NAME:manga-ai}
       access-key-id: ${MANGA_OSS_ACCESS_KEY_ID:}
