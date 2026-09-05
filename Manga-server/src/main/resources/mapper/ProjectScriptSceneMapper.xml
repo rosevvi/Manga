@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.ProjectScriptSceneMapper">
+
+    <resultMap id="sceneResultMap" type="com.manga.entity.ProjectScriptScene">
+        <id property="id" column="id"/>
+        <result property="episodeId" column="episode_id"/>
+        <result property="sceneNumber" column="scene_number"/>
+        <result property="location" column="location"/>
+        <result property="timeDescription" column="time_description"/>
+        <result property="summary" column="summary"/>
+        <result property="content" column="content"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findByScriptId" resultMap="sceneResultMap">
+        SELECT s.id, s.episode_id, s.scene_number, s.location, s.time_description,
+               s.summary, s.content, s.sort_order, s.created_at, s.updated_at
+        FROM manga_project_script_scene s
+        INNER JOIN manga_project_script_episode e ON e.id = s.episode_id
+        WHERE e.script_id = #{scriptId}
+        ORDER BY e.sort_order, s.sort_order, s.id
+    </select>
+
+    <delete id="deleteByScriptId">
+        DELETE FROM manga_project_script_scene
+        WHERE episode_id IN (
+            SELECT id FROM manga_project_script_episode WHERE script_id = #{scriptId}
+        )
+    </delete>
+</mapper>

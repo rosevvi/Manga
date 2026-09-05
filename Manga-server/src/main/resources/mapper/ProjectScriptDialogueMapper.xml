@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.ProjectScriptDialogueMapper">
+
+    <resultMap id="dialogueResultMap" type="com.manga.entity.ProjectScriptDialogue">
+        <id property="id" column="id"/>
+        <result property="sceneId" column="scene_id"/>
+        <result property="speaker" column="speaker"/>
+        <result property="text" column="text"/>
+        <result property="dialogueType" column="dialogue_type"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findByScriptId" resultMap="dialogueResultMap">
+        SELECT d.id, d.scene_id, d.speaker, d.text, d.dialogue_type, d.sort_order,
+               d.created_at, d.updated_at
+        FROM manga_project_script_dialogue d
+        INNER JOIN manga_project_script_scene s ON s.id = d.scene_id
+        INNER JOIN manga_project_script_episode e ON e.id = s.episode_id
+        WHERE e.script_id = #{scriptId}
+        ORDER BY e.sort_order, s.sort_order, d.sort_order, d.id
+    </select>
+
+    <delete id="deleteByScriptId">
+        DELETE FROM manga_project_script_dialogue
+        WHERE scene_id IN (
+            SELECT s.id
+            FROM manga_project_script_scene s
+            INNER JOIN manga_project_script_episode e ON e.id = s.episode_id
+            WHERE e.script_id = #{scriptId}
+        )
+    </delete>
+</mapper>

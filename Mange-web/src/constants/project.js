@@ -61,6 +61,26 @@ export function projectEndpoint(projectId) {
   return `${PROJECT_ENDPOINTS.projects}/${encodeURIComponent(projectId)}`
 }
 
+export function projectWorkspaceEndpoint(projectId) {
+  return `${projectEndpoint(projectId)}/workspace`
+}
+
+export function projectWorkflowStageEndpoint(projectId) {
+  return `${projectEndpoint(projectId)}/workflow-stage`
+}
+
+export function projectScriptEndpoint(projectId) {
+  return `${projectEndpoint(projectId)}/script`
+}
+
+export function projectScriptImportEndpoint(projectId) {
+  return `${projectScriptEndpoint(projectId)}/import`
+}
+
+export function projectScriptGenerateEndpoint(projectId) {
+  return `${projectScriptEndpoint(projectId)}/generate`
+}
+
 export function projectMembersEndpoint(projectId) {
   return `${projectEndpoint(projectId)}/members`
 }

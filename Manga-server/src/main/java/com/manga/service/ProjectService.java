@@ -5,6 +5,7 @@ import com.manga.common.enums.ProjectResponseCode;
 import com.manga.common.enums.ProjectMemberRole;
 import com.manga.common.enums.ProjectStatus;
 import com.manga.common.enums.ProjectVisibilityScope;
+import com.manga.common.enums.ProjectWorkflowStage;
 import com.manga.common.exception.BusinessException;
 import com.manga.common.security.SecurityUtils;
 import com.manga.config.ArtStylePresets;
@@ -33,6 +34,7 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
+    private final ProjectWorkflowService workflowService;
 
     /** 查询当前用户可访问的项目列表。 */
     public List<ProjectResponse> findAll() {
@@ -42,7 +44,10 @@ public class ProjectService {
 
     /** 查询当前用户可访问的项目详情。 */
     public ProjectResponse findById(long projectId) {
-        return toResponse(requireAccessibleProject(projectId, SecurityUtils.requireCurrentUserId()));
+        long userId = SecurityUtils.requireCurrentUserId();
+        MangaProject project = requireAccessibleProject(projectId, userId);
+        project.setWorkflowStage(workflowService.getOrCreate(projectId, SecurityUtils.requireCurrentUsername()).getCurrentStage());
+        return toResponse(project);
     }
 
     /** 查询当前用户可访问的项目成员。 */
@@ -88,6 +93,7 @@ public class ProjectService {
                 .createdBy(actor)
                 .updatedBy(actor)
                 .build());
+        project.setWorkflowStage(workflowService.getOrCreate(project.getId(), actor).getCurrentStage());
         log.info("Project created projectId={} ownerUserId={}", project.getId(), ownerUserId);
         return toResponse(requireOwnedProject(project.getId(), ownerUserId));
     }
@@ -130,13 +136,13 @@ public class ProjectService {
     }
 
     /** 查询并校验当前用户拥有的项目。 */
-    MangaProject requireOwnedProject(long projectId, long ownerUserId) {
+    public MangaProject requireOwnedProject(long projectId, long ownerUserId) {
         return projectRepository.findOwnedById(projectId, ownerUserId)
                 .orElseThrow(() -> new BusinessException(ProjectResponseCode.PROJECT_NOT_FOUND, HttpStatus.NOT_FOUND));
     }
 
     /** 查询并校验当前用户可访问的项目。 */
-    MangaProject requireAccessibleProject(long projectId, long userId) {
+    public MangaProject requireAccessibleProject(long projectId, long userId) {
         return projectRepository.findAccessibleById(projectId, userId)
                 .orElseThrow(() -> new BusinessException(ProjectResponseCode.PROJECT_NOT_FOUND, HttpStatus.NOT_FOUND));
     }
@@ -147,6 +153,7 @@ public class ProjectService {
         return new ProjectResponse(
                 project.getId(), project.getName(), project.getDescription(), project.getCoverUrl(), project.getGenre(),
                 project.getAspectRatio(), project.getVisibilityScope(), project.getStatus(),
+                project.getWorkflowStage() == null ? ProjectWorkflowStage.SCRIPT : project.getWorkflowStage(),
                 project.getArtStyle(), preset == null ? null : preset.name(), project.getArtStyleDescription(),
                 project.getArtStyleImagePrompt(), project.getArtStyleImageUrl(),
                 project.getShotCount() == null ? 0 : project.getShotCount(),

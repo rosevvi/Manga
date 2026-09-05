@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.ProjectScriptEpisodeMapper">
+
+    <resultMap id="episodeResultMap" type="com.manga.entity.ProjectScriptEpisode">
+        <id property="id" column="id"/>
+        <result property="scriptId" column="script_id"/>
+        <result property="episodeNumber" column="episode_number"/>
+        <result property="title" column="title"/>
+        <result property="summary" column="summary"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findByScriptId" resultMap="episodeResultMap">
+        SELECT id, script_id, episode_number, title, summary, sort_order, created_at, updated_at
+        FROM manga_project_script_episode
+        WHERE script_id = #{scriptId}
+        ORDER BY sort_order, id
+    </select>
+
+    <delete id="deleteByScriptId">
+        DELETE FROM manga_project_script_episode WHERE script_id = #{scriptId}
+    </delete>
+</mapper>

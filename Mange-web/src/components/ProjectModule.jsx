@@ -49,7 +49,7 @@ const VISIBILITY_OPTIONS = Object.freeze([
 ])
 
 /** 展示当前用户项目，并提供搜索、创建、编辑与删除入口。 */
-function ProjectModule({ accessToken, projects, loading, error, onProjectsChanged, onOpenStoryboard }) {
+function ProjectModule({ accessToken, projects, loading, error, onProjectsChanged, onOpenProject }) {
   const { translate } = useLanguage()
   const [query, setQuery] = useState('')
   const [editingProject, setEditingProject] = useState(undefined)
@@ -169,13 +169,15 @@ function ProjectModule({ accessToken, projects, loading, error, onProjectsChange
         artStyleImagePrompt: artStyleMode === 'custom' ? form.artStyleImagePrompt : '',
         artStyleImageUrl: artStyleMode === 'custom' ? form.artStyleImageUrl : '',
       }
+      let savedProject
       if (editingProject) {
-        await updateProject(accessToken, editingProject.id, payload)
+        savedProject = await updateProject(accessToken, editingProject.id, payload)
       } else {
-        await createProject(accessToken, payload)
+        savedProject = await createProject(accessToken, payload)
       }
       await onProjectsChanged()
       closeEditor()
+      if (!editingProject && savedProject?.id) onOpenProject(savedProject)
     } catch (requestError) {
       setFormError(requestError.message)
     } finally {
@@ -253,14 +255,14 @@ function ProjectModule({ accessToken, projects, loading, error, onProjectsChange
             const styleName = project.artStyleName || (project.artStyle === CUSTOM_ART_STYLE ? translate('projects.customArtStyle') : translate('projects.artStyleUnset'))
             return (
               <article className="project-module-card" key={project.id}>
-                <button className="project-module-cover" type="button" onClick={() => onOpenStoryboard(project)}>
+                  <button className="project-module-cover" type="button" onClick={() => onOpenProject(project)}>
                   {project.coverUrl ? <img src={project.coverUrl} alt="" /> : <ImageOff size={30} />}
                   <span className={`workspace-status ${statusClass}`}>
                     {translate(`projectStatus.${project.status}`)}
                   </span>
                 </button>
                 <div className="project-module-copy">
-                  <button className="project-module-title" type="button" onClick={() => onOpenStoryboard(project)}>
+                  <button className="project-module-title" type="button" onClick={() => onOpenProject(project)}>
                     <strong>{project.name}</strong>
                     <span>{project.genre || translate('projects.genreUnset')}</span>
                   </button>

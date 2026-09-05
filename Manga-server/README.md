@@ -201,6 +201,21 @@ MANGA_AI_SECRET_ENCRYPTION_KEY=请替换为独立的高强度随机值
 - `DELETE /api/v1/ai-provider-configs/{configId}`
 - `PUT /api/v1/ai-provider-configs/{configId}/default`
 
+## 项目创作工作流
+
+项目创建后会进入项目详情工作区，当前推荐流程为“剧本 → 分镜 → 角色与场景 → 图片与视频 → 合成与导出”。项目详情、剧本和分镜可以通过阶段导航自由往返，阶段只表示当前推荐工作位置，不会锁定其他节点。
+
+首期剧本接口如下：
+
+- `GET /api/v1/projects/{projectId}/workspace` / 项目详情、阶段和剧本/分镜统计
+- `PUT /api/v1/projects/{projectId}/workflow-stage` / 手动切换推荐阶段
+- `GET /api/v1/projects/{projectId}/script` / 查询剧本结构
+- `PUT /api/v1/projects/{projectId}/script` / 保存原文、分集、场景和对白
+- `POST /api/v1/projects/{projectId}/script/import` / 导入 TXT 或 Markdown 文本
+- `POST /api/v1/projects/{projectId}/script/generate` / 使用默认 OpenAI 兼容模型进行 SSE 流式生成
+
+剧本生成提示词位于 `src/main/resources/prompts/script/`，以版本化 JSON 文件维护。角色/场景素材、图片/视频生成和成片导出阶段暂显示为规划中状态。
+
 ## 日志与 traceId
 
 后端统一使用 SLF4J 输出日志。每个 HTTP 请求都会复用合法的 `X-Trace-Id` 请求头或生成新的 traceId，并通过同名响应头返回；日志格式会从 MDC 输出该值。前端如需主动传递 traceId，CORS 已允许并暴露该请求头。

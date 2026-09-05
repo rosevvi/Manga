@@ -183,7 +183,7 @@ function App() {
     )
   }
 
-  if (currentPath === APP_ROUTE.CONSOLE) {
+  if (currentPath === APP_ROUTE.CONSOLE || currentPath.startsWith(`${APP_ROUTE.CONSOLE}/projects/`)) {
     return (
       <Dashboard
         authSession={authSession}

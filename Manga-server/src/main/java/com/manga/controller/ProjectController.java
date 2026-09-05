@@ -6,7 +6,17 @@ import com.manga.dto.ArtStylePresetResponse;
 import com.manga.dto.ProjectMemberResponse;
 import com.manga.dto.ProjectCreateRequest;
 import com.manga.dto.ProjectResponse;
+import com.manga.dto.ProjectScriptImportRequest;
+import com.manga.dto.ProjectScriptGenerateRequest;
+import com.manga.dto.ProjectScriptResponse;
+import com.manga.dto.ProjectScriptSaveRequest;
+import com.manga.dto.ProjectWorkflowStageUpdateRequest;
+import com.manga.dto.ProjectWorkspaceResponse;
 import com.manga.dto.ProjectUpdateRequest;
+import com.manga.entity.ProjectWorkflow;
+import com.manga.service.ProjectScriptService;
+import com.manga.service.ProjectScriptGenerationService;
+import com.manga.service.ProjectWorkflowService;
 import com.manga.service.ProjectService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +32,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+import reactor.core.publisher.Flux;
+import org.springframework.http.codec.ServerSentEvent;
+
 /** 提供当前用户项目的 REST 接口。 */
 @RestController
 @RequestMapping("/api/v1/projects")
@@ -30,6 +43,9 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final ProjectScriptService scriptService;
+    private final ProjectScriptGenerationService scriptGenerationService;
+    private final ProjectWorkflowService workflowService;
 
     /** 查询当前用户可访问的项目列表。 */
     @GetMapping
@@ -58,6 +74,84 @@ public class ProjectController {
         log.info("[ProjectController#findById] response projectId={} shotCount={} status={}",
                 result.id(), result.shotCount(), result.status());
         return ApiResponse.success(result);
+    }
+
+    /** 查询项目详情工作区及阶段摘要。 */
+    @GetMapping("/{projectId}/workspace")
+    public ApiResponse<ProjectWorkspaceResponse> findWorkspace(@PathVariable long projectId) {
+        log.info("[ProjectController#findWorkspace] request projectId={} subject={}",
+                projectId, SecurityUtils.getCurrentUsername());
+        ProjectResponse project = projectService.findById(projectId);
+        ProjectScriptResponse script = scriptService.find(projectId);
+        int sceneCount = script == null ? 0 : script.episodes().stream()
+                .mapToInt(episode -> episode.scenes() == null ? 0 : episode.scenes().size())
+                .sum();
+        ProjectWorkflow workflow = workflowService.getOrCreate(projectId, SecurityUtils.requireCurrentUsername());
+        ProjectWorkspaceResponse result = new ProjectWorkspaceResponse(
+                project, workflow.getCurrentStage(), workflow.getStageRevision() == null ? 0 : workflow.getStageRevision(),
+                script, script == null ? 0 : script.episodes().size(), sceneCount, project.shotCount());
+        log.info("[ProjectController#findWorkspace] response projectId={} stage={} scriptPresent={} shotCount={}",
+                projectId, result.workflowStage(), result.script() != null, result.storyboardShotCount());
+        return ApiResponse.success(result);
+    }
+
+    /** 手动切换项目当前推荐工作流阶段。 */
+    @PutMapping("/{projectId}/workflow-stage")
+    public ApiResponse<ProjectResponse> updateWorkflowStage(
+            @PathVariable long projectId,
+            @Valid @RequestBody ProjectWorkflowStageUpdateRequest request) {
+        projectService.requireOwnedProject(projectId, SecurityUtils.requireCurrentUserId());
+        ProjectWorkflow workflow = workflowService.setStage(
+                projectId, request.stage(), SecurityUtils.requireCurrentUsername());
+        ProjectResponse result = projectService.findById(projectId);
+        log.info("[ProjectController#updateWorkflowStage] response projectId={} stage={} revision={}",
+                projectId, workflow.getCurrentStage(), workflow.getStageRevision());
+        return ApiResponse.success(result);
+    }
+
+    /** 查询项目剧本。 */
+    @GetMapping("/{projectId}/script")
+    public ApiResponse<ProjectScriptResponse> findScript(@PathVariable long projectId) {
+        log.info("[ProjectController#findScript] request projectId={} subject={}",
+                projectId, SecurityUtils.getCurrentUsername());
+        ProjectScriptResponse result = scriptService.find(projectId);
+        log.info("[ProjectController#findScript] response projectId={} present={}", projectId, result != null);
+        return ApiResponse.success(result);
+    }
+
+    /** 保存项目剧本结构。 */
+    @PutMapping("/{projectId}/script")
+    public ApiResponse<ProjectScriptResponse> saveScript(
+            @PathVariable long projectId,
+            @Valid @RequestBody ProjectScriptSaveRequest request) {
+        log.info("[ProjectController#saveScript] request projectId={} subject={} episodeCount={}",
+                projectId, SecurityUtils.getCurrentUsername(), request.episodes() == null ? 0 : request.episodes().size());
+        ProjectScriptResponse result = scriptService.save(projectId, request);
+        log.info("[ProjectController#saveScript] response projectId={} scriptId={} parseStatus={}",
+                projectId, result.id(), result.parseStatus());
+        return ApiResponse.success(result);
+    }
+
+    /** 导入项目剧本原始文本。 */
+    @PostMapping("/{projectId}/script/import")
+    public ApiResponse<ProjectScriptResponse> importScript(
+            @PathVariable long projectId,
+            @Valid @RequestBody ProjectScriptImportRequest request) {
+        log.info("[ProjectController#importScript] request projectId={} subject={} contentLength={}",
+                projectId, SecurityUtils.getCurrentUsername(), request.rawContent().length());
+        ProjectScriptResponse result = scriptService.importText(projectId, request.rawContent(), request.sourceType());
+        log.info("[ProjectController#importScript] response projectId={} scriptId={}", projectId, result.id());
+        return ApiResponse.success(result);
+    }
+
+    /** 通过默认 OpenAI 兼容模型流式生成剧本。 */
+    @PostMapping("/{projectId}/script/generate")
+    public Flux<ServerSentEvent<String>> generateScript(
+            @PathVariable long projectId,
+            @Valid @RequestBody ProjectScriptGenerateRequest request) {
+        log.info("[ProjectController#generateScript] request projectId={} subject={} promptLength={}",
+                projectId, SecurityUtils.getCurrentUsername(), request.prompt().length());
+        return scriptGenerationService.generate(projectId, request);
     }
 
     /** 查询项目成员列表。 */

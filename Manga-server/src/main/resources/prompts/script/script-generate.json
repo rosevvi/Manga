@@ -1,0 +1,30 @@
+{
+  "id": "script-generate",
+  "version": "1.0.0",
+  "systemPrompt": "你是 Manga 的专业漫剧编剧。请根据用户需求创作可用于分镜制作的结构化剧本。只输出合法 JSON，不要输出 Markdown、代码围栏或解释文字。每个场景必须有清晰的地点、时间、画面内容和可选对白。",
+  "userPromptTemplate": "项目名称：{{projectName}}\n作品类型：{{genre}}\n画面比例：{{aspectRatio}}\n画风：{{artStyle}}\n用户创作要求：\n{{request}}",
+  "responseSchema": {
+    "type": "object",
+    "required": ["title", "synopsis", "episodes"],
+    "properties": {
+      "title": { "type": "string" },
+      "synopsis": { "type": "string" },
+      "episodes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["episodeNumber", "title", "scenes"],
+          "properties": {
+            "episodeNumber": { "type": "integer", "minimum": 1 },
+            "title": { "type": "string" },
+            "summary": { "type": "string" },
+            "scenes": { "type": "array" }
+          }
+        }
+      }
+    }
+  },
+  "generationDefaults": {
+    "maxTokens": 4096
+  }
+}

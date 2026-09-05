@@ -2,6 +2,7 @@ package com.manga.dto;
 
 import com.manga.common.enums.ProjectStatus;
 import com.manga.common.enums.ProjectVisibilityScope;
+import com.manga.common.enums.ProjectWorkflowStage;
 
 import java.time.LocalDateTime;
 
@@ -23,6 +24,8 @@ public record ProjectResponse(
         ProjectVisibilityScope visibilityScope,
         /** 项目状态。 */
         ProjectStatus status,
+        /** 当前推荐创作阶段。 */
+        ProjectWorkflowStage workflowStage,
         /** 画风预设标识或 custom。 */
         String artStyle,
         /** 画风显示名称。 */

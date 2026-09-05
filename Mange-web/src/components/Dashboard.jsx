@@ -35,6 +35,7 @@ import UserAccountMenu from './UserAccountMenu'
 import ProjectModule from './ProjectModule'
 import StoryboardModule from './StoryboardModule'
 import AiProviderSettings from './AiProviderSettings'
+import ProjectWorkspace from './ProjectWorkspace'
 import { getProjects } from '../api/projectApi'
 import { useLanguage } from '../i18n/LanguageContext'
 
@@ -118,16 +119,27 @@ const CREATION_FILTERS = [
 ]
 const DEFAULT_USER_NAME = 'Sakura'
 
+function projectRoute(pathname = window.location.pathname) {
+  const match = pathname.match(/^\/console\/projects\/(\d+)(?:\/(script|storyboards|assets|generation|export))?$/)
+  if (!match) return null
+  return {
+    projectId: Number(match[1]),
+    stage: match[2] === 'storyboards' ? 'STORYBOARD' : match[2] ? match[2].toUpperCase() : 'OVERVIEW',
+  }
+}
+
 /** 漫剧系统控制台首页，承载创作入口、项目与作品概览。 */
 function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   const { translate } = useLanguage()
-  const [activeNav, setActiveNav] = useState(SIDEBAR_NAV_ITEMS[0].id)
+  const initialProjectRoute = projectRoute()
+  const [activeNav, setActiveNav] = useState(initialProjectRoute ? 'project' : SIDEBAR_NAV_ITEMS[0].id)
   const [activeFilter, setActiveFilter] = useState(CREATION_FILTERS[0].id)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [projects, setProjects] = useState([])
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [projectsError, setProjectsError] = useState('')
-  const [selectedProjectId, setSelectedProjectId] = useState(null)
+  const [selectedProjectId, setSelectedProjectId] = useState(initialProjectRoute?.projectId ?? null)
+  const [projectStage, setProjectStage] = useState(initialProjectRoute?.stage ?? 'OVERVIEW')
   const displayName = authSession?.user?.displayName || DEFAULT_USER_NAME
   const accessToken = authSession?.accessToken
   const isGuest = Boolean(authSession?.user?.guest)
@@ -154,16 +166,47 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
     loadProjects()
   }, [loadProjects])
 
+  useEffect(() => {
+    const handleHistoryChange = () => {
+      const route = projectRoute()
+      if (route) {
+        setSelectedProjectId(route.projectId)
+        setProjectStage(route.stage)
+        setActiveNav(route.stage === 'STORYBOARD' ? 'storyboards' : 'project')
+      }
+    }
+    window.addEventListener('popstate', handleHistoryChange)
+    return () => window.removeEventListener('popstate', handleHistoryChange)
+  }, [])
+
   /** 切换控制台功能并在窄屏下关闭侧栏。 */
   const selectNavigation = (navigationId) => {
+    if (window.location.pathname.startsWith('/console/projects/')) {
+      window.history.pushState(null, '', '/console')
+      setProjectStage('OVERVIEW')
+    }
     setActiveNav(navigationId)
     setSidebarOpen(false)
   }
 
-  /** 进入指定项目的分镜工作区。 */
-  const openStoryboard = (project) => {
+  const navigateProject = (project, stage = 'OVERVIEW') => {
     setSelectedProjectId(project.id)
-    selectNavigation('storyboards')
+    setProjectStage(stage)
+    const suffix = stage === 'OVERVIEW' ? '' : `/${stage === 'STORYBOARD' ? 'storyboards' : stage.toLowerCase()}`
+    window.history.pushState(null, '', `/console/projects/${encodeURIComponent(project.id)}${suffix}`)
+    setActiveNav(stage === 'STORYBOARD' ? 'storyboards' : 'project')
+    setSidebarOpen(false)
+  }
+
+  /** 进入指定项目详情工作区。 */
+  const openProject = (project) => navigateProject(project)
+
+  /** 进入指定项目的分镜工作区。 */
+  const openStoryboard = (project) => navigateProject(project, 'STORYBOARD')
+
+  const navigateProjectStage = (stage) => {
+    const project = projects.find((item) => item.id === selectedProjectId)
+    if (project) navigateProject(project, stage)
   }
 
   return (
@@ -231,14 +274,23 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
       </header>
 
       <main className="dashboard-main">
-        {activeNav === 'projects' ? (
+        {activeNav === 'project' ? (
+          <ProjectWorkspace
+            accessToken={accessToken}
+            projectId={selectedProjectId}
+            initialStage={projectStage}
+            onBack={() => selectNavigation('projects')}
+            onOpenStoryboard={openStoryboard}
+            onNavigateStage={navigateProjectStage}
+          />
+        ) : activeNav === 'projects' ? (
           <ProjectModule
             accessToken={accessToken}
             projects={projects}
             loading={projectsLoading}
             error={projectsError}
             onProjectsChanged={loadProjects}
-            onOpenStoryboard={openStoryboard}
+            onOpenProject={openProject}
           />
         ) : activeNav === 'storyboards' ? (
           <StoryboardModule
@@ -287,7 +339,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
           </div>
           <div className="recent-project-grid">
             {projects.slice(0, 4).map((project) => (
-              <button className="recent-project-card" type="button" key={project.id} onClick={() => openStoryboard(project)}>
+              <button className="recent-project-card" type="button" key={project.id} onClick={() => openProject(project)}>
                 <div className="project-image-wrap">
                   {project.coverUrl ? <img src={project.coverUrl} alt="" /> : <span className="project-cover-placeholder"><ImageIcon size={28} /></span>}
                   <MoreVertical size={17} />

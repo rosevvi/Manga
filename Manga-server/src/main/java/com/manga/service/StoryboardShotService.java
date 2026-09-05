@@ -29,6 +29,7 @@ public class StoryboardShotService {
 
     private final StoryboardShotRepository storyboardShotRepository;
     private final ProjectService projectService;
+    private final ProjectWorkflowService workflowService;
 
     /** 查询项目分镜镜头列表。 */
     public List<StoryboardShotResponse> findAll(long projectId) {
@@ -61,6 +62,7 @@ public class StoryboardShotService {
                 .updatedBy(actor)
                 .build();
         storyboardShotRepository.create(shot);
+        workflowService.advanceTo(projectId, com.manga.common.enums.ProjectWorkflowStage.ASSETS, actor);
         log.info("Storyboard shot created projectId={} shotId={} sortOrder={}",
                 projectId, shot.getId(), sortOrder);
         return toResponse(requireShot(projectId, shot.getId()));
@@ -88,6 +90,8 @@ public class StoryboardShotService {
                 .updatedBy(SecurityUtils.requireCurrentUsername())
                 .build();
         storyboardShotRepository.update(shot, projectId);
+        workflowService.advanceTo(projectId, com.manga.common.enums.ProjectWorkflowStage.ASSETS,
+                SecurityUtils.requireCurrentUsername());
         log.info("Storyboard shot updated projectId={} shotId={} status={}",
                 projectId, shotId, shot.getStatus());
         return toResponse(requireShot(projectId, shotId));
@@ -122,6 +126,8 @@ public class StoryboardShotService {
             throw new BusinessException(ProjectResponseCode.STORYBOARD_ORDER_INVALID);
         }
         storyboardShotRepository.updateOrder(projectId, requestedIds, SecurityUtils.requireCurrentUsername());
+        workflowService.advanceTo(projectId, com.manga.common.enums.ProjectWorkflowStage.ASSETS,
+                SecurityUtils.requireCurrentUsername());
         log.info("Storyboard order updated projectId={} shotCount={}", projectId, requestedIds.size());
         return storyboardShotRepository.findAllByProjectId(projectId).stream().map(this::toResponse).toList();
     }

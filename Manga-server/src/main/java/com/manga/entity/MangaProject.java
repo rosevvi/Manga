@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.manga.common.enums.ProjectStatus;
 import com.manga.common.enums.ProjectVisibilityScope;
+import com.manga.common.enums.ProjectWorkflowStage;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -40,6 +41,9 @@ public class MangaProject {
     private ProjectVisibilityScope visibilityScope;
     /** 项目状态。 */
     private ProjectStatus status;
+    /** 当前推荐创作阶段，来自项目工作流表。 */
+    @TableField(exist = false)
+    private ProjectWorkflowStage workflowStage;
     /** 画风预设标识或 custom。 */
     private String artStyle;
     /** 自定义画风中文描述。 */

@@ -1,7 +1,13 @@
 import { authorizedFormRequest, authorizedRequest } from './authorizedApi'
+import { AUTH_CONFIG } from '../constants/auth'
 import {
   PROJECT_ENDPOINTS,
   projectEndpoint,
+  projectScriptEndpoint,
+  projectScriptGenerateEndpoint,
+  projectScriptImportEndpoint,
+  projectWorkflowStageEndpoint,
+  projectWorkspaceEndpoint,
   storyboardShotEndpoint,
   storyboardShotOrderEndpoint,
   storyboardShotsEndpoint,
@@ -34,6 +40,81 @@ export function updateProject(accessToken, projectId, project) {
     method: 'PUT',
     body: JSON.stringify(project),
   })
+}
+
+export function getProjectWorkspace(accessToken, projectId) {
+  return authorizedRequest(accessToken, projectWorkspaceEndpoint(projectId))
+}
+
+export function getProjectScript(accessToken, projectId) {
+  return authorizedRequest(accessToken, projectScriptEndpoint(projectId))
+}
+
+export function saveProjectScript(accessToken, projectId, script) {
+  return authorizedRequest(accessToken, projectScriptEndpoint(projectId), {
+    method: 'PUT',
+    body: JSON.stringify(script),
+  })
+}
+
+export function importProjectScript(accessToken, projectId, rawContent, sourceType) {
+  return authorizedRequest(accessToken, projectScriptImportEndpoint(projectId), {
+    method: 'POST',
+    body: JSON.stringify({ rawContent, sourceType }),
+  })
+}
+
+export function updateProjectWorkflowStage(accessToken, projectId, stage) {
+  return authorizedRequest(accessToken, projectWorkflowStageEndpoint(projectId), {
+    method: 'PUT',
+    body: JSON.stringify({ stage }),
+  })
+}
+
+export async function generateProjectScript(accessToken, projectId, prompt, onEvent, signal) {
+  const response = await fetch(`${AUTH_CONFIG.apiBaseUrl}${projectScriptGenerateEndpoint(projectId)}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      Authorization: `${AUTH_CONFIG.bearerType} ${accessToken}`,
+    },
+    body: JSON.stringify({ prompt }),
+    signal,
+  })
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null)
+    throw new Error(payload?.message ?? 'Unable to generate project script')
+  }
+  if (!response.body) throw new Error('Script generation stream is unavailable')
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let eventName = 'message'
+  let eventData = []
+  const dispatch = () => {
+    if (eventData.length === 0) return
+    const event = { event: eventName, data: eventData.join('\n') }
+    onEvent?.(event)
+    eventName = 'message'
+    eventData = []
+  }
+  while (true) {
+    const { value, done } = await reader.read()
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done })
+    const lines = buffer.split(/\r?\n/)
+    buffer = lines.pop() ?? ''
+    lines.forEach((line) => {
+      if (!line) return dispatch()
+      if (line.startsWith('event:')) eventName = line.slice(6).trim()
+      if (line.startsWith('data:')) eventData.push(line.slice(5).trimStart())
+    })
+    if (done) {
+      dispatch()
+      break
+    }
+  }
 }
 
 export function deleteProject(accessToken, projectId) {

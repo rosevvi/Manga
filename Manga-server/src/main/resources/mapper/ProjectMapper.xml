@@ -14,6 +14,7 @@
         <result property="aspectRatio" column="aspect_ratio"/>
         <result property="visibilityScope" column="visibility_scope" javaType="com.manga.common.enums.ProjectVisibilityScope"/>
         <result property="status" column="status" javaType="com.manga.common.enums.ProjectStatus"/>
+        <result property="workflowStage" column="workflow_stage" javaType="com.manga.common.enums.ProjectWorkflowStage"/>
         <result property="artStyle" column="art_style"/>
         <result property="artStyleDescription" column="art_style_description"/>
         <result property="artStyleImagePrompt" column="art_style_image_prompt"/>
@@ -35,6 +36,7 @@
                p.aspect_ratio,
                p.visibility_scope,
                p.status,
+               wf.current_stage AS workflow_stage,
                p.art_style,
                p.art_style_description,
                p.art_style_image_prompt,
@@ -46,6 +48,7 @@
                COUNT(DISTINCT s.id) AS shot_count
         FROM manga_project p
         LEFT JOIN manga_storyboard_shot s ON s.project_id = p.id
+        LEFT JOIN manga_project_workflow wf ON wf.project_id = p.id
     </sql>
 
     <sql id="projectSummaryGroupBy">
@@ -58,6 +61,7 @@
                  p.aspect_ratio,
                  p.visibility_scope,
                  p.status,
+                 wf.current_stage,
                  p.art_style,
                  p.art_style_description,
                  p.art_style_image_prompt,

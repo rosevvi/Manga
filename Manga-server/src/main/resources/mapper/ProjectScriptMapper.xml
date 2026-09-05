@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.ProjectScriptMapper">
+
+    <resultMap id="scriptResultMap" type="com.manga.entity.ProjectScript">
+        <id property="id" column="id"/>
+        <result property="projectId" column="project_id"/>
+        <result property="title" column="title"/>
+        <result property="synopsis" column="synopsis"/>
+        <result property="rawContent" column="raw_content"/>
+        <result property="sourceType" column="source_type"/>
+        <result property="parseStatus" column="parse_status"/>
+        <result property="structureVersion" column="structure_version"/>
+        <result property="structureJson" column="structure_json"/>
+        <result property="lastError" column="last_error"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+    </resultMap>
+
+    <select id="findByProjectId" resultMap="scriptResultMap">
+        SELECT id, project_id, title, synopsis, raw_content, source_type, parse_status,
+               structure_version, structure_json, last_error, created_at, updated_at,
+               created_by, updated_by
+        FROM manga_project_script
+        WHERE project_id = #{projectId}
+    </select>
+
+    <update id="updateByProjectId">
+        UPDATE manga_project_script
+        SET title = #{script.title},
+            synopsis = #{script.synopsis},
+            raw_content = #{script.rawContent},
+            source_type = #{script.sourceType},
+            parse_status = #{script.parseStatus},
+            structure_version = #{script.structureVersion},
+            structure_json = #{script.structureJson},
+            last_error = #{script.lastError},
+            updated_at = CURRENT_TIMESTAMP,
+            updated_by = #{script.updatedBy}
+        WHERE project_id = #{script.projectId}
+    </update>
+</mapper>

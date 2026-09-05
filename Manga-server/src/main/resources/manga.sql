@@ -114,6 +114,86 @@ CREATE TABLE IF NOT EXISTS manga_project_member (
     CONSTRAINT fk_manga_project_member_user FOREIGN KEY (user_id) REFERENCES manga_user (id) ON DELETE CASCADE
 ) COMMENT = '项目协作成员表';
 
+CREATE TABLE IF NOT EXISTS manga_project_workflow (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '项目工作流记录主键',
+    project_id BIGINT NOT NULL COMMENT '所属项目主键',
+    current_stage VARCHAR(20) NOT NULL DEFAULT 'SCRIPT' COMMENT '当前推荐创作阶段',
+    stage_revision INT NOT NULL DEFAULT 0 COMMENT '阶段记录版本号',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
+    created_by VARCHAR(64) NOT NULL COMMENT '创建人标识',
+    updated_by VARCHAR(64) NOT NULL COMMENT '最后修改人标识',
+    PRIMARY KEY (id),
+    CONSTRAINT uk_manga_project_workflow_project UNIQUE (project_id),
+    CONSTRAINT fk_manga_project_workflow_project FOREIGN KEY (project_id) REFERENCES manga_project (id) ON DELETE CASCADE
+) COMMENT = '项目创作工作流阶段表';
+
+CREATE TABLE IF NOT EXISTS manga_project_script (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '项目剧本主键',
+    project_id BIGINT NOT NULL COMMENT '所属项目主键',
+    title VARCHAR(120) NOT NULL COMMENT '剧本标题',
+    synopsis VARCHAR(2000) NULL COMMENT '剧本简介',
+    raw_content LONGTEXT NOT NULL COMMENT '剧本原始文本',
+    source_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL' COMMENT '原始文本来源类型',
+    parse_status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' COMMENT '结构化解析状态',
+    structure_version INT NOT NULL DEFAULT 1 COMMENT '结构化数据版本',
+    structure_json LONGTEXT NULL COMMENT '结构化剧本 JSON',
+    last_error VARCHAR(2000) NULL COMMENT '最近一次解析错误摘要',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
+    created_by VARCHAR(64) NOT NULL COMMENT '创建人标识',
+    updated_by VARCHAR(64) NOT NULL COMMENT '最后修改人标识',
+    PRIMARY KEY (id),
+    CONSTRAINT uk_manga_project_script_project UNIQUE (project_id),
+    CONSTRAINT fk_manga_project_script_project FOREIGN KEY (project_id) REFERENCES manga_project (id) ON DELETE CASCADE
+) COMMENT = '项目剧本主表';
+
+CREATE TABLE IF NOT EXISTS manga_project_script_episode (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '剧本分集主键',
+    script_id BIGINT NOT NULL COMMENT '所属剧本主键',
+    episode_number INT NOT NULL COMMENT '分集编号',
+    title VARCHAR(120) NOT NULL COMMENT '分集标题',
+    summary VARCHAR(2000) NULL COMMENT '分集简介',
+    sort_order INT NOT NULL COMMENT '分集排序',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
+    PRIMARY KEY (id),
+    CONSTRAINT uk_manga_script_episode_number UNIQUE (script_id, episode_number),
+    INDEX idx_manga_script_episode_script_order (script_id, sort_order),
+    CONSTRAINT fk_manga_script_episode_script FOREIGN KEY (script_id) REFERENCES manga_project_script (id) ON DELETE CASCADE
+) COMMENT = '项目剧本分集表';
+
+CREATE TABLE IF NOT EXISTS manga_project_script_scene (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '剧本场景主键',
+    episode_id BIGINT NOT NULL COMMENT '所属分集主键',
+    scene_number INT NOT NULL COMMENT '场景编号',
+    location VARCHAR(120) NULL COMMENT '场景地点',
+    time_description VARCHAR(120) NULL COMMENT '场景时间描述',
+    summary VARCHAR(2000) NULL COMMENT '场景摘要',
+    content VARCHAR(5000) NULL COMMENT '场景画面内容',
+    sort_order INT NOT NULL COMMENT '场景排序',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
+    PRIMARY KEY (id),
+    CONSTRAINT uk_manga_script_scene_number UNIQUE (episode_id, scene_number),
+    INDEX idx_manga_script_scene_episode_order (episode_id, sort_order),
+    CONSTRAINT fk_manga_script_scene_episode FOREIGN KEY (episode_id) REFERENCES manga_project_script_episode (id) ON DELETE CASCADE
+) COMMENT = '项目剧本场景表';
+
+CREATE TABLE IF NOT EXISTS manga_project_script_dialogue (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '剧本对白主键',
+    scene_id BIGINT NOT NULL COMMENT '所属场景主键',
+    speaker VARCHAR(120) NULL COMMENT '说话角色',
+    text VARCHAR(5000) NOT NULL COMMENT '对白或旁白文本',
+    dialogue_type VARCHAR(20) NOT NULL DEFAULT 'DIALOGUE' COMMENT '对白类型',
+    sort_order INT NOT NULL COMMENT '对白排序',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
+    PRIMARY KEY (id),
+    INDEX idx_manga_script_dialogue_scene_order (scene_id, sort_order),
+    CONSTRAINT fk_manga_script_dialogue_scene FOREIGN KEY (scene_id) REFERENCES manga_project_script_scene (id) ON DELETE CASCADE
+) COMMENT = '项目剧本对白表';
+
 CREATE TABLE IF NOT EXISTS manga_storyboard_shot (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '分镜镜头主键',
     project_id BIGINT NOT NULL COMMENT '所属项目主键',

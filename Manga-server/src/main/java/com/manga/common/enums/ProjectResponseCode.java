@@ -15,7 +15,9 @@ public enum ProjectResponseCode implements ResponseCode {
     /** 游客不能管理项目。 */
     GUEST_OPERATION_FORBIDDEN("GUEST_OPERATION_FORBIDDEN", "游客账号不能管理项目"),
     /** 分镜排序数据不一致。 */
-    STORYBOARD_ORDER_INVALID("STORYBOARD_ORDER_INVALID", "分镜排序数据与当前项目不一致");
+    STORYBOARD_ORDER_INVALID("STORYBOARD_ORDER_INVALID", "分镜排序数据与当前项目不一致"),
+    /** 剧本结构不符合当前版本契约。 */
+    SCRIPT_INVALID("SCRIPT_INVALID", "剧本结构不符合要求");
 
     /** 稳定业务编码。 */
     private final String code;
