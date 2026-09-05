@@ -11,8 +11,8 @@ import jakarta.validation.constraints.Size;
 
 import static com.manga.common.constant.ValidationConstants.*;
 
-/** 承载 AI 服务配置更新，并支持显式清除已保存密钥。 */
-    public record AiProviderConfigUpdateRequest(
+/** 承载 AI 服务配置更新。 */
+public record AiProviderConfigUpdateRequest(
         /** AI 服务配置名称。 */
         @NotBlank(message = AI_CONFIG_NAME_REQUIRED)
         @Size(max = AI_CONFIG_NAME_MAX_LENGTH, message = AI_CONFIG_NAME_TOO_LONG)
@@ -31,8 +31,6 @@ import static com.manga.common.constant.ValidationConstants.*;
         /** AI 服务 API Key 明文，仅在请求处理中短暂使用。 */
         @Size(max = AI_API_KEY_MAX_LENGTH, message = AI_API_KEY_TOO_LONG)
         String apiKey,
-        /** 是否移除已保存的 API Key。 */
-        Boolean removeApiKey,
         /** 出站代理类型。 */
         AiProxyType proxyType,
         /** 出站代理主机。 */
@@ -63,6 +61,6 @@ import static com.manga.common.constant.ValidationConstants.*;
     public String toString() {
         return "AiProviderConfigUpdateRequest[name=%s, providerType=%s, apiKeyChanged=%s]"
                 .formatted(name, providerType,
-                        (apiKey != null && !apiKey.isBlank()) || Boolean.TRUE.equals(removeApiKey));
+                        apiKey != null && !apiKey.isBlank());
     }
 }

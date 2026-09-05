@@ -294,7 +294,7 @@ function ProjectModule({ accessToken, projects, loading, error, onProjectsChange
             <header>
               <div>
                 <span className="workspace-eyebrow">{translate('projects.editorEyebrow')}</span>
-                <h2>{translate(editingProject ? 'projects.editTitle' : 'projects.createTitle')}</h2>
+                <h2>{editingProject ? form.name || translate('projects.editTitle') : translate('projects.createTitle')}</h2>
               </div>
               <button type="button" aria-label={translate('common.close')} onClick={closeEditor}><X size={19} /></button>
             </header>

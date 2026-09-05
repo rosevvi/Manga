@@ -41,7 +41,6 @@ const EMPTY_FORM = Object.freeze({
   baseUrl: DEFAULT_PROVIDER.baseUrl,
   defaultModel: DEFAULT_PROVIDER.model,
   apiKey: '',
-  removeApiKey: false,
   proxyType: 'NONE',
   proxyHost: '',
   proxyPort: '',
@@ -133,8 +132,7 @@ function AiProviderSettings({ accessToken, isGuest }) {
       providerType: config.providerType,
       baseUrl: config.baseUrl,
       defaultModel: config.defaultModel ?? '',
-      apiKey: '',
-      removeApiKey: false,
+      apiKey: config.apiKey ?? '',
       proxyType: config.proxyType ?? 'NONE',
       proxyHost: config.proxyHost ?? '',
       proxyPort: config.proxyPort ?? '',
@@ -249,8 +247,7 @@ function AiProviderSettings({ accessToken, isGuest }) {
         providerType: config.providerType,
         baseUrl: config.baseUrl,
         defaultModel: config.defaultModel,
-        apiKey: '',
-        removeApiKey: false,
+        apiKey: config.apiKey ?? '',
         proxyType: config.proxyType ?? 'NONE',
         proxyHost: config.proxyHost ?? '',
         proxyPort: config.proxyPort,
@@ -291,7 +288,6 @@ function AiProviderSettings({ accessToken, isGuest }) {
         baseUrl: form.baseUrl,
         defaultModel: form.defaultModel,
         apiKey: form.apiKey,
-        removeApiKey: form.removeApiKey,
         proxyType: form.proxyType,
         proxyHost: form.proxyHost,
         proxyPort: proxyPortValue(form.proxyPort),
@@ -458,19 +454,25 @@ function AiProviderSettings({ accessToken, isGuest }) {
               <label className="workspace-field">
                 <span>{translate('aiConfig.field.apiKey')}</span>
                 <div className="ai-secret-input">
-                  <input type={showApiKey ? 'text' : 'password'} autoComplete="new-password" maxLength={AI_CONFIG_LIMITS.apiKey} value={form.apiKey} disabled={form.removeApiKey} onChange={(event) => setForm({ ...form, apiKey: event.target.value })} placeholder={editingConfig?.hasApiKey ? translate('aiConfig.keepExistingKey') : 'sk-...'} />
+                  <input
+                    type={editingConfig?.hasApiKey && form.apiKey && !showApiKey ? 'text' : showApiKey ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    maxLength={AI_CONFIG_LIMITS.apiKey}
+                    value={editingConfig?.hasApiKey && form.apiKey && !showApiKey ? maskApiKey(form.apiKey) : form.apiKey}
+                    readOnly={Boolean(editingConfig?.hasApiKey && form.apiKey && !showApiKey)}
+                    onChange={(event) => updateForm('apiKey', event.target.value)}
+                    placeholder="sk-..."
+                  />
                   <button
                     type="button"
                     aria-label={translate(showApiKey ? 'aiConfig.hideApiKey' : 'aiConfig.showApiKey')}
                     title={translate(showApiKey ? 'aiConfig.hideApiKey' : 'aiConfig.showApiKey')}
-                    disabled={form.removeApiKey}
                     onClick={() => setShowApiKey((visible) => !visible)}
                   >
                     {showApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
               </label>
-              {editingConfig?.hasApiKey && <label className="ai-clear-key field-wide"><input type="checkbox" checked={form.removeApiKey} onChange={(event) => setForm({ ...form, removeApiKey: event.target.checked, apiKey: '' })} /><span>{translate('aiConfig.removeKey')}</span></label>}
               <label className="workspace-field">
                 <span className="ai-label-with-icon"><Network size={13} />{translate('aiConfig.proxy.title')}</span>
                 <AiSelectMenu
@@ -621,7 +623,6 @@ function configPayload(form) {
     baseUrl: form.baseUrl,
     defaultModel: form.defaultModel,
     apiKey: form.apiKey,
-    removeApiKey: form.removeApiKey,
     proxyType: form.proxyType,
     proxyHost: proxyEnabled ? form.proxyHost : '',
     proxyPort: proxyEnabled ? proxyPortValue(form.proxyPort) : null,
@@ -640,6 +641,12 @@ function proxyPortValue(value) {
   }
   const port = Number(value)
   return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : null
+}
+
+function maskApiKey(value) {
+  if (!value) return ''
+  if (value.length <= 8) return `${value.slice(0, 2)}••••${value.slice(-2)}`
+  return `${value.slice(0, 4)}••••${value.slice(-4)}`
 }
 
 function proxyDefaults(proxyType) {

@@ -68,7 +68,7 @@ public class AiProviderConfigController {
     public ApiResponse<AiProviderConfigResponse> update(
             @PathVariable long configId,
             @Valid @RequestBody AiProviderConfigUpdateRequest request) {
-        boolean keyChanged = hasText(request.apiKey()) || Boolean.TRUE.equals(request.removeApiKey());
+        boolean keyChanged = hasText(request.apiKey());
         log.info("[AiProviderConfigController#update] request configId={} subject={} provider={} keyChanged={}",
                 configId, SecurityUtils.getCurrentUsername(), request.providerType(), keyChanged);
         AiProviderConfigResponse result = configService.update(configId, request);

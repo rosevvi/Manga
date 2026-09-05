@@ -185,7 +185,7 @@ MANGA_OSS_PUBLIC_DOMAIN=
 
 登录控制台后可在侧栏“AI 配置”中保存多套服务商连接，支持 OpenAI、OpenAI Compatible、Anthropic、Gemini、DeepSeek、DashScope、Ollama 和自定义协议，并可选择一套启用的默认配置。
 
-API Key 使用 AES-GCM 加密后写入 `manga_ai_provider_config.api_key_ciphertext`，列表和更新响应不会返回明文或密文，仅返回是否已配置以及脱敏摘要。生产环境应在 `.env` 中提供独立的高强度随机密钥：
+API Key 使用 AES-GCM 加密后写入 `manga_ai_provider_config.api_key_ciphertext`。当前已授权的配置管理响应会返回 API Key，前端默认仅显示前四位、后四位和中间掩码，点击小眼睛后才显示完整值；生产环境必须使用 HTTPS，并避免在日志、截图或共享终端中暴露密钥。生产环境应在 `.env` 中提供独立的高强度随机密钥：
 
 ```properties
 MANGA_AI_SECRET_ENCRYPTION_KEY=请替换为独立的高强度随机值

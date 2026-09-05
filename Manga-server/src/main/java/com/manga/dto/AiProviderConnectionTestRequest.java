@@ -44,8 +44,6 @@ public record AiProviderConnectionTestRequest(
         /** AI 服务 API Key 明文，仅在请求处理中短暂使用。 */
         @Size(max = AI_API_KEY_MAX_LENGTH, message = AI_API_KEY_TOO_LONG)
         String apiKey,
-        /** 是否移除已保存的 API Key。 */
-        Boolean removeApiKey,
         /** 出站代理类型。 */
         AiProxyType proxyType,
         /** 出站代理主机。 */
@@ -67,7 +65,7 @@ public record AiProviderConnectionTestRequest(
     /** 返回不包含密钥明文的日志字符串。 */
     @Override
     public String toString() {
-        return "AiProviderConnectionTestRequest[configId=%s, providerType=%s, apiKeyPresent=%s, removeApiKey=%s]"
-                .formatted(configId, providerType, apiKey != null && !apiKey.isBlank(), removeApiKey);
+        return "AiProviderConnectionTestRequest[configId=%s, providerType=%s, apiKeyPresent=%s]"
+                .formatted(configId, providerType, apiKey != null && !apiKey.isBlank());
     }
 }

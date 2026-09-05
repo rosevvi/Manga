@@ -6,7 +6,7 @@ import com.manga.common.enums.AiProxyType;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/** 返回不包含密钥明文和密文的 AI 服务配置摘要。 */
+/** 返回 AI 服务配置摘要及供已授权编辑使用的 API Key。 */
 public record AiProviderConfigResponse(
         /** AI 服务配置主键。 */
         Long id,
@@ -22,6 +22,8 @@ public record AiProviderConfigResponse(
         boolean hasApiKey,
         /** API Key 脱敏摘要。 */
         String apiKeyHint,
+        /** API Key 明文，仅返回给当前已授权用户的配置管理页面。 */
+        String apiKey,
         /** 服务商显示名称。 */
         String providerLabel,
         /** 服务商能力说明。 */

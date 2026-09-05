@@ -130,9 +130,8 @@ public class AiProviderConfigService {
         AiProviderConfig current = requireOwned(configId, ownerUserId);
         String name = request.name().trim();
         requireUniqueName(ownerUserId, name, configId);
-        boolean removeApiKey = Boolean.TRUE.equals(request.removeApiKey());
         String newApiKey = normalize(request.apiKey());
-        boolean keyChanged = removeApiKey || newApiKey != null;
+        boolean keyChanged = newApiKey != null;
         boolean defaultConfig = request.defaultConfig() == null
                 ? Boolean.TRUE.equals(current.getDefaultConfig())
                 : request.defaultConfig();
@@ -151,10 +150,8 @@ public class AiProviderConfigService {
                 .providerType(request.providerType())
                 .baseUrl(normalizeBaseUrl(request.baseUrl()))
                 .defaultModel(normalize(request.defaultModel()))
-                .apiKeyCiphertext(removeApiKey ? null
-                        : newApiKey == null ? current.getApiKeyCiphertext() : secretCipher.encrypt(newApiKey))
-                .apiKeyHint(removeApiKey ? null
-                        : newApiKey == null ? current.getApiKeyHint() : maskSecret(newApiKey))
+                .apiKeyCiphertext(newApiKey == null ? current.getApiKeyCiphertext() : secretCipher.encrypt(newApiKey))
+                .apiKeyHint(newApiKey == null ? current.getApiKeyHint() : maskSecret(newApiKey))
                 .proxyType(proxyFields.proxyType())
                 .proxyHost(proxyFields.proxyHost())
                 .proxyPort(proxyFields.proxyPort())
@@ -233,7 +230,7 @@ public class AiProviderConfigService {
         long ownerUserId = SecurityUtils.requireCurrentUserId();
         AiProviderConfig savedConfig = request.configId() == null ? null : requireOwned(request.configId(), ownerUserId);
         String apiKey = normalize(request.apiKey());
-        if (apiKey == null && savedConfig != null && !Boolean.TRUE.equals(request.removeApiKey())) {
+        if (apiKey == null && savedConfig != null) {
             apiKey = savedConfig.getApiKeyCiphertext() == null
                     ? null
                     : secretCipher.decrypt(savedConfig.getApiKeyCiphertext());
@@ -424,11 +421,12 @@ public class AiProviderConfigService {
         }
     }
 
-    /** 将 AI 服务配置转换为脱敏响应。 */
+    /** 将 AI 服务配置转换为当前用户可编辑的响应。 */
     private AiProviderConfigResponse toResponse(AiProviderConfig config) {
         return new AiProviderConfigResponse(
                 config.getId(), config.getName(), config.getProviderType(), config.getBaseUrl(),
                 config.getDefaultModel(), config.getApiKeyCiphertext() != null, config.getApiKeyHint(),
+                config.getApiKeyCiphertext() == null ? null : secretCipher.decrypt(config.getApiKeyCiphertext()),
                 config.getProviderType().label(), config.getProviderType().description(),
                 config.getProviderType().recommendedModel(), config.getProviderType().apiKeyRequired(),
                 config.getProviderType().capabilities(),

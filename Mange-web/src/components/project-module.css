@@ -382,6 +382,15 @@
   width: min(790px, 100%);
 }
 
+.project-editor > header h2 {
+  max-width: min(52vw, 480px);
+  overflow: hidden;
+  font-size: 22px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .workspace-modal > header,
 .workspace-modal > footer {
   display: flex;
@@ -668,6 +677,17 @@
 
 .project-image-field {
   align-content: start;
+}
+
+.project-image-field.field-wide .manga-image-input {
+  width: min(100%, 360px);
+}
+
+.project-image-field.field-wide .manga-image-preview,
+.project-image-field.field-wide .manga-image-drop,
+.project-image-field.field-wide .manga-image-empty {
+  min-height: 0;
+  aspect-ratio: 16 / 9;
 }
 
 .workspace-field input:focus,
