@@ -24,6 +24,8 @@ public class StoryboardShot {
     private Long id;
     /** 所属项目主键。 */
     private Long projectId;
+    /** 所属剧本章节主键，可为空以兼容旧项目级镜头。 */
+    private Long chapterId;
     /** 分镜排序值。 */
     private Integer sortOrder;
     /** 分镜镜头编号。 */

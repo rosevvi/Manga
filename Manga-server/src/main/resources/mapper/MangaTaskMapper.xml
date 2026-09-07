@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.MangaTaskMapper">
+    <resultMap id="taskResultMap" type="com.manga.entity.MangaTask">
+        <id property="id" column="id"/><result property="ownerUserId" column="owner_user_id"/>
+        <result property="projectId" column="project_id"/><result property="taskType" column="task_type" javaType="com.manga.common.enums.TaskType"/>
+        <result property="status" column="status" javaType="com.manga.common.enums.TaskStatus"/><result property="title" column="title"/>
+        <result property="sourceReference" column="source_reference"/><result property="sourceSha256" column="source_sha256"/>
+        <result property="sourceSize" column="source_size"/><result property="sourceContentType" column="source_content_type"/>
+        <result property="afterChapterId" column="after_chapter_id"/><result property="totalUnits" column="total_units"/>
+        <result property="completedUnits" column="completed_units"/><result property="failedUnits" column="failed_units"/>
+        <result property="currentUnit" column="current_unit"/><result property="lastError" column="last_error"/>
+        <result property="attemptCount" column="attempt_count"/><result property="createdAt" column="created_at"/>
+        <result property="startedAt" column="started_at"/><result property="finishedAt" column="finished_at"/>
+        <result property="createdBy" column="created_by"/><result property="updatedBy" column="updated_by"/>
+    </resultMap>
+    <sql id="taskColumns">id, owner_user_id, project_id, task_type, status, title, source_reference, source_sha256,
+        source_size, source_content_type, after_chapter_id, total_units, completed_units, failed_units, current_unit,
+        last_error, attempt_count, created_at, started_at, finished_at, created_by, updated_by</sql>
+    <select id="findByOwner" resultMap="taskResultMap">SELECT <include refid="taskColumns"/> FROM manga_task WHERE owner_user_id = #{ownerUserId} ORDER BY created_at DESC</select>
+    <select id="findActive" resultMap="taskResultMap">SELECT <include refid="taskColumns"/> FROM manga_task WHERE owner_user_id = #{ownerUserId} AND status IN ('QUEUED','RUNNING') ORDER BY created_at DESC</select>
+    <select id="findRecoverable" resultMap="taskResultMap">SELECT <include refid="taskColumns"/> FROM manga_task WHERE status IN ('QUEUED','RUNNING') ORDER BY created_at</select>
+    <update id="updateProgress">
+        UPDATE manga_task SET status=#{task.status}, completed_units=#{task.completedUnits}, failed_units=#{task.failedUnits},
+        current_unit=#{task.currentUnit}, last_error=#{task.lastError}, attempt_count=#{task.attemptCount},
+        started_at=#{task.startedAt}, finished_at=#{task.finishedAt}, updated_by=#{task.updatedBy}
+        WHERE id=#{task.id} AND owner_user_id=#{task.ownerUserId}
+    </update>
+</mapper>

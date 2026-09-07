@@ -746,3 +746,56 @@
     display: none;
   }
 }
+.dashboard-notification-button {
+  position: relative;
+}
+
+.dashboard-notification-button span {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  display: grid;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  place-items: center;
+  border-radius: 99px;
+  color: #fff;
+  background: #8b4df5;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.dashboard-task-panel {
+  position: absolute;
+  z-index: 90;
+  top: 48px;
+  right: 80px;
+  width: min(330px, calc(100vw - 24px));
+  padding: 10px;
+  border: 1px solid #30283a;
+  border-radius: 10px;
+  background: rgba(17, 14, 21, 0.98);
+  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.48);
+}
+
+.dashboard-task-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 5px 9px;
+}
+
+.dashboard-task-panel article {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border-top: 1px solid #28222f;
+}
+
+.dashboard-task-panel article span,
+.dashboard-task-panel article small,
+.dashboard-task-panel > p {
+  color: #92879b;
+  font-size: 9px;
+}

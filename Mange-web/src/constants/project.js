@@ -81,6 +81,14 @@ export function projectScriptGenerateEndpoint(projectId) {
   return `${projectScriptEndpoint(projectId)}/generate`
 }
 
+export function projectScriptChapterEndpoint(projectId, chapterId) {
+  return `${projectScriptEndpoint(projectId)}/chapters/${encodeURIComponent(chapterId)}`
+}
+
+export function projectScriptChapterImportEndpoint(projectId) {
+  return `${projectScriptEndpoint(projectId)}/chapters/import`
+}
+
 export function projectMembersEndpoint(projectId) {
   return `${projectEndpoint(projectId)}/members`
 }

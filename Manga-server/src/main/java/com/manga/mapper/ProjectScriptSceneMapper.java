@@ -10,8 +10,8 @@ import java.util.List;
 public interface ProjectScriptSceneMapper extends BaseMapper<ProjectScriptScene> {
 
     /** 查询剧本全部场景。 */
-    List<ProjectScriptScene> findByScriptId(@Param("scriptId") long scriptId);
+    List<ProjectScriptScene> findByChapterId(@Param("chapterId") long chapterId);
 
     /** 删除剧本全部场景。 */
-    int deleteByScriptId(@Param("scriptId") long scriptId);
+    int deleteByChapterId(@Param("chapterId") long chapterId);
 }

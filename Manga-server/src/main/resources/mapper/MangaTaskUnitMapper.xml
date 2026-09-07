@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.MangaTaskUnitMapper">
+    <resultMap id="unitResultMap" type="com.manga.entity.MangaTaskUnit">
+        <id property="id" column="id"/><result property="taskId" column="task_id"/><result property="unitIndex" column="unit_index"/>
+        <result property="chapterId" column="chapter_id"/><result property="chapterTitle" column="chapter_title"/>
+        <result property="status" column="status" javaType="com.manga.common.enums.TaskStatus"/><result property="errorMessage" column="error_message"/>
+        <result property="startedAt" column="started_at"/><result property="finishedAt" column="finished_at"/>
+    </resultMap>
+    <select id="findByTaskId" resultMap="unitResultMap">SELECT id, task_id, unit_index, chapter_id, chapter_title, status, error_message, started_at, finished_at FROM manga_task_unit WHERE task_id=#{taskId} ORDER BY unit_index</select>
+</mapper>

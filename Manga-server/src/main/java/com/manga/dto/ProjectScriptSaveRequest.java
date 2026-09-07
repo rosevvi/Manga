@@ -8,32 +8,19 @@ import java.util.List;
 
 import static com.manga.common.constant.ValidationConstants.PROJECT_DESCRIPTION_MAX_LENGTH;
 
-/** 承载人工编辑或导入后的结构化剧本。 */
+/** 承载单章节编辑后的结构化内容。 */
 public record ProjectScriptSaveRequest(
-        /** 剧本标题。 */
+        /** 章节标题。 */
         @NotBlank @Size(max = 120) String title,
-        /** 剧本简介。 */
+        /** 章节简介。 */
         @Size(max = PROJECT_DESCRIPTION_MAX_LENGTH) String synopsis,
-        /** 剧本原始文本。 */
+        /** 当前章节原始文本。 */
         @NotBlank String rawContent,
-        /** 原始文本来源类型。 */
+        /** 当前章节来源类型。 */
         @Size(max = 32) String sourceType,
-        /** 分集列表。 */
-        @Valid List<Episode> episodes
+        /** 场景列表。 */
+        @Valid List<Scene> scenes
 ) {
-
-    /** 描述剧本分集。 */
-    public record Episode(
-            /** 分集编号。 */
-            Integer episodeNumber,
-            /** 分集标题。 */
-            @Size(max = 120) String title,
-            /** 分集简介。 */
-            @Size(max = 2000) String summary,
-            /** 场景列表。 */
-            @Valid List<Scene> scenes
-    ) {
-    }
 
     /** 描述剧本场景。 */
     public record Scene(

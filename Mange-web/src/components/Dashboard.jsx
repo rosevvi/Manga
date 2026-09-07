@@ -36,7 +36,7 @@ import ProjectModule from './ProjectModule'
 import StoryboardModule from './StoryboardModule'
 import AiProviderSettings from './AiProviderSettings'
 import ProjectWorkspace from './ProjectWorkspace'
-import { getProjects } from '../api/projectApi'
+import { getActiveTasks, getProjects } from '../api/projectApi'
 import { useLanguage } from '../i18n/LanguageContext'
 
 const SIDEBAR_NAV_ITEMS = [
@@ -120,11 +120,12 @@ const CREATION_FILTERS = [
 const DEFAULT_USER_NAME = 'Sakura'
 
 function projectRoute(pathname = window.location.pathname) {
-  const match = pathname.match(/^\/console\/projects\/(\d+)(?:\/(script|storyboards|assets|generation|export))?$/)
+  const match = pathname.match(/^\/console\/projects\/(\d+)(?:\/(script\/chapters\/(\d+)|storyboards|script|assets|generation|export))?$/)
   if (!match) return null
   return {
     projectId: Number(match[1]),
-    stage: match[2] === 'storyboards' ? 'STORYBOARD' : match[2] ? match[2].toUpperCase() : 'OVERVIEW',
+    stage: match[2]?.startsWith('script/chapters') ? 'SCRIPT_CHAPTER' : match[2] === 'storyboards' ? 'STORYBOARD' : match[2] ? match[2].toUpperCase() : 'OVERVIEW',
+    chapterId: match[3] ? Number(match[3]) : null,
   }
 }
 
@@ -139,6 +140,9 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [projectsError, setProjectsError] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectRoute?.projectId ?? null)
+  const [selectedChapterId, setSelectedChapterId] = useState(initialProjectRoute?.chapterId ?? null)
+  const [activeTasks, setActiveTasks] = useState([])
+  const [taskPanelOpen, setTaskPanelOpen] = useState(false)
   const [projectStage, setProjectStage] = useState(initialProjectRoute?.stage ?? 'OVERVIEW')
   const displayName = authSession?.user?.displayName || DEFAULT_USER_NAME
   const accessToken = authSession?.accessToken
@@ -167,11 +171,21 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   }, [loadProjects])
 
   useEffect(() => {
+    if (!accessToken || isGuest) return undefined
+    let cancelled = false
+    const loadTasks = () => getActiveTasks(accessToken).then((tasks) => { if (!cancelled) setActiveTasks(tasks) }).catch(() => {})
+    loadTasks()
+    const timer = window.setInterval(loadTasks, 5000)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [accessToken, isGuest])
+
+  useEffect(() => {
     const handleHistoryChange = () => {
       const route = projectRoute()
       if (route) {
         setSelectedProjectId(route.projectId)
         setProjectStage(route.stage)
+        setSelectedChapterId(route.chapterId)
         setActiveNav(route.stage === 'STORYBOARD' ? 'storyboards' : 'project')
       }
     }
@@ -192,6 +206,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   const navigateProject = (project, stage = 'OVERVIEW') => {
     setSelectedProjectId(project.id)
     setProjectStage(stage)
+    setSelectedChapterId(null)
     const suffix = stage === 'OVERVIEW' ? '' : `/${stage === 'STORYBOARD' ? 'storyboards' : stage.toLowerCase()}`
     window.history.pushState(null, '', `/console/projects/${encodeURIComponent(project.id)}${suffix}`)
     setActiveNav(stage === 'STORYBOARD' ? 'storyboards' : 'project')
@@ -203,6 +218,13 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
 
   /** 进入指定项目的分镜工作区。 */
   const openStoryboard = (project) => navigateProject(project, 'STORYBOARD')
+
+  const openChapter = (chapterId) => {
+    setSelectedChapterId(chapterId)
+    setProjectStage('SCRIPT_CHAPTER')
+    window.history.pushState(null, '', `/console/projects/${encodeURIComponent(selectedProjectId)}/script/chapters/${encodeURIComponent(chapterId)}`)
+    setActiveNav('project')
+  }
 
   const navigateProjectStage = (stage) => {
     const project = projects.find((item) => item.id === selectedProjectId)
@@ -262,7 +284,8 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
         </button>
         <div className="dashboard-top-actions">
           <button type="button" aria-label={translate('dashboard.search')}><Search size={18} /></button>
-          <button type="button" aria-label={translate('dashboard.notifications')}><Bell size={18} /></button>
+          <button type="button" className="dashboard-notification-button" aria-label={translate('dashboard.notifications')} title={translate('dashboard.notifications')} onClick={() => setTaskPanelOpen((open) => !open)}><Bell size={18} />{activeTasks.length > 0 && <span>{activeTasks.length}</span>}</button>
+          {taskPanelOpen && <div className="dashboard-task-panel"><header><strong>{translate('dashboard.notifications')}</strong><button type="button" onClick={() => setTaskPanelOpen(false)}><X size={14} /></button></header>{activeTasks.length === 0 ? <p>{translate('tasks.none')}</p> : activeTasks.map((task) => <article key={task.id}><strong>{task.title}</strong><span>{task.completedUnits}/{task.totalUnits || '?'} · {task.status}</span><small>{task.currentUnit || translate('tasks.waiting')}</small></article>)}</div>}
           <LanguageSelector compact />
           <UserAccountMenu
             authSession={authSession}
@@ -279,9 +302,11 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
             accessToken={accessToken}
             projectId={selectedProjectId}
             initialStage={projectStage}
+            initialChapterId={selectedChapterId}
             onBack={() => selectNavigation('projects')}
             onOpenStoryboard={openStoryboard}
             onNavigateStage={navigateProjectStage}
+            onNavigateChapter={openChapter}
           />
         ) : activeNav === 'projects' ? (
           <ProjectModule

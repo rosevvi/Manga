@@ -12,6 +12,12 @@ public final class MediaUploadConstants {
     public static final String UPLOAD_IMAGE_TOO_LARGE = "上传图片不能超过 %s";
     /** 上传请求超出大小限制提示。 */
     public static final String UPLOAD_REQUEST_TOO_LARGE = "上传文件过大，请压缩后重试";
+    /** 导入文件为空提示。 */
+    public static final String UPLOAD_SCRIPT_EMPTY = "导入文件不能为空";
+    /** 导入文件类型不受支持提示。 */
+    public static final String UPLOAD_SCRIPT_TYPE_UNSUPPORTED = "仅支持 TXT 或 Markdown 文本文件";
+    /** 导入文件编码不受支持提示。 */
+    public static final String UPLOAD_SCRIPT_ENCODING_UNSUPPORTED = "导入文件必须使用 UTF-8 编码";
     /** 上传图片类型不受支持提示。 */
     public static final String UPLOAD_IMAGE_TYPE_UNSUPPORTED = "仅支持 JPG、PNG、WebP 和 GIF 图片";
     /** 图片上传失败提示。 */

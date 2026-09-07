@@ -12,4 +12,6 @@ public interface ProjectScriptMapper extends BaseMapper<ProjectScript> {
 
     /** 更新项目剧本。 */
     int updateByProjectId(@Param("script") ProjectScript script);
+
+    int updateChapterCount(@Param("scriptId") long scriptId, @Param("chapterCount") int chapterCount);
 }

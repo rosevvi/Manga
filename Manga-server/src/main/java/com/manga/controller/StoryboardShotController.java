@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -32,10 +33,11 @@ public class StoryboardShotController {
 
     /** 查询项目分镜镜头列表。 */
     @GetMapping("/{projectId}/storyboard-shots")
-    public ApiResponse<List<StoryboardShotResponse>> findAll(@PathVariable long projectId) {
+    public ApiResponse<List<StoryboardShotResponse>> findAll(@PathVariable long projectId,
+            @RequestParam(required = false) Long chapterId) {
         log.info("[StoryboardShotController#findAll] request projectId={} subject={}",
                 projectId, SecurityUtils.getCurrentUsername());
-        List<StoryboardShotResponse> result = storyboardShotService.findAll(projectId);
+        List<StoryboardShotResponse> result = storyboardShotService.findAll(projectId, chapterId);
         log.info("[StoryboardShotController#findAll] response projectId={} count={}", projectId, result.size());
         return ApiResponse.success(result);
     }

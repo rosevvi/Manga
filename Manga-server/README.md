@@ -211,7 +211,7 @@ MANGA_AI_SECRET_ENCRYPTION_KEY=请替换为独立的高强度随机值
 - `PUT /api/v1/projects/{projectId}/workflow-stage` / 手动切换推荐阶段
 - `GET /api/v1/projects/{projectId}/script` / 查询剧本结构
 - `PUT /api/v1/projects/{projectId}/script` / 保存原文、分集、场景和对白
-- `POST /api/v1/projects/{projectId}/script/import` / 导入 TXT 或 Markdown 文本
+- `POST /api/v1/projects/{projectId}/script/import` / 通过文件上传导入 TXT 或 Markdown 文本
 - `POST /api/v1/projects/{projectId}/script/generate` / 使用默认 OpenAI 兼容模型进行 SSE 流式生成
 
 剧本生成提示词位于 `src/main/resources/prompts/script/`，以版本化 JSON 文件维护。角色/场景素材、图片/视频生成和成片导出阶段暂显示为规划中状态。

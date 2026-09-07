@@ -10,7 +10,7 @@ import java.util.List;
 public interface StoryboardShotMapper extends BaseMapper<StoryboardShot> {
 
     /** 查询项目分镜镜头列表。 */
-    List<StoryboardShot> findAllByProjectId(@Param("projectId") long projectId);
+    List<StoryboardShot> findAllByProjectId(@Param("projectId") long projectId, @Param("chapterId") Long chapterId);
 
     /** 查询项目内指定分镜镜头。 */
     StoryboardShot findByProjectAndId(@Param("projectId") long projectId, @Param("shotId") long shotId);

@@ -12,11 +12,13 @@ public record ProjectWorkspaceResponse(
         int stageRevision,
         /** 当前项目剧本。 */
         ProjectScriptResponse script,
-        /** 剧本分集数量。 */
-        int scriptEpisodeCount,
-        /** 剧本场景数量。 */
+        /** 剧本章节数量。 */
+        int scriptChapterCount,
+        /** 已结构化章节数量。 */
         int scriptSceneCount,
         /** 项目分镜数量。 */
-        int storyboardShotCount
+        int storyboardShotCount,
+        /** 项目最近任务摘要。 */
+        java.util.List<TaskResponse> tasks
 ) {
 }

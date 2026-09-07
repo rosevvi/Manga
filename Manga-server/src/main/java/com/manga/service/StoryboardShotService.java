@@ -32,9 +32,9 @@ public class StoryboardShotService {
     private final ProjectWorkflowService workflowService;
 
     /** 查询项目分镜镜头列表。 */
-    public List<StoryboardShotResponse> findAll(long projectId) {
+    public List<StoryboardShotResponse> findAll(long projectId, Long chapterId) {
         requireProject(projectId);
-        return storyboardShotRepository.findAllByProjectId(projectId).stream().map(this::toResponse).toList();
+        return storyboardShotRepository.findAllByProjectId(projectId, chapterId).stream().map(this::toResponse).toList();
     }
 
     /** 创建项目分镜镜头。 */
@@ -45,6 +45,7 @@ public class StoryboardShotService {
         int sortOrder = storyboardShotRepository.nextSortOrder(projectId);
         StoryboardShot shot = StoryboardShot.builder()
                 .projectId(projectId)
+                .chapterId(request.chapterId())
                 .sortOrder(sortOrder)
                 .shotNumber(SHOT_NUMBER_FORMAT.formatted(sortOrder))
                 .title(request.title().trim())
@@ -76,6 +77,7 @@ public class StoryboardShotService {
         StoryboardShot current = requireShot(projectId, shotId);
         StoryboardShot shot = StoryboardShot.builder()
                 .id(shotId)
+                .chapterId(request.chapterId())
                 .title(request.title().trim())
                 .sceneName(normalize(request.sceneName()))
                 .shotType(normalize(request.shotType()))
@@ -103,7 +105,7 @@ public class StoryboardShotService {
         requireProject(projectId);
         requireShot(projectId, shotId);
         storyboardShotRepository.delete(shotId);
-        List<Long> remainingIds = storyboardShotRepository.findAllByProjectId(projectId).stream()
+        List<Long> remainingIds = storyboardShotRepository.findAllByProjectId(projectId, null).stream()
                 .map(StoryboardShot::getId)
                 .toList();
         if (!remainingIds.isEmpty()) {
@@ -116,7 +118,7 @@ public class StoryboardShotService {
     @Transactional
     public List<StoryboardShotResponse> reorder(long projectId, StoryboardShotOrderRequest request) {
         requireProject(projectId);
-        List<Long> currentIds = storyboardShotRepository.findAllByProjectId(projectId).stream()
+        List<Long> currentIds = storyboardShotRepository.findAllByProjectId(projectId, null).stream()
                 .map(StoryboardShot::getId)
                 .toList();
         List<Long> requestedIds = request.shotIds();
@@ -129,7 +131,7 @@ public class StoryboardShotService {
         workflowService.advanceTo(projectId, com.manga.common.enums.ProjectWorkflowStage.ASSETS,
                 SecurityUtils.requireCurrentUsername());
         log.info("Storyboard order updated projectId={} shotCount={}", projectId, requestedIds.size());
-        return storyboardShotRepository.findAllByProjectId(projectId).stream().map(this::toResponse).toList();
+        return storyboardShotRepository.findAllByProjectId(projectId, null).stream().map(this::toResponse).toList();
     }
 
     /** 校验当前用户可访问目标项目。 */
@@ -147,7 +149,7 @@ public class StoryboardShotService {
     /** 将分镜镜头转换为响应对象。 */
     private StoryboardShotResponse toResponse(StoryboardShot shot) {
         return new StoryboardShotResponse(
-                shot.getId(), shot.getProjectId(), shot.getSortOrder(), shot.getShotNumber(), shot.getTitle(),
+                shot.getId(), shot.getProjectId(), shot.getChapterId(), shot.getSortOrder(), shot.getShotNumber(), shot.getTitle(),
                 shot.getSceneName(), shot.getShotType(), shot.getCameraMovement(), shot.getDurationSeconds(),
                 shot.getContent(), shot.getDialogue(), shot.getSoundEffect(), shot.getImageUrl(), shot.getNotes(),
                 shot.getStatus(), shot.getCreatedAt(), shot.getUpdatedAt());

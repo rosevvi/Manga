@@ -10,6 +10,7 @@ public record StoryboardShotResponse(
         Long id,
         /** 所属项目主键。 */
         Long projectId,
+        Long chapterId,
         /** 分镜排序值。 */
         int sortOrder,
         /** 分镜镜头编号。 */

@@ -17,8 +17,8 @@ public class StoryboardShotRepository {
     private final StoryboardShotMapper storyboardShotMapper;
 
     /** 查询项目分镜镜头列表。 */
-    public List<StoryboardShot> findAllByProjectId(long projectId) {
-        return storyboardShotMapper.findAllByProjectId(projectId);
+    public List<StoryboardShot> findAllByProjectId(long projectId, Long chapterId) {
+        return storyboardShotMapper.findAllByProjectId(projectId, chapterId);
     }
 
     /** 查询项目内指定分镜镜头。 */

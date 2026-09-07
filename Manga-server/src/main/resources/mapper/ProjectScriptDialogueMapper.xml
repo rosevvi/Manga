@@ -15,23 +15,21 @@
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
-    <select id="findByScriptId" resultMap="dialogueResultMap">
+    <select id="findByChapterId" resultMap="dialogueResultMap">
         SELECT d.id, d.scene_id, d.speaker, d.text, d.dialogue_type, d.sort_order,
                d.created_at, d.updated_at
         FROM manga_project_script_dialogue d
         INNER JOIN manga_project_script_scene s ON s.id = d.scene_id
-        INNER JOIN manga_project_script_episode e ON e.id = s.episode_id
-        WHERE e.script_id = #{scriptId}
-        ORDER BY e.sort_order, s.sort_order, d.sort_order, d.id
+        WHERE s.chapter_id = #{chapterId}
+        ORDER BY s.sort_order, d.sort_order, d.id
     </select>
 
-    <delete id="deleteByScriptId">
+    <delete id="deleteByChapterId">
         DELETE FROM manga_project_script_dialogue
         WHERE scene_id IN (
             SELECT s.id
             FROM manga_project_script_scene s
-            INNER JOIN manga_project_script_episode e ON e.id = s.episode_id
-            WHERE e.script_id = #{scriptId}
+            WHERE s.chapter_id = #{chapterId}
         )
     </delete>
 </mapper>

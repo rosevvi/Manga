@@ -7,6 +7,7 @@
     <resultMap id="storyboardShotResultMap" type="com.manga.entity.StoryboardShot">
         <id property="id" column="id"/>
         <result property="projectId" column="project_id"/>
+        <result property="chapterId" column="chapter_id"/>
         <result property="sortOrder" column="sort_order"/>
         <result property="shotNumber" column="shot_number"/>
         <result property="title" column="title"/>
@@ -27,9 +28,12 @@
     </resultMap>
 
     <select id="findAllByProjectId" resultMap="storyboardShotResultMap">
-        SELECT *
+        SELECT id, project_id, chapter_id, sort_order, shot_number, title, scene_name, shot_type,
+               camera_movement, duration_seconds, content, dialogue, sound_effect, image_url, notes,
+               status, created_at, updated_at, created_by, updated_by
         FROM manga_storyboard_shot
         WHERE project_id = #{projectId}
+        <if test="chapterId != null">AND chapter_id = #{chapterId}</if>
         ORDER BY sort_order, id
     </select>
 
@@ -48,7 +52,8 @@
 
     <update id="updateInProject">
         UPDATE manga_storyboard_shot
-        SET title = #{shot.title},
+        SET chapter_id = #{shot.chapterId},
+            title = #{shot.title},
             scene_name = #{shot.sceneName},
             shot_type = #{shot.shotType},
             camera_movement = #{shot.cameraMovement},

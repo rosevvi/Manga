@@ -7,15 +7,16 @@ import com.manga.dto.ProjectMemberResponse;
 import com.manga.dto.ProjectCreateRequest;
 import com.manga.dto.ProjectResponse;
 import com.manga.dto.ProjectScriptImportRequest;
-import com.manga.dto.ProjectScriptGenerateRequest;
-import com.manga.dto.ProjectScriptResponse;
+import com.manga.dto.ProjectScriptChapterImportRequest;
+import com.manga.dto.ProjectScriptChapterResponse;
 import com.manga.dto.ProjectScriptSaveRequest;
+import com.manga.dto.ProjectScriptResponse;
 import com.manga.dto.ProjectWorkflowStageUpdateRequest;
 import com.manga.dto.ProjectWorkspaceResponse;
 import com.manga.dto.ProjectUpdateRequest;
 import com.manga.entity.ProjectWorkflow;
 import com.manga.service.ProjectScriptService;
-import com.manga.service.ProjectScriptGenerationService;
+import com.manga.service.ScriptTaskService;
 import com.manga.service.ProjectWorkflowService;
 import com.manga.service.ProjectService;
 import jakarta.validation.Valid;
@@ -28,12 +29,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-import reactor.core.publisher.Flux;
-import org.springframework.http.codec.ServerSentEvent;
 
 /** 提供当前用户项目的 REST 接口。 */
 @RestController
@@ -44,8 +45,8 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final ProjectScriptService scriptService;
-    private final ProjectScriptGenerationService scriptGenerationService;
     private final ProjectWorkflowService workflowService;
+    private final ScriptTaskService scriptTaskService;
 
     /** 查询当前用户可访问的项目列表。 */
     @GetMapping
@@ -83,13 +84,13 @@ public class ProjectController {
                 projectId, SecurityUtils.getCurrentUsername());
         ProjectResponse project = projectService.findById(projectId);
         ProjectScriptResponse script = scriptService.find(projectId);
-        int sceneCount = script == null ? 0 : script.episodes().stream()
-                .mapToInt(episode -> episode.scenes() == null ? 0 : episode.scenes().size())
-                .sum();
+        int sceneCount = script == null ? 0 : script.chapters().stream().mapToInt(com.manga.dto.ProjectScriptChapterSummaryResponse::sceneCount).sum();
         ProjectWorkflow workflow = workflowService.getOrCreate(projectId, SecurityUtils.requireCurrentUsername());
         ProjectWorkspaceResponse result = new ProjectWorkspaceResponse(
                 project, workflow.getCurrentStage(), workflow.getStageRevision() == null ? 0 : workflow.getStageRevision(),
-                script, script == null ? 0 : script.episodes().size(), sceneCount, project.shotCount());
+                script, script == null ? 0 : script.chapterCount(), sceneCount, project.shotCount(),
+                scriptTaskService.list(SecurityUtils.requireCurrentUserId(), false).stream()
+                        .filter(task -> task.projectId().equals(projectId)).limit(20).toList());
         log.info("[ProjectController#findWorkspace] response projectId={} stage={} scriptPresent={} shotCount={}",
                 projectId, result.workflowStage(), result.script() != null, result.storyboardShotCount());
         return ApiResponse.success(result);
@@ -120,38 +121,71 @@ public class ProjectController {
     }
 
     /** 保存项目剧本结构。 */
-    @PutMapping("/{projectId}/script")
-    public ApiResponse<ProjectScriptResponse> saveScript(
+    @PutMapping(value = "/{projectId}/script", consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    public org.springframework.http.ResponseEntity<ApiResponse<com.manga.dto.TaskResponse>> saveScript(
             @PathVariable long projectId,
-            @Valid @RequestBody ProjectScriptSaveRequest request) {
-        log.info("[ProjectController#saveScript] request projectId={} subject={} episodeCount={}",
-                projectId, SecurityUtils.getCurrentUsername(), request.episodes() == null ? 0 : request.episodes().size());
-        ProjectScriptResponse result = scriptService.save(projectId, request);
-        log.info("[ProjectController#saveScript] response projectId={} scriptId={} parseStatus={}",
-                projectId, result.id(), result.parseStatus());
-        return ApiResponse.success(result);
+            @Valid @RequestBody ProjectScriptImportRequest request) {
+        return org.springframework.http.ResponseEntity.accepted().body(ApiResponse.success(scriptTaskService.submitImport(projectId, request,
+                SecurityUtils.requireCurrentUserId(), SecurityUtils.requireCurrentUsername())));
     }
 
     /** 导入项目剧本原始文本。 */
-    @PostMapping("/{projectId}/script/import")
-    public ApiResponse<ProjectScriptResponse> importScript(
+    @PostMapping(value = "/{projectId}/script/import", consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    public org.springframework.http.ResponseEntity<ApiResponse<com.manga.dto.TaskResponse>> importScript(
             @PathVariable long projectId,
             @Valid @RequestBody ProjectScriptImportRequest request) {
-        log.info("[ProjectController#importScript] request projectId={} subject={} contentLength={}",
-                projectId, SecurityUtils.getCurrentUsername(), request.rawContent().length());
-        ProjectScriptResponse result = scriptService.importText(projectId, request.rawContent(), request.sourceType());
-        log.info("[ProjectController#importScript] response projectId={} scriptId={}", projectId, result.id());
-        return ApiResponse.success(result);
+        return org.springframework.http.ResponseEntity.accepted().body(ApiResponse.success(scriptTaskService.submitImport(projectId, request,
+                SecurityUtils.requireCurrentUserId(), SecurityUtils.requireCurrentUsername())));
     }
 
-    /** 通过默认 OpenAI 兼容模型流式生成剧本。 */
-    @PostMapping("/{projectId}/script/generate")
-    public Flux<ServerSentEvent<String>> generateScript(
+    /** 通过文件上传导入项目剧本原始文本。 */
+    @PostMapping(value = "/{projectId}/script/import", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public org.springframework.http.ResponseEntity<ApiResponse<com.manga.dto.TaskResponse>> importScript(
             @PathVariable long projectId,
-            @Valid @RequestBody ProjectScriptGenerateRequest request) {
-        log.info("[ProjectController#generateScript] request projectId={} subject={} promptLength={}",
-                projectId, SecurityUtils.getCurrentUsername(), request.prompt().length());
-        return scriptGenerationService.generate(projectId, request);
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "sourceType", required = false) String sourceType,
+            @RequestParam(value = "afterChapterId", required = false) Long afterChapterId) {
+        return org.springframework.http.ResponseEntity.accepted().body(ApiResponse.success(scriptTaskService.submitImport(
+                projectId, file, sourceType, afterChapterId, SecurityUtils.requireCurrentUserId(),
+                SecurityUtils.requireCurrentUsername())));
+    }
+
+    /** 同步导入单个章节。 */
+    @PostMapping("/{projectId}/script/chapters/import")
+    public ApiResponse<ProjectScriptChapterResponse> importChapter(
+            @PathVariable long projectId, @Valid @RequestBody ProjectScriptChapterImportRequest request) {
+        return ApiResponse.success(scriptService.createChapter(projectId, request.title(), request.synopsis(),
+                request.rawContent(), request.sourceType()));
+    }
+
+    /** 查询单章节正文。 */
+    @GetMapping("/{projectId}/script/chapters/{chapterId}")
+    public ApiResponse<ProjectScriptChapterResponse> findChapter(
+            @PathVariable long projectId, @PathVariable long chapterId) {
+        return ApiResponse.success(scriptService.findChapter(projectId, chapterId));
+    }
+
+    /** 保存单章节正文。 */
+    @PutMapping("/{projectId}/script/chapters/{chapterId}")
+    public ApiResponse<ProjectScriptChapterResponse> saveChapter(
+            @PathVariable long projectId, @PathVariable long chapterId,
+            @Valid @RequestBody ProjectScriptSaveRequest request) {
+        return ApiResponse.success(scriptService.saveChapter(projectId, chapterId, request));
+    }
+
+    /** 删除单章节。 */
+    @DeleteMapping("/{projectId}/script/chapters/{chapterId}")
+    public ApiResponse<Void> deleteChapter(@PathVariable long projectId, @PathVariable long chapterId) {
+        scriptService.deleteChapter(projectId, chapterId);
+        return ApiResponse.success(null);
+    }
+
+    /** 查询项目任务历史。 */
+    @GetMapping("/{projectId}/tasks")
+    public ApiResponse<List<com.manga.dto.TaskResponse>> listProjectTasks(@PathVariable long projectId) {
+        projectService.requireAccessibleProject(projectId, SecurityUtils.requireCurrentUserId());
+        return ApiResponse.success(scriptTaskService.list(SecurityUtils.requireCurrentUserId(), false).stream()
+                .filter(task -> task.projectId().equals(projectId)).toList());
     }
 
     /** 查询项目成员列表。 */

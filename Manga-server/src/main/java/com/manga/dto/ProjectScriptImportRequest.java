@@ -1,13 +1,24 @@
 package com.manga.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-/** 承载 TXT 或 Markdown 剧本导入内容。 */
+import java.util.List;
+
+/** 承载全文或多章节异步导入请求。 */
 public record ProjectScriptImportRequest(
-        /** 导入的原始文本。 */
-        @NotBlank @Size(max = 200000) String rawContent,
-        /** 导入来源类型。 */
-        @Size(max = 32) String sourceType
+        Long afterChapterId,
+        @Size(max = 32) String sourceType,
+        @Size(max = 20000000) String rawContent,
+        @Valid List<Chapter> chapters
 ) {
+
+    /** 显式提供的章节输入。 */
+    public record Chapter(
+            @NotBlank @Size(max = 120) String title,
+            @Size(max = 2000) String synopsis,
+            @NotBlank @Size(max = 200000) String rawContent
+    ) {
+    }
 }

@@ -276,6 +276,98 @@
   gap: 16px;
 }
 
+.script-chapter-list {
+  display: grid;
+  gap: 8px;
+}
+
+.script-task-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(150, 98, 255, 0.28);
+  border-radius: 7px;
+  color: #c6a8ef;
+  background: rgba(104, 62, 178, 0.14);
+  font-size: 10px;
+}
+
+.script-chapter-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #2a2431;
+  border-radius: 8px;
+  color: #eeeaf2;
+  background: #121016;
+  text-align: left;
+  cursor: pointer;
+}
+
+.script-chapter-card:hover {
+  border-color: #5b3e7c;
+  background: #17121e;
+}
+
+.script-chapter-number {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 7px;
+  color: #c7a8ff;
+  background: rgba(111, 62, 190, 0.2);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.script-chapter-card strong,
+.script-chapter-card small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.script-chapter-card small {
+  margin-top: 4px;
+  color: #8d8495;
+  font-size: 9px;
+}
+
+.script-chapter-status {
+  color: #8d8495;
+  font-size: 9px;
+}
+
+.script-chapter-status.completed { color: #7bdaa5; }
+.script-chapter-status.failed { color: #f3a2b7; }
+
+.script-import-panel {
+  display: grid;
+  gap: 11px;
+  padding: 16px;
+  border: 1px solid #2a2431;
+  border-radius: 9px;
+  background: rgba(18, 15, 23, 0.8);
+}
+
+.script-inline-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #302a34;
+  border-radius: 6px;
+  outline: 0;
+  color: #eeeaf0;
+  background: #0e0c10;
+  font: inherit;
+}
+
 .script-workspace-heading {
   display: flex;
   align-items: flex-end;

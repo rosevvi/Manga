@@ -14,8 +14,8 @@ spring:
       schema-locations: classpath:manga.sql
   servlet:
     multipart:
-      max-file-size: ${MANGA_UPLOAD_MAX_IMAGE_SIZE:8MB}
-      max-request-size: ${MANGA_UPLOAD_MAX_REQUEST_SIZE:9MB}
+      max-file-size: ${MANGA_SCRIPT_UPLOAD_MAX_FILE_SIZE:20MB}
+      max-request-size: ${MANGA_SCRIPT_UPLOAD_MAX_REQUEST_SIZE:21MB}
   threads:
     virtual:
       enabled: true
@@ -39,6 +39,11 @@ server:
     include-stacktrace: never
 
 manga:
+  script:
+    task:
+      input-directory: data/script-tasks
+      max-input-size: ${MANGA_SCRIPT_TASK_MAX_INPUT_SIZE:20000000}
+      max-attempts: 3
   external-http:
     connect-timeout: 10s
     request-timeout: 30s

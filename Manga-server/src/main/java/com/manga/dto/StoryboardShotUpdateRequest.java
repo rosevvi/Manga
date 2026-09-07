@@ -10,6 +10,7 @@ import static com.manga.common.constant.ValidationConstants.*;
 
 /** 承载分镜镜头的完整更新。 */
 public record StoryboardShotUpdateRequest(
+        Long chapterId,
         /** 分镜标题。 */
         @NotBlank(message = SHOT_TITLE_REQUIRED)
         @Size(max = SHOT_TITLE_MAX_LENGTH, message = SHOT_TITLE_TOO_LONG)

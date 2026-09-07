@@ -10,8 +10,8 @@ import java.util.List;
 public interface ProjectScriptDialogueMapper extends BaseMapper<ProjectScriptDialogue> {
 
     /** 查询剧本全部对白。 */
-    List<ProjectScriptDialogue> findByScriptId(@Param("scriptId") long scriptId);
+    List<ProjectScriptDialogue> findByChapterId(@Param("chapterId") long chapterId);
 
     /** 删除剧本全部对白。 */
-    int deleteByScriptId(@Param("scriptId") long scriptId);
+    int deleteByChapterId(@Param("chapterId") long chapterId);
 }

@@ -133,11 +133,10 @@ CREATE TABLE IF NOT EXISTS manga_project_script (
     project_id BIGINT NOT NULL COMMENT '所属项目主键',
     title VARCHAR(120) NOT NULL COMMENT '剧本标题',
     synopsis VARCHAR(2000) NULL COMMENT '剧本简介',
-    raw_content LONGTEXT NOT NULL COMMENT '剧本原始文本',
     source_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL' COMMENT '原始文本来源类型',
     parse_status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' COMMENT '结构化解析状态',
     structure_version INT NOT NULL DEFAULT 1 COMMENT '结构化数据版本',
-    structure_json LONGTEXT NULL COMMENT '结构化剧本 JSON',
+    chapter_count INT NOT NULL DEFAULT 0 COMMENT '章节数量',
     last_error VARCHAR(2000) NULL COMMENT '最近一次解析错误摘要',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
@@ -148,24 +147,31 @@ CREATE TABLE IF NOT EXISTS manga_project_script (
     CONSTRAINT fk_manga_project_script_project FOREIGN KEY (project_id) REFERENCES manga_project (id) ON DELETE CASCADE
 ) COMMENT = '项目剧本主表';
 
-CREATE TABLE IF NOT EXISTS manga_project_script_episode (
-    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '剧本分集主键',
+CREATE TABLE IF NOT EXISTS manga_project_script_chapter (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '剧本章节主键',
     script_id BIGINT NOT NULL COMMENT '所属剧本主键',
-    episode_number INT NOT NULL COMMENT '分集编号',
-    title VARCHAR(120) NOT NULL COMMENT '分集标题',
-    summary VARCHAR(2000) NULL COMMENT '分集简介',
-    sort_order INT NOT NULL COMMENT '分集排序',
+    title VARCHAR(120) NOT NULL COMMENT '章节标题',
+    synopsis VARCHAR(2000) NULL COMMENT '章节简介',
+    raw_content LONGTEXT NOT NULL COMMENT '当前章节原文',
+    structure_json LONGTEXT NULL COMMENT '当前章节结构 JSON',
+    source_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL' COMMENT '章节来源类型',
+    parse_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '章节处理状态',
+    structure_version INT NOT NULL DEFAULT 1 COMMENT '章节结构版本',
+    last_error VARCHAR(2000) NULL COMMENT '章节错误摘要',
+    sort_order INT NOT NULL COMMENT '稳定排序值',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
+    created_by VARCHAR(64) NOT NULL COMMENT '创建人标识',
+    updated_by VARCHAR(64) NOT NULL COMMENT '最后修改人标识',
     PRIMARY KEY (id),
-    CONSTRAINT uk_manga_script_episode_number UNIQUE (script_id, episode_number),
-    INDEX idx_manga_script_episode_script_order (script_id, sort_order),
-    CONSTRAINT fk_manga_script_episode_script FOREIGN KEY (script_id) REFERENCES manga_project_script (id) ON DELETE CASCADE
-) COMMENT = '项目剧本分集表';
+    CONSTRAINT uk_manga_script_chapter_order UNIQUE (script_id, sort_order),
+    INDEX idx_manga_script_chapter_script (script_id, sort_order),
+    CONSTRAINT fk_manga_script_chapter_script FOREIGN KEY (script_id) REFERENCES manga_project_script (id) ON DELETE CASCADE
+) COMMENT = '项目剧本章节表';
 
 CREATE TABLE IF NOT EXISTS manga_project_script_scene (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '剧本场景主键',
-    episode_id BIGINT NOT NULL COMMENT '所属分集主键',
+    chapter_id BIGINT NOT NULL COMMENT '所属章节主键',
     scene_number INT NOT NULL COMMENT '场景编号',
     location VARCHAR(120) NULL COMMENT '场景地点',
     time_description VARCHAR(120) NULL COMMENT '场景时间描述',
@@ -175,9 +181,9 @@ CREATE TABLE IF NOT EXISTS manga_project_script_scene (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后修改时间',
     PRIMARY KEY (id),
-    CONSTRAINT uk_manga_script_scene_number UNIQUE (episode_id, scene_number),
-    INDEX idx_manga_script_scene_episode_order (episode_id, sort_order),
-    CONSTRAINT fk_manga_script_scene_episode FOREIGN KEY (episode_id) REFERENCES manga_project_script_episode (id) ON DELETE CASCADE
+    CONSTRAINT uk_manga_script_scene_number UNIQUE (chapter_id, scene_number),
+    INDEX idx_manga_script_scene_chapter_order (chapter_id, sort_order),
+    CONSTRAINT fk_manga_script_scene_chapter FOREIGN KEY (chapter_id) REFERENCES manga_project_script_chapter (id) ON DELETE CASCADE
 ) COMMENT = '项目剧本场景表';
 
 CREATE TABLE IF NOT EXISTS manga_project_script_dialogue (
@@ -193,6 +199,52 @@ CREATE TABLE IF NOT EXISTS manga_project_script_dialogue (
     INDEX idx_manga_script_dialogue_scene_order (scene_id, sort_order),
     CONSTRAINT fk_manga_script_dialogue_scene FOREIGN KEY (scene_id) REFERENCES manga_project_script_scene (id) ON DELETE CASCADE
 ) COMMENT = '项目剧本对白表';
+
+CREATE TABLE IF NOT EXISTS manga_task (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '任务主键',
+    owner_user_id BIGINT NOT NULL COMMENT '任务所有者',
+    project_id BIGINT NOT NULL COMMENT '所属项目',
+    task_type VARCHAR(40) NOT NULL COMMENT '任务类型',
+    status VARCHAR(24) NOT NULL COMMENT '任务状态',
+    title VARCHAR(160) NOT NULL COMMENT '任务标题',
+    source_reference VARCHAR(1024) NULL COMMENT '临时输入文件引用',
+    source_sha256 CHAR(64) NULL COMMENT '输入哈希',
+    source_size BIGINT NULL COMMENT '输入字节数',
+    source_content_type VARCHAR(120) NULL COMMENT '输入类型',
+    after_chapter_id BIGINT NULL COMMENT '插入位置之前的章节',
+    total_units INT NOT NULL DEFAULT 0 COMMENT '总处理单元数',
+    completed_units INT NOT NULL DEFAULT 0 COMMENT '完成单元数',
+    failed_units INT NOT NULL DEFAULT 0 COMMENT '失败单元数',
+    current_unit VARCHAR(160) NULL COMMENT '当前处理单元',
+    last_error VARCHAR(2000) NULL COMMENT '最近错误',
+    attempt_count INT NOT NULL DEFAULT 0 COMMENT '尝试次数',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    started_at TIMESTAMP NULL COMMENT '开始时间',
+    finished_at TIMESTAMP NULL COMMENT '完成时间',
+    created_by VARCHAR(64) NOT NULL COMMENT '创建人标识',
+    updated_by VARCHAR(64) NOT NULL COMMENT '更新人标识',
+    PRIMARY KEY (id),
+    INDEX idx_manga_task_owner_status (owner_user_id, status, created_at),
+    CONSTRAINT fk_manga_task_owner FOREIGN KEY (owner_user_id) REFERENCES manga_user (id) ON DELETE CASCADE,
+    CONSTRAINT fk_manga_task_project FOREIGN KEY (project_id) REFERENCES manga_project (id) ON DELETE CASCADE
+) COMMENT = '统一后台任务表';
+
+CREATE TABLE IF NOT EXISTS manga_task_unit (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '任务单元主键',
+    task_id BIGINT NOT NULL COMMENT '所属任务',
+    unit_index INT NOT NULL COMMENT '输入顺序',
+    chapter_id BIGINT NULL COMMENT '已创建章节主键',
+    chapter_title VARCHAR(120) NOT NULL COMMENT '章节标题',
+    status VARCHAR(24) NOT NULL COMMENT '单元状态',
+    error_message VARCHAR(2000) NULL COMMENT '错误摘要',
+    started_at TIMESTAMP NULL COMMENT '开始时间',
+    finished_at TIMESTAMP NULL COMMENT '完成时间',
+    PRIMARY KEY (id),
+    CONSTRAINT uk_manga_task_unit_index UNIQUE (task_id, unit_index),
+    INDEX idx_manga_task_unit_task_status (task_id, status),
+    CONSTRAINT fk_manga_task_unit_task FOREIGN KEY (task_id) REFERENCES manga_task (id) ON DELETE CASCADE,
+    CONSTRAINT fk_manga_task_unit_chapter FOREIGN KEY (chapter_id) REFERENCES manga_project_script_chapter (id) ON DELETE SET NULL
+) COMMENT = '后台任务处理单元表';
 
 CREATE TABLE IF NOT EXISTS manga_storyboard_shot (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '分镜镜头主键',

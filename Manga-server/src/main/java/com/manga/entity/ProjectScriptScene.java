@@ -21,8 +21,8 @@ public class ProjectScriptScene {
     /** 场景主键。 */
     @TableId(type = IdType.AUTO)
     private Long id;
-    /** 所属分集主键。 */
-    private Long episodeId;
+    /** 所属章节主键。 */
+    private Long chapterId;
     /** 场景编号。 */
     private Integer sceneNumber;
     /** 场景地点。 */

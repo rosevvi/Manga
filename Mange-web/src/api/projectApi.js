@@ -4,6 +4,8 @@ import {
   PROJECT_ENDPOINTS,
   projectEndpoint,
   projectScriptEndpoint,
+  projectScriptChapterEndpoint,
+  projectScriptChapterImportEndpoint,
   projectScriptGenerateEndpoint,
   projectScriptImportEndpoint,
   projectWorkflowStageEndpoint,
@@ -57,11 +59,44 @@ export function saveProjectScript(accessToken, projectId, script) {
   })
 }
 
-export function importProjectScript(accessToken, projectId, rawContent, sourceType) {
-  return authorizedRequest(accessToken, projectScriptImportEndpoint(projectId), {
-    method: 'POST',
-    body: JSON.stringify({ rawContent, sourceType }),
+export function importProjectScript(accessToken, projectId, file, sourceType, afterChapterId) {
+  const formData = new FormData()
+  formData.append('file', file)
+  if (sourceType) {
+    formData.append('sourceType', sourceType)
+  }
+  if (afterChapterId !== undefined && afterChapterId !== null) {
+    formData.append('afterChapterId', String(afterChapterId))
+  }
+  return authorizedFormRequest(accessToken, projectScriptImportEndpoint(projectId), formData)
+}
+
+export function importProjectChapter(accessToken, projectId, chapter) {
+  return authorizedRequest(accessToken, projectScriptChapterImportEndpoint(projectId), {
+    method: 'POST', body: JSON.stringify(chapter),
   })
+}
+
+export function getProjectChapter(accessToken, projectId, chapterId) {
+  return authorizedRequest(accessToken, projectScriptChapterEndpoint(projectId, chapterId))
+}
+
+export function saveProjectChapter(accessToken, projectId, chapterId, chapter) {
+  return authorizedRequest(accessToken, projectScriptChapterEndpoint(projectId, chapterId), {
+    method: 'PUT', body: JSON.stringify(chapter),
+  })
+}
+
+export function deleteProjectChapter(accessToken, projectId, chapterId) {
+  return authorizedRequest(accessToken, projectScriptChapterEndpoint(projectId, chapterId), { method: 'DELETE' })
+}
+
+export function getProjectTasks(accessToken, projectId) {
+  return authorizedRequest(accessToken, `/projects/${encodeURIComponent(projectId)}/tasks`)
+}
+
+export function getActiveTasks(accessToken) {
+  return authorizedRequest(accessToken, '/tasks/active')
 }
 
 export function updateProjectWorkflowStage(accessToken, projectId, stage) {
