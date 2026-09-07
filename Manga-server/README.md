@@ -58,7 +58,7 @@ mvn spring-boot:run
 
 操作系统环境变量的优先级高于 `.env`。其他数据库连接参数可通过 `MANGA_DB_HOST`、`MANGA_DB_PORT`、`MANGA_DB_NAME`、`MANGA_DB_USERNAME` 或完整的 `MANGA_DB_URL` 覆盖；部署到其他环境时可通过 `SPRING_PROFILES_ACTIVE` 切换 Profile。
 
-前端本地 API 地址保存在 `Mange-web/.env.local`，当前指向 `http://localhost:8080/api/v1`，Vite 启动时会自动读取该文件。
+前端本地 API 地址保存在 `Manga-web/.env.local`，当前指向 `http://localhost:8080/api/v1`，Vite 启动时会自动读取该文件。
 
 ## Docker 启动应用
 
