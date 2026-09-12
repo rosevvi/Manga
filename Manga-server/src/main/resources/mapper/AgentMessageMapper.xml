@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.AgentMessageMapper">
+    <select id="findByConversation" resultType="com.manga.entity.AgentMessage">
+        SELECT id, conversation_id, run_id, role, content, message_order, created_at
+        FROM manga_agent_message
+        WHERE conversation_id = #{conversationId}
+        ORDER BY message_order ASC
+    </select>
+    <select id="nextOrder" resultType="long">
+        SELECT COALESCE(MAX(message_order), 0) + 1 FROM manga_agent_message WHERE conversation_id = #{conversationId}
+    </select>
+</mapper>

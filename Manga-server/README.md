@@ -82,9 +82,9 @@ docker run --rm `
 
 ## 数据库初始化
 
-全部业务表定义在 `src/main/resources/manga.sql`。应用启动时会幂等执行该文件，因此连接 DBeaver 中的 `Manga` 库后会自动建表；也可以直接在 DBeaver 中打开并执行该文件。
+数据库结构由 Flyway 管理，迁移位于 `src/main/resources/db/migration/`。空数据库会依次执行 `V1__baseline_schema.sql` 和后续增量迁移；已有 Manga 数据库会在首次启动时基线到版本 `1`，随后只执行新迁移。不要直接修改已发布迁移文件。
 
-所有表和字段均带中文注释，每张表统一包含 `created_at`、`updated_at`、`created_by`、`updated_by`。项目仅保留 `manga.sql` 作为数据库初始化脚本，后续结构调整直接同步维护该初始化脚本。
+所有表和字段均带中文注释。新增或修改结构时创建新的 Flyway 版本化 SQL，并在目标数据库执行前先完成备份和 `flyway validate`。
 
 首次启动还会初始化 `GUEST`、`USER`、`ADMIN` 三个角色，并创建：
 
@@ -252,4 +252,4 @@ com.manga
 
 自定义 Mapper SQL 位于 `src/main/resources/mapper`。
 
-当前阶段复用 `manga.sql` 管理表结构；表结构进入频繁迭代后建议接入 Flyway，按版本保存增量迁移。
+项目使用 Flyway 按版本保存数据库变更。生产或共享数据库执行迁移前，应先确认当前版本、备份状态和变更窗口。

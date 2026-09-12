@@ -46,7 +46,12 @@ public class ProjectScriptService {
 
     /** 查询剧本元数据和章节摘要，不返回正文。 */
     public ProjectScriptResponse find(long projectId) {
-        requireAccessibleProject(projectId);
+        return findForUser(projectId, SecurityUtils.requireCurrentUserId());
+    }
+
+    /** 按显式用户范围查询剧本摘要，供异步助手工具调用。 */
+    public ProjectScriptResponse findForUser(long projectId, long userId) {
+        projectService.requireAccessibleProject(projectId, userId);
         ProjectScript script = scriptRepository.findByProjectId(projectId).orElse(null);
         if (script == null) return null;
         List<ProjectScriptChapter> chapters = chapterRepository.findSummaries(script.getId());

@@ -214,6 +214,16 @@ public class AiProviderConfigService {
                         : secretCipher.decrypt(config.getProxyPasswordCiphertext())));
     }
 
+    /** 按显式用户范围解析运行时保存的 AI 配置，供异步助手恢复执行。 */
+    public Optional<ResolvedAiProviderConfig> resolveOwned(long ownerUserId, long configId) {
+        return configRepository.findOwnedById(configId, ownerUserId).filter(config -> Boolean.TRUE.equals(config.getEnabled()))
+                .map(config -> new ResolvedAiProviderConfig(
+                        config.getId(), config.getProviderType(), config.getBaseUrl(), config.getDefaultModel(),
+                        secretCipher.decrypt(config.getApiKeyCiphertext()), AiProxyType.normalize(config.getProxyType()),
+                        config.getProxyHost(), config.getProxyPort(), config.getProxyUsername(),
+                        config.getProxyPasswordCiphertext() == null ? null : secretCipher.decrypt(config.getProxyPasswordCiphertext())));
+    }
+
     /** 检测保存的服务地址和认证是否可用，返回不包含密钥的结果摘要。 */
     public AiProviderConnectionTestResponse testConnection(long configId) {
         long ownerUserId = SecurityUtils.requireCurrentUserId();

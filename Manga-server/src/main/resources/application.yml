@@ -8,10 +8,12 @@ spring:
     name: manga-server
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:manga.sql
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+    validate-on-migrate: true
   servlet:
     multipart:
       max-file-size: ${MANGA_SCRIPT_UPLOAD_MAX_FILE_SIZE:20MB}
@@ -89,6 +91,14 @@ manga:
       username: ${MANGA_INITIAL_ADMIN_USERNAME:admin}
       password: ${MANGA_INITIAL_ADMIN_PASSWORD:}
       display-name: Manga Administrator
+  agent:
+    state:
+      database-name: ${MANGA_DB_NAME:Manga}
+      table-name: manga_agent_state
+    runtime:
+      owner-lease: ${MANGA_AGENT_OWNER_LEASE:30s}
+      run-timeout: ${MANGA_AGENT_RUN_TIMEOUT:10m}
+      max-iterations: ${MANGA_AGENT_MAX_ITERATIONS:12}
 
 management:
   endpoints:

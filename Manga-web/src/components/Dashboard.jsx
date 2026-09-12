@@ -36,6 +36,7 @@ import ProjectModule from './ProjectModule'
 import StoryboardModule from './StoryboardModule'
 import AiProviderSettings from './AiProviderSettings'
 import ProjectWorkspace from './ProjectWorkspace'
+import MangaAssistant from './MangaAssistant'
 import { getActiveTasks, getProjects } from '../api/projectApi'
 import { useLanguage } from '../i18n/LanguageContext'
 
@@ -147,6 +148,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   const displayName = authSession?.user?.displayName || DEFAULT_USER_NAME
   const accessToken = authSession?.accessToken
   const isGuest = Boolean(authSession?.user?.guest)
+  const assistantProjectId = window.location.pathname.startsWith('/console/projects/') ? selectedProjectId : null
 
   /** 刷新当前用户项目，游客保持只读控制台体验。 */
   const loadProjects = useCallback(async () => {
@@ -413,6 +415,12 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
           </>
         )}
       </main>
+      <MangaAssistant
+        accessToken={accessToken}
+        isGuest={isGuest}
+        projects={projects}
+        projectId={assistantProjectId}
+      />
     </div>
   )
 }

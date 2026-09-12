@@ -33,7 +33,12 @@ public class StoryboardShotService {
 
     /** 查询项目分镜镜头列表。 */
     public List<StoryboardShotResponse> findAll(long projectId, Long chapterId) {
-        requireProject(projectId);
+        return findAllForUser(projectId, SecurityUtils.requireCurrentUserId(), chapterId);
+    }
+
+    /** 按显式用户范围查询分镜，供异步助手工具调用。 */
+    public List<StoryboardShotResponse> findAllForUser(long projectId, long userId, Long chapterId) {
+        projectService.requireAccessibleProject(projectId, userId);
         return storyboardShotRepository.findAllByProjectId(projectId, chapterId).stream().map(this::toResponse).toList();
     }
 

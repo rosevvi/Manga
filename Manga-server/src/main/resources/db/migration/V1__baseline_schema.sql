@@ -249,6 +249,7 @@ CREATE TABLE IF NOT EXISTS manga_task_unit (
 CREATE TABLE IF NOT EXISTS manga_storyboard_shot (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '分镜镜头主键',
     project_id BIGINT NOT NULL COMMENT '所属项目主键',
+    chapter_id BIGINT NULL COMMENT '关联剧本章节主键',
     sort_order INT NOT NULL COMMENT '项目内排序序号',
     shot_number VARCHAR(20) NOT NULL COMMENT '项目内展示镜号',
     title VARCHAR(120) NOT NULL COMMENT '分镜标题',

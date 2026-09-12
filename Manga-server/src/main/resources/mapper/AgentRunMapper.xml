@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.AgentRunMapper">
+    <resultMap id="agentRunResultMap" type="com.manga.entity.AgentRun">
+        <id property="id" column="id"/>
+        <result property="runId" column="run_id"/><result property="conversationId" column="conversation_id"/>
+        <result property="userId" column="user_id"/><result property="projectId" column="project_id"/>
+        <result property="agentKey" column="agent_key"/><result property="providerConfigId" column="provider_config_id"/>
+        <result property="modelCode" column="model_code"/><result property="kernelFingerprint" column="kernel_fingerprint"/>
+        <result property="kernelSnapshotJson" column="kernel_snapshot_json"/><result property="stateSessionId" column="state_session_id"/>
+        <result property="status" column="status" javaType="com.manga.agent.AgentRunStatus"/>
+        <result property="activeConversationId" column="active_conversation_id"/><result property="ownerInstanceId" column="owner_instance_id"/>
+        <result property="ownerEpoch" column="owner_epoch"/><result property="leaseUntil" column="lease_until"/>
+        <result property="deadlineAt" column="deadline_at"/><result property="nextSequence" column="next_sequence"/>
+        <result property="errorCode" column="error_code"/><result property="errorMessage" column="error_message"/>
+        <result property="startedAt" column="started_at"/><result property="finishedAt" column="finished_at"/>
+        <result property="createdAt" column="created_at"/><result property="updatedAt" column="updated_at"/>
+    </resultMap>
+    <sql id="columns">id, run_id, conversation_id, user_id, project_id, agent_key, provider_config_id, model_code,
+        kernel_fingerprint, kernel_snapshot_json, state_session_id, status, active_conversation_id, owner_instance_id,
+        owner_epoch, lease_until, deadline_at, next_sequence, error_code, error_message, started_at, finished_at, created_at, updated_at</sql>
+    <select id="findOwned" resultMap="agentRunResultMap">
+        SELECT <include refid="columns"/> FROM manga_agent_run WHERE run_id = #{runId} AND user_id = #{userId}
+    </select>
+    <select id="lockByRunId" resultMap="agentRunResultMap">
+        SELECT <include refid="columns"/> FROM manga_agent_run WHERE run_id = #{runId} FOR UPDATE
+    </select>
+    <select id="findExpiredRunning" resultMap="agentRunResultMap">
+        SELECT <include refid="columns"/> FROM manga_agent_run
+        WHERE status = 'RUNNING' AND lease_until IS NOT NULL AND lease_until &lt; #{now}
+    </select>
+</mapper>

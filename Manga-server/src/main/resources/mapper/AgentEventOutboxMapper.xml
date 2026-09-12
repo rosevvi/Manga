@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.AgentEventOutboxMapper">
+    <select id="findPending" resultType="com.manga.entity.AgentEventOutbox">
+        SELECT id, run_id, sequence_no, status, published_at, attempts, last_error, created_at, updated_at
+        FROM manga_agent_event_outbox
+        WHERE status = 'PENDING'
+        ORDER BY id ASC
+        LIMIT #{limit}
+    </select>
+</mapper>

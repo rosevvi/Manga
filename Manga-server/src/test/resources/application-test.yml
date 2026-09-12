@@ -5,6 +5,10 @@ spring:
     password:
 
 manga:
+  agent:
+    redis-listener-enabled: false
+    state:
+      mode: IN_MEMORY
   storage:
     aliyun-oss:
       enabled: false
