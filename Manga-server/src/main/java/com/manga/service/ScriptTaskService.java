@@ -2,6 +2,7 @@ package com.manga.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manga.common.constant.AsyncConstants;
 import com.manga.common.enums.CommonResponseCode;
 import com.manga.common.exception.BusinessException;
 import com.manga.common.enums.TaskStatus;
@@ -60,7 +61,7 @@ public class ScriptTaskService {
     private final ScriptTaskProperties properties;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redisTemplate;
-    @Qualifier("applicationTaskExecutor")
+    @Qualifier(AsyncConstants.MANGA_COMMON_TASK_EXECUTOR)
     private final Executor executor;
 
     /** 创建并异步执行全文或多章节导入任务。 */

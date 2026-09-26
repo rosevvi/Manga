@@ -5,8 +5,8 @@ package com.manga.common.constant;
  */
 public final class AsyncConstants {
 
-    /** 应用异步线程池 Bean 名称。 */
-    public static final String APPLICATION_TASK_EXECUTOR = "applicationTaskExecutor";
+    /** Manga 通用业务线程池 Bean 名称。 */
+    public static final String MANGA_COMMON_TASK_EXECUTOR = "mangaCommonTaskExecutor";
     /** Spring 默认任务执行器 Bean 名称。 */
     public static final String TASK_EXECUTOR = "taskExecutor";
 

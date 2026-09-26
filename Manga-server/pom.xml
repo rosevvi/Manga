@@ -23,6 +23,7 @@
         <aliyun-oss.version>3.18.2</aliyun-oss.version>
         <agentscope.version>2.0.0</agentscope.version>
         <openai-java.version>4.32.0</openai-java.version>
+        <springdoc-openapi.version>2.9.1</springdoc-openapi.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.proc>full</maven.compiler.proc>
@@ -52,6 +53,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc-openapi.version}</version>
         </dependency>
         <dependency>
             <groupId>com.baomidou</groupId>

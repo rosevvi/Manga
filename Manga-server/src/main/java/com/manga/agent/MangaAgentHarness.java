@@ -19,6 +19,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
+import java.util.Objects;
 
 /** 创建一次性、受限的 Manga AgentScope Harness。 */
 @Component
@@ -32,17 +33,18 @@ public class MangaAgentHarness {
     private final MangaAgentProperties properties;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
+    /** 根据不可变 Kernel 快照创建一次性 Harness，并以事件流返回本次执行结果。 */
     public Flux<AgentEvent> stream(MangaKernelSpec spec, ResolvedAiProviderConfig providerConfig,
             MangaAgentContext executionContext, String stateSessionId, String message) {
-        if (executionContext.projectId() != null) {
+        if (Objects.nonNull(executionContext.projectId())) {
             projectService.requireAccessibleProject(executionContext.projectId(), executionContext.userId());
         }
         Toolkit toolkit = new Toolkit(ToolkitConfig.builder().parallel(false).build());
         toolkit.registerAgentTool(new MangaProjectContextTool(projectContextService, objectMapper, Schedulers.boundedElastic()));
         HarnessAgent agent = HarnessAgent.builder()
                 .agentId(spec.agentKey())
-                .name("Manga 创作助手")
-                .description("负责分析项目、剧本和分镜的受限创作助手")
+                .name(spec.displayName())
+                .description(spec.description())
                 .sysPrompt(spec.systemPrompt())
                 .model(modelFactory.create(providerConfig, spec.modelCode()))
                 .stateStore(agentStateStore)

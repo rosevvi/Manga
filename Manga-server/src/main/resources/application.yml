@@ -25,6 +25,12 @@ spring:
     default-property-inclusion: non_null
     time-zone: Asia/Shanghai
 
+springdoc:
+  api-docs:
+    enabled: ${MANGA_OPENAPI_ENABLED:true}
+  swagger-ui:
+    enabled: ${MANGA_SWAGGER_UI_ENABLED:true}
+
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
   type-aliases-package: com.manga.entity
@@ -41,6 +47,10 @@ server:
     include-stacktrace: never
 
 manga:
+  openapi:
+    title: Manga AI Platform API
+    description: Manga AI 漫剧生成平台后端接口
+    version: v1
   script:
     task:
       input-directory: data/script-tasks
@@ -53,13 +63,14 @@ manga:
     secrets:
       # 生产环境建议使用独立密钥；未单独配置时复用现有 JWT 密钥以便本地启动。
       encryption-key: ${MANGA_AI_SECRET_ENCRYPTION_KEY:${MANGA_JWT_SECRET:}}
-  async:
-    core-pool-size: 4
-    max-pool-size: 16
-    queue-capacity: 200
-    keep-alive: 60s
-    await-termination: 30s
-    thread-name-prefix: manga-async-
+  executors:
+    common:
+      core-pool-size: 4
+      max-pool-size: 16
+      queue-capacity: 200
+      keep-alive: 60s
+      await-termination: 30s
+      thread-name-prefix: manga-common-
   auth:
     storage:
       external-login-session: redis
@@ -92,10 +103,17 @@ manga:
       password: ${MANGA_INITIAL_ADMIN_PASSWORD:}
       display-name: Manga Administrator
   agent:
+    routing:
+      # 项目覆盖优先于用户覆盖；未命中时使用默认运行时。
+      default-runtime: ${MANGA_CREATIVE_RUNTIME_DEFAULT:LEGACY}
+      user-overrides: {}
+      project-overrides: {}
     state:
       database-name: ${MANGA_DB_NAME:Manga}
       table-name: manga_agent_state
     runtime:
+      # 多实例部署时建议由容器实例名或 Pod UID 显式注入。
+      instance-id: ${MANGA_AGENT_INSTANCE_ID:}
       owner-lease: ${MANGA_AGENT_OWNER_LEASE:30s}
       run-timeout: ${MANGA_AGENT_RUN_TIMEOUT:10m}
       max-iterations: ${MANGA_AGENT_MAX_ITERATIONS:12}

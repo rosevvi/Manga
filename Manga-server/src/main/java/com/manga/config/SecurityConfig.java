@@ -43,6 +43,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(SecurityConstants.OPENAPI_PUBLIC_PATHS).permitAll()
                         .requestMatchers(
                                 "/api/v1/public/**",
                                 "/api/v1/auth/login",

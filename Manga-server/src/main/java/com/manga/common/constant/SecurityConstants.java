@@ -35,6 +35,14 @@ public final class SecurityConstants {
     /** JWT 签名密钥最小字节数。 */
     public static final int JWT_MIN_SECRET_BYTES = 32;
 
+    /** 无需登录即可访问的 OpenAPI JSON 与 Swagger UI 路径。 */
+    public static final String[] OPENAPI_PUBLIC_PATHS = {
+            "/v3/api-docs/**",
+            "/v3/api-docs.yaml",
+            "/swagger-ui/**",
+            "/swagger-ui.html"
+    };
+
     /** 跨域允许的 HTTP 方法集合。 */
     public static final List<String> CORS_ALLOWED_METHODS = List.of(
             HttpMethod.GET.name(),

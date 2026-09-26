@@ -55,9 +55,18 @@ public class MangaAgentProperties {
     }
 
     public static class Runtime {
+        private String instanceId;
         private Duration ownerLease = Duration.ofSeconds(30);
         private Duration runTimeout = Duration.ofMinutes(10);
         private int maxIterations = 12;
+
+        public String getInstanceId() {
+            return instanceId;
+        }
+
+        public void setInstanceId(String instanceId) {
+            this.instanceId = instanceId;
+        }
 
         public Duration getOwnerLease() {
             return ownerLease;
