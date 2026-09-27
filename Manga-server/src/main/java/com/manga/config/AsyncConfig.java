@@ -11,7 +11,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -22,6 +26,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Slf4j
 @Configuration
 @EnableAsync
+@EnableScheduling
 @RequiredArgsConstructor
 public class AsyncConfig implements AsyncConfigurer {
 
@@ -44,6 +49,24 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(Math.toIntExact(properties.awaitTermination().toSeconds()));
         return executor;
+    }
+
+    /** 将受控通用线程池适配为 Reactor 阻塞任务 Scheduler。 */
+    @Bean(name = AsyncConstants.MANGA_BLOCKING_SCHEDULER, destroyMethod = "dispose")
+    public Scheduler mangaBlockingScheduler() {
+        return Schedulers.fromExecutor(mangaCommonTaskExecutor());
+    }
+
+    /** 创建负责 Outbox 发布和订阅恢复等周期任务的受控调度线程池。 */
+    @Bean(name = {AsyncConstants.MANGA_COMMON_TASK_SCHEDULER, AsyncConstants.TASK_SCHEDULER})
+    public ThreadPoolTaskScheduler mangaCommonTaskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(properties.scheduledPoolSize());
+        scheduler.setThreadNamePrefix(properties.scheduledThreadNamePrefix());
+        scheduler.setRemoveOnCancelPolicy(true);
+        scheduler.setWaitForTasksToCompleteOnShutdown(true);
+        scheduler.setAwaitTerminationSeconds(Math.toIntExact(properties.awaitTermination().toSeconds()));
+        return scheduler;
     }
 
     /** 返回 Spring 异步任务执行器。 */

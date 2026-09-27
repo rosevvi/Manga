@@ -20,6 +20,10 @@ public record AsyncExecutorProperties(
         /** 应用关闭时等待通用业务任务完成的时长。 */
         Duration awaitTermination,
         /** 通用业务线程名称前缀。 */
-        String threadNamePrefix
+        String threadNamePrefix,
+        /** 通用定时任务调度器线程数。 */
+        int scheduledPoolSize,
+        /** 通用定时任务调度器线程名称前缀。 */
+        String scheduledThreadNamePrefix
 ) {
 }

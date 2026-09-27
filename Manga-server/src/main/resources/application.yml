@@ -18,9 +18,6 @@ spring:
     multipart:
       max-file-size: ${MANGA_SCRIPT_UPLOAD_MAX_FILE_SIZE:20MB}
       max-request-size: ${MANGA_SCRIPT_UPLOAD_MAX_REQUEST_SIZE:21MB}
-  threads:
-    virtual:
-      enabled: true
   jackson:
     default-property-inclusion: non_null
     time-zone: Asia/Shanghai
@@ -71,6 +68,8 @@ manga:
       keep-alive: 60s
       await-termination: 30s
       thread-name-prefix: manga-common-
+      scheduled-pool-size: 2
+      scheduled-thread-name-prefix: manga-scheduled-
   auth:
     storage:
       external-login-session: redis
@@ -102,21 +101,16 @@ manga:
       username: ${MANGA_INITIAL_ADMIN_USERNAME:admin}
       password: ${MANGA_INITIAL_ADMIN_PASSWORD:}
       display-name: Manga Administrator
-  agent:
-    routing:
-      # 项目覆盖优先于用户覆盖；未命中时使用默认运行时。
-      default-runtime: ${MANGA_CREATIVE_RUNTIME_DEFAULT:LEGACY}
-      user-overrides: {}
-      project-overrides: {}
-    state:
-      database-name: ${MANGA_DB_NAME:Manga}
-      table-name: manga_agent_state
+  creative:
+    redis-listener-enabled: ${MANGA_CREATIVE_REDIS_LISTENER_ENABLED:true}
+    redis-listener-retry-interval: ${MANGA_CREATIVE_REDIS_RETRY_INTERVAL:5s}
+    event-outbox:
+      publish-interval: ${MANGA_CREATIVE_OUTBOX_PUBLISH_INTERVAL:1s}
     runtime:
-      # 多实例部署时建议由容器实例名或 Pod UID 显式注入。
-      instance-id: ${MANGA_AGENT_INSTANCE_ID:}
-      owner-lease: ${MANGA_AGENT_OWNER_LEASE:30s}
-      run-timeout: ${MANGA_AGENT_RUN_TIMEOUT:10m}
-      max-iterations: ${MANGA_AGENT_MAX_ITERATIONS:12}
+      engine-version: durable-v1
+      workflow-version: v1
+      event-schema-version: 1
+      run-timeout: ${MANGA_CREATIVE_RUN_TIMEOUT:30m}
 
 management:
   endpoints:

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.CreativeRunMapper">
+    <resultMap id="creativeRunResultMap" type="com.manga.entity.CreativeRun">
+        <id property="id" column="id"/>
+        <result property="runId" column="run_id"/>
+        <result property="requestId" column="request_id"/>
+        <result property="requestFingerprint" column="request_fingerprint"/>
+        <result property="conversationId" column="conversation_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="projectId" column="project_id"/>
+        <result property="engineVersion" column="engine_version"/>
+        <result property="workflowType" column="workflow_type" javaType="com.manga.agent.domain.CreativeWorkflowType"/>
+        <result property="workflowVersion" column="workflow_version"/>
+        <result property="permissionPolicy" column="permission_policy" javaType="com.manga.agent.domain.AgentPermissionPolicy"/>
+        <result property="budgetJson" column="budget_json"/>
+        <result property="triggerSource" column="trigger_source" javaType="com.manga.agent.domain.CreativeRunTriggerSource"/>
+        <result property="operationType" column="operation_type" javaType="com.manga.agent.domain.CreativeOperationType"/>
+        <result property="targetType" column="target_type" javaType="com.manga.agent.domain.CreativeResourceType"/>
+        <result property="targetId" column="target_id"/>
+        <result property="status" column="status" javaType="com.manga.agent.domain.CreativeRunStatus"/>
+        <result property="activeConversationId" column="active_conversation_id"/>
+        <result property="ownerInstanceId" column="owner_instance_id"/>
+        <result property="ownerEpoch" column="owner_epoch"/>
+        <result property="leaseUntil" column="lease_until"/>
+        <result property="deadlineAt" column="deadline_at"/>
+        <result property="nextSequence" column="next_sequence"/>
+        <result property="terminalSequence" column="terminal_sequence"/>
+        <result property="cancelRequestedAt" column="cancel_requested_at"/>
+        <result property="errorCode" column="error_code"/>
+        <result property="errorMessage" column="error_message"/>
+        <result property="startedAt" column="started_at"/>
+        <result property="finishedAt" column="finished_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+    </resultMap>
+
+    <select id="findOwned" resultMap="creativeRunResultMap">
+        SELECT id, run_id, request_id, request_fingerprint, conversation_id, user_id, project_id,
+               engine_version, workflow_type, workflow_version, permission_policy, budget_json,
+               trigger_source, operation_type, target_type, target_id, status, active_conversation_id,
+               owner_instance_id, owner_epoch, lease_until, deadline_at, next_sequence, terminal_sequence,
+               cancel_requested_at, error_code, error_message, started_at, finished_at,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_run
+        WHERE run_id = #{runId}
+          AND user_id = #{userId}
+    </select>
+
+    <select id="findByRequestId" resultMap="creativeRunResultMap">
+        SELECT id, run_id, request_id, request_fingerprint, conversation_id, user_id, project_id,
+               engine_version, workflow_type, workflow_version, permission_policy, budget_json,
+               trigger_source, operation_type, target_type, target_id, status, active_conversation_id,
+               owner_instance_id, owner_epoch, lease_until, deadline_at, next_sequence, terminal_sequence,
+               cancel_requested_at, error_code, error_message, started_at, finished_at,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_run
+        WHERE user_id = #{userId}
+          AND request_id = #{requestId}
+    </select>
+
+    <select id="lockOwned" resultMap="creativeRunResultMap">
+        SELECT id, run_id, request_id, request_fingerprint, conversation_id, user_id, project_id,
+               engine_version, workflow_type, workflow_version, permission_policy, budget_json,
+               trigger_source, operation_type, target_type, target_id, status, active_conversation_id,
+               owner_instance_id, owner_epoch, lease_until, deadline_at, next_sequence, terminal_sequence,
+               cancel_requested_at, error_code, error_message, started_at, finished_at,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_run
+        WHERE run_id = #{runId}
+          AND user_id = #{userId}
+        FOR UPDATE
+    </select>
+
+    <select id="lockByRunId" resultMap="creativeRunResultMap">
+        SELECT id, run_id, request_id, request_fingerprint, conversation_id, user_id, project_id,
+               engine_version, workflow_type, workflow_version, permission_policy, budget_json,
+               trigger_source, operation_type, target_type, target_id, status, active_conversation_id,
+               owner_instance_id, owner_epoch, lease_until, deadline_at, next_sequence, terminal_sequence,
+               cancel_requested_at, error_code, error_message, started_at, finished_at,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_run
+        WHERE run_id = #{runId}
+        FOR UPDATE
+    </select>
+</mapper>

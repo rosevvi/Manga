@@ -1,6 +1,6 @@
 package com.manga.agent.application;
 
-import com.manga.agent.AgentRunStatus;
+import com.manga.agent.domain.CreativeRunStatus;
 
 import java.time.LocalDateTime;
 
@@ -15,7 +15,7 @@ public record CreativeRunStartResult(
         /** 运行绑定的项目主键。 */
         Long projectId,
         /** 运行创建后的当前状态。 */
-        AgentRunStatus status,
+        CreativeRunStatus status,
         /** 运行开始时间。 */
         LocalDateTime startedAt,
         /** 运行结束时间，未结束时为空。 */

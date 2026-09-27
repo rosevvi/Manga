@@ -6,7 +6,7 @@
 
 ## 1. 文档目的
 
-本文定义 Manga AI 漫剧生成平台下一代创作运行时的目标架构、核心模型、请求链路、状态机、数据契约和分阶段实施顺序。
+本文定义 Manga AI 漫剧生成平台创作运行时的目标架构、核心模型、请求链路、状态机、数据契约和分阶段实施顺序。
 
 方案不以迁移或复制 `ai-fusion-video` 为目标，而是针对 Manga 的业务特点重新设计：
 
@@ -2035,11 +2035,11 @@ manga:
 
 ## 27. 分阶段实施计划
 
-实施采用纵向切片，每一阶段都必须可运行、可测试、可回滚。不要一次性删除旧实现。
+实施采用纵向切片，每一阶段都必须可运行、可测试。当前项目尚未上线旧版运行时，因此直接建设单一的新架构，不引入兼容层或迁移路由。
 
 | 顺序 | 阶段 | 可交付结果 |
 | ---: | --- | --- |
-| 1 | 阶段 0：契约与兼容层 | 新旧引擎可灰度，状态/API/事件契约冻结 |
+| 1 | 阶段 0：契约与运行入口 | 单一运行入口可用，状态/API/事件契约冻结 |
 | 2 | 阶段 1：可恢复运行底座 | 无真实模型也能启动、流式、取消、重启恢复 |
 | 3 | 阶段 2：单 Director | 只读分析、KernelPool 与 HarnessLease 可用 |
 | 4 | 阶段 3：消息与记忆 | 连续对话和页面刷新一致 |
@@ -2063,8 +2063,8 @@ ADR 与 API/事件契约
 → REST / SSE 接口
 → 前端最小闭环
 → 单元、集成、E2E 和故障注入测试
-→ 功能开关下内部灰度
-→ 验收后扩大流量
+→ 集成环境验证
+→ 验收后发布
 ```
 
 ### 阶段 0：冻结契约与搭建验证框架
@@ -2076,7 +2076,7 @@ ADR 与 API/事件契约
 #### 后端任务
 
 - 创建 `com.manga.agent` 新包骨架。
-- 定义 `CreativeRuntime` 门面，提供 `LegacyCreativeRuntime`、`DurableCreativeRuntime` 和按用户/项目开关路由的 `CreativeRuntimeRouter`。
+- 定义唯一的 `CreativeRuntime` 门面，由 `DurableCreativeRuntime` 实现；调用方不感知内部调度细节。
 - 定义 Run、Step、Event、ErrorCode、PermissionPolicy 枚举。
 - 定义 API DTO 和事件 Envelope，不接入 AgentScope。
 - 建立 `CreativeRuntimeProperties`。
@@ -2094,7 +2094,7 @@ ADR 与 API/事件契约
 
 #### 测试任务
 
-- 为旧链路补充特征测试：会话、流式响应、取消、异常、项目权限、生成提交和断线重连。
+- 为新链路补充契约测试：会话、手动触发、流式响应、取消、异常、项目权限和断线重连。
 - 状态机单测。
 - 枚举持久化兼容测试。
 - Flyway 迁移和元数据校验。
@@ -2105,7 +2105,21 @@ ADR 与 API/事件契约
 - 不调用模型也能创建模拟 Run、查询状态并验证状态机。
 - 迁移可在全新 MySQL 数据库完成。
 - 所有状态和错误均有稳定机器编码。
-- 新旧引擎不会共同消费同一在线请求；Run 创建时固定 `engine_version` 和 `workflow_version`，运行途中不切换。
+- Run 创建时固定 `engine_version` 和 `workflow_version`，确保恢复执行时使用一致的工作流语义。
+
+#### 当前实现状态（2026-09-28）
+
+- [x] 唯一的 `CreativeRuntime` 门面和 `DurableCreativeRuntime` 实现已落地，无兼容适配器和灰度路由。
+- [x] 会话触发与用户手动触发使用同一 Run 契约，手动操作显式携带 operation、target 和 permission policy。
+- [x] Run、Step、Event、ErrorCode、PermissionPolicy 与状态机契约已冻结，并提供稳定机器编码。
+- [x] `/api/v1/creative-runs` 创建、查询、取消和支持游标恢复的 SSE 接口已提供；不存在并行的旧接口。
+- [x] Run 创建时固化 engine、workflow 和 permission 信息；ID、系统操作者、错误消息与 Redis key 职责已集中。
+- [x] V2 已建立阶段 0 所需的 Conversation、Run、Event 和 Event Outbox；表字段注释、审计字段、索引及约束已校验。
+- [x] 事件推送和异步执行使用按职责命名的受控业务线程池，不依赖 Reactor 默认弹性线程池。
+- [x] 状态机、枚举持久化、DTO 校验、受理幂等、SSE 回放/唤醒、Redis key、Flyway 元数据与 OpenAPI 均有自动化测试。
+- [x] Flyway V1→V2 已在测试环境的全新 MySQL 兼容数据库完成建库、元数据和真实 Mapper 写入测试。
+
+阶段 0 到此关闭。`DurableCreativeRuntime` 当前负责幂等受理、查询、取消和事件流，实际 Step 领取、恢复与调度属于阶段 1。
 
 ---
 
@@ -2421,22 +2435,16 @@ ADR 与 API/事件契约
 
 ---
 
-## 28. 旧实现替换策略
+## 28. 新架构演进原则
 
-即使允许重写，也不建议一次性删除现有代码。
+当前没有已上线的 Agent 运行时或历史数据，因此采用单轨演进：
 
-推荐：
-
-1. 新运行时使用独立 `/api/v1/creative-runs` API、新表和 `CreativeRuntimeRouter`。
-2. 使用配置开关按环境、用户、项目或租户灰度；一次请求只路由一个引擎，不做真实模型双写。
-3. Run 创建时保存 `engine_version` 和 `workflow_version`；开关变化只影响新 Run，已启动 Run 仍由原引擎收敛。
-4. 旧助手继续提供基本能力，直到新链路完成阶段 4。
-5. 新链路通过只读问答、ChangeSet 写入和取消恢复验收后，前端切换默认入口。
-6. 旧 Run 不迁移到新状态机，只保留只读历史。
-7. 回滚开关只停止新流量进入 Durable Runtime，不强制把执行中的 Run 切回旧引擎。
-8. 停止写入旧表后经过观察期，再移除旧执行代码；历史迁移脚本不可修改。
-
-这样可以重写核心实现，但避免在一次发布中同时重写数据库、后端、前端和 AI 行为。
+1. `/api/v1/creative-runs` 是唯一运行入口，所有会话触发和用户手动推进都创建统一的 Creative Run。
+2. Run 创建时保存 `engine_version` 和 `workflow_version`，用于恢复、审计和将来的工作流版本升级。
+3. 每个阶段只增加当前所需的持久化模型和执行能力，不预埋兼容旧引擎的类型、路由、表或配置。
+4. 新版本工作流通过显式版本选择演进，已经启动的 Run 始终由创建时冻结的版本收敛。
+5. 回滚以停止新 Run 受理、保留现有数据并修复同一实现为原则，不切换到另一套运行时。
+6. AgentScope 在阶段 2 作为执行器基础设施接入，不作为公开 API，也不改变 Run/Event 的领域契约。
 
 ---
 

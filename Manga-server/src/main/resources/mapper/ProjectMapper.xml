@@ -26,7 +26,7 @@
         <result property="updatedBy" column="updated_by"/>
     </resultMap>
 
-    <sql id="projectSummaryColumns">
+    <select id="findAllOwnedBy" resultMap="projectSummaryResultMap">
         SELECT p.id,
                p.owner_user_id,
                p.name,
@@ -49,9 +49,7 @@
         FROM manga_project p
         LEFT JOIN manga_storyboard_shot s ON s.project_id = p.id
         LEFT JOIN manga_project_workflow wf ON wf.project_id = p.id
-    </sql>
-
-    <sql id="projectSummaryGroupBy">
+        WHERE p.owner_user_id = #{ownerUserId}
         GROUP BY p.id,
                  p.owner_user_id,
                  p.name,
@@ -70,37 +68,145 @@
                  p.updated_at,
                  p.created_by,
                  p.updated_by
-    </sql>
-
-    <select id="findAllOwnedBy" resultMap="projectSummaryResultMap">
-        <include refid="projectSummaryColumns"/>
-        WHERE p.owner_user_id = #{ownerUserId}
-        <include refid="projectSummaryGroupBy"/>
         ORDER BY p.updated_at DESC, p.id DESC
     </select>
 
     <select id="findAllAccessibleBy" resultMap="projectSummaryResultMap">
-        <include refid="projectSummaryColumns"/>
+        SELECT p.id,
+               p.owner_user_id,
+               p.name,
+               p.description,
+               p.cover_url,
+               p.genre,
+               p.aspect_ratio,
+               p.visibility_scope,
+               p.status,
+               wf.current_stage AS workflow_stage,
+               p.art_style,
+               p.art_style_description,
+               p.art_style_image_prompt,
+               p.art_style_image_url,
+               p.created_at,
+               p.updated_at,
+               p.created_by,
+               p.updated_by,
+               COUNT(DISTINCT s.id) AS shot_count
+        FROM manga_project p
+        LEFT JOIN manga_storyboard_shot s ON s.project_id = p.id
+        LEFT JOIN manga_project_workflow wf ON wf.project_id = p.id
         LEFT JOIN manga_project_member pm ON pm.project_id = p.id
         WHERE p.owner_user_id = #{userId}
            OR pm.user_id = #{userId}
-        <include refid="projectSummaryGroupBy"/>
+        GROUP BY p.id,
+                 p.owner_user_id,
+                 p.name,
+                 p.description,
+                 p.cover_url,
+                 p.genre,
+                 p.aspect_ratio,
+                 p.visibility_scope,
+                 p.status,
+                 wf.current_stage,
+                 p.art_style,
+                 p.art_style_description,
+                 p.art_style_image_prompt,
+                 p.art_style_image_url,
+                 p.created_at,
+                 p.updated_at,
+                 p.created_by,
+                 p.updated_by
         ORDER BY p.updated_at DESC, p.id DESC
     </select>
 
     <select id="findOwnedById" resultMap="projectSummaryResultMap">
-        <include refid="projectSummaryColumns"/>
+        SELECT p.id,
+               p.owner_user_id,
+               p.name,
+               p.description,
+               p.cover_url,
+               p.genre,
+               p.aspect_ratio,
+               p.visibility_scope,
+               p.status,
+               wf.current_stage AS workflow_stage,
+               p.art_style,
+               p.art_style_description,
+               p.art_style_image_prompt,
+               p.art_style_image_url,
+               p.created_at,
+               p.updated_at,
+               p.created_by,
+               p.updated_by,
+               COUNT(DISTINCT s.id) AS shot_count
+        FROM manga_project p
+        LEFT JOIN manga_storyboard_shot s ON s.project_id = p.id
+        LEFT JOIN manga_project_workflow wf ON wf.project_id = p.id
         WHERE p.id = #{projectId}
           AND p.owner_user_id = #{ownerUserId}
-        <include refid="projectSummaryGroupBy"/>
+        GROUP BY p.id,
+                 p.owner_user_id,
+                 p.name,
+                 p.description,
+                 p.cover_url,
+                 p.genre,
+                 p.aspect_ratio,
+                 p.visibility_scope,
+                 p.status,
+                 wf.current_stage,
+                 p.art_style,
+                 p.art_style_description,
+                 p.art_style_image_prompt,
+                 p.art_style_image_url,
+                 p.created_at,
+                 p.updated_at,
+                 p.created_by,
+                 p.updated_by
     </select>
 
     <select id="findAccessibleById" resultMap="projectSummaryResultMap">
-        <include refid="projectSummaryColumns"/>
+        SELECT p.id,
+               p.owner_user_id,
+               p.name,
+               p.description,
+               p.cover_url,
+               p.genre,
+               p.aspect_ratio,
+               p.visibility_scope,
+               p.status,
+               wf.current_stage AS workflow_stage,
+               p.art_style,
+               p.art_style_description,
+               p.art_style_image_prompt,
+               p.art_style_image_url,
+               p.created_at,
+               p.updated_at,
+               p.created_by,
+               p.updated_by,
+               COUNT(DISTINCT s.id) AS shot_count
+        FROM manga_project p
+        LEFT JOIN manga_storyboard_shot s ON s.project_id = p.id
+        LEFT JOIN manga_project_workflow wf ON wf.project_id = p.id
         LEFT JOIN manga_project_member pm ON pm.project_id = p.id
         WHERE p.id = #{projectId}
           AND (p.owner_user_id = #{userId} OR pm.user_id = #{userId})
-        <include refid="projectSummaryGroupBy"/>
+        GROUP BY p.id,
+                 p.owner_user_id,
+                 p.name,
+                 p.description,
+                 p.cover_url,
+                 p.genre,
+                 p.aspect_ratio,
+                 p.visibility_scope,
+                 p.status,
+                 wf.current_stage,
+                 p.art_style,
+                 p.art_style_description,
+                 p.art_style_image_prompt,
+                 p.art_style_image_url,
+                 p.created_at,
+                 p.updated_at,
+                 p.created_by,
+                 p.updated_by
     </select>
 
     <update id="updateOwned">

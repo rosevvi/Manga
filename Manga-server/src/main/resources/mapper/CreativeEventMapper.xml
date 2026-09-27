@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.CreativeEventMapper">
+    <select id="findAfter" resultType="com.manga.entity.CreativeEvent">
+        SELECT id,
+               run_id,
+               step_id,
+               sequence_no,
+               schema_version,
+               event_type,
+               source,
+               correlation_id,
+               payload_json,
+               created_at,
+               updated_at,
+               created_by,
+               updated_by
+        FROM manga_creative_event
+        WHERE run_id = #{runId}
+          AND sequence_no &gt; #{afterSequence}
+        ORDER BY sequence_no ASC
+    </select>
+</mapper>

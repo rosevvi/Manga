@@ -28,30 +28,31 @@
         <result property="updatedBy" column="updated_by"/>
     </resultMap>
 
-    <sql id="allColumns">
-        id, owner_user_id, name, provider_type, base_url, default_model,
-        api_key_ciphertext, api_key_hint, proxy_type, proxy_host, proxy_port,
-        proxy_username, proxy_password_ciphertext, proxy_password_hint,
-        enabled, default_config, remark,
-        created_at, updated_at, created_by, updated_by
-    </sql>
-
     <select id="findAllOwnedBy" resultMap="aiProviderConfigResultMap">
-        SELECT <include refid="allColumns"/>
+        SELECT id, owner_user_id, name, provider_type, base_url, default_model,
+               api_key_ciphertext, api_key_hint, proxy_type, proxy_host, proxy_port,
+               proxy_username, proxy_password_ciphertext, proxy_password_hint,
+               enabled, default_config, remark, created_at, updated_at, created_by, updated_by
         FROM manga_ai_provider_config
         WHERE owner_user_id = #{ownerUserId}
         ORDER BY default_config DESC, enabled DESC, updated_at DESC, id DESC
     </select>
 
     <select id="findOwnedById" resultMap="aiProviderConfigResultMap">
-        SELECT <include refid="allColumns"/>
+        SELECT id, owner_user_id, name, provider_type, base_url, default_model,
+               api_key_ciphertext, api_key_hint, proxy_type, proxy_host, proxy_port,
+               proxy_username, proxy_password_ciphertext, proxy_password_hint,
+               enabled, default_config, remark, created_at, updated_at, created_by, updated_by
         FROM manga_ai_provider_config
         WHERE id = #{configId}
           AND owner_user_id = #{ownerUserId}
     </select>
 
     <select id="findDefaultOwnedBy" resultMap="aiProviderConfigResultMap">
-        SELECT <include refid="allColumns"/>
+        SELECT id, owner_user_id, name, provider_type, base_url, default_model,
+               api_key_ciphertext, api_key_hint, proxy_type, proxy_host, proxy_port,
+               proxy_username, proxy_password_ciphertext, proxy_password_hint,
+               enabled, default_config, remark, created_at, updated_at, created_by, updated_by
         FROM manga_ai_provider_config
         WHERE owner_user_id = #{ownerUserId}
           AND default_config = TRUE

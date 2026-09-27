@@ -13,9 +13,9 @@ public record CreativeResourceReference(
 ) {
 
     public CreativeResourceReference {
-        Objects.requireNonNull(resourceType, "创作目标资源类型不能为空");
+        Objects.requireNonNull(resourceType, CreativeRuntimeMessages.RESOURCE_TYPE_REQUIRED);
         if (resourceId <= 0) {
-            throw new IllegalArgumentException("创作目标资源主键必须大于零");
+            throw new IllegalArgumentException(CreativeRuntimeMessages.RESOURCE_ID_MUST_BE_POSITIVE);
         }
     }
 }
