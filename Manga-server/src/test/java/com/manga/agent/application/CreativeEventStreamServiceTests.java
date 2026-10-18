@@ -2,6 +2,8 @@ package com.manga.agent.application;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.manga.agent.domain.CreativeEventType;
+import com.manga.agent.api.CreativeRunResponse;
+import com.manga.agent.domain.CreativeRunStatus;
 import com.manga.agent.event.CreativeEventSignalHub;
 import com.manga.agent.event.CreativeEventSources;
 import com.manga.entity.CreativeEvent;
@@ -61,6 +63,21 @@ class CreativeEventStreamServiceTests {
                 .assertNext(envelope -> assertThat(envelope.eventType())
                         .isEqualTo(CreativeEventType.RUN_CANCELLED))
                 .verifyComplete();
+    }
+
+    @Test
+    void shouldCloseReconnectWhenCursorAlreadyReachedTerminalEvent() {
+        CreativeEventService eventService = mock(CreativeEventService.class);
+        CreativeEventSignalHub signalHub = new CreativeEventSignalHub();
+        CreativeRunQueryService queryService = mock(CreativeRunQueryService.class);
+        CreativeRunResponse run = mock(CreativeRunResponse.class);
+        when(run.status()).thenReturn(CreativeRunStatus.COMPLETED);
+        when(queryService.findOwned(RUN_ID, USER_ID)).thenReturn(run);
+        when(eventService.findAfter(RUN_ID, 4L)).thenReturn(List.of());
+        CreativeEventStreamService service = new CreativeEventStreamService(
+                queryService, eventService, signalHub, Schedulers.immediate());
+
+        StepVerifier.create(service.stream(RUN_ID, USER_ID, 4L)).verifyComplete();
     }
 
     /** 创建使用立即调度器的测试服务，避免测试依赖真实线程池。 */

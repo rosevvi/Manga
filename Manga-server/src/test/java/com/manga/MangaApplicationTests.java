@@ -89,6 +89,8 @@ class MangaApplicationTests {
         List<String> expectedTables = List.of(
                 "manga_creative_conversation",
                 "manga_creative_run",
+                "manga_creative_step",
+                "manga_creative_dispatch_outbox",
                 "manga_creative_event",
                 "manga_creative_event_outbox"
         );
@@ -119,10 +121,10 @@ class MangaApplicationTests {
     }
 
     /**
-     * 使用真实 Mapper 和事务验证 Run 受理、事件写入及取消链路。
+     * 使用真实 Mapper、线程池和事务验证 Run 从受理到完成的整条链路。
      */
     @Test
-    void creativeRuntimePersistsAndCancelsRun() {
+    void creativeRuntimeExecutesRunToCompletion() throws InterruptedException {
         Long userId = jdbcTemplate.queryForObject(
                 "SELECT id FROM manga_user ORDER BY id ASC LIMIT 1", Long.class);
         String requestId = UUID.randomUUID().toString();
@@ -132,20 +134,62 @@ class MangaApplicationTests {
 
         assertThat(started.status()).isEqualTo(CreativeRunStatus.QUEUED);
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM manga_creative_event WHERE run_id = ?", Integer.class, started.runId()))
+                "SELECT COUNT(*) FROM manga_creative_step WHERE run_id = ?", Integer.class, started.runId()))
                 .isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM manga_creative_event_outbox WHERE run_id = ?", Integer.class, started.runId()))
+                "SELECT COUNT(*) FROM manga_creative_dispatch_outbox WHERE step_id = "
+                        + "(SELECT step_id FROM manga_creative_step WHERE run_id = ?)",
+                Integer.class, started.runId()))
                 .isEqualTo(1);
 
+        awaitRunStatus(started.runId(), CreativeRunStatus.COMPLETED);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM manga_creative_run WHERE run_id = ?", String.class, started.runId()))
+                .isEqualTo(CreativeRunStatus.COMPLETED.code());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM manga_creative_step WHERE run_id = ?", String.class, started.runId()))
+                .isEqualTo("COMPLETED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM manga_creative_event WHERE run_id = ?", Integer.class, started.runId()))
+                .isGreaterThanOrEqualTo(8);
+    }
+
+    /**
+     * 验证取消会传播到根 Step 并最终产生 CANCELLED 聚合终态。
+     */
+    @Test
+    void creativeRuntimeCancelsActiveRun() throws InterruptedException {
+        Long userId = jdbcTemplate.queryForObject(
+                "SELECT id FROM manga_user ORDER BY id ASC LIMIT 1", Long.class);
+        CreativeRunStartResult started = creativeRuntime.start(StartCreativeRunCommand.conversation(
+                userId, UUID.randomUUID().toString(), null, null, "验证创作运行取消链路"));
+
         creativeRuntime.cancel(new CancelCreativeRunCommand(started.runId(), userId));
+        awaitRunStatus(started.runId(), CreativeRunStatus.CANCELLED);
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT status FROM manga_creative_run WHERE run_id = ?", String.class, started.runId()))
                 .isEqualTo(CreativeRunStatus.CANCELLED.code());
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM manga_creative_event WHERE run_id = ?", Integer.class, started.runId()))
-                .isEqualTo(3);
+                "SELECT COUNT(*) FROM manga_creative_event WHERE run_id = ? AND event_type = 'RUN_CANCELLED'",
+                Integer.class, started.runId())).isEqualTo(1);
+    }
+
+    /** 在限定时间内等待异步 Run 到达期望状态。 */
+    private void awaitRunStatus(String runId, CreativeRunStatus expected) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 5000L;
+        while (System.currentTimeMillis() < deadline) {
+            String status = jdbcTemplate.queryForObject(
+                    "SELECT status FROM manga_creative_run WHERE run_id = ?", String.class, runId);
+            if (expected.code().equals(status)) {
+                return;
+            }
+            Thread.sleep(20L);
+        }
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM manga_creative_run WHERE run_id = ?", String.class, runId))
+                .isEqualTo(expected.code());
     }
 
     /**

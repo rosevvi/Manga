@@ -20,6 +20,11 @@ public class UuidCreativeIdentifierGenerator implements CreativeIdentifierGenera
         return nextUuid();
     }
 
+    @Override
+    public String nextStepId() {
+        return nextUuid();
+    }
+
     /** 生成标准小写 UUID 文本。 */
     private String nextUuid() {
         return UUID.randomUUID().toString();

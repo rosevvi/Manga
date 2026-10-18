@@ -36,6 +36,7 @@ import ProjectModule from './ProjectModule'
 import StoryboardModule from './StoryboardModule'
 import AiProviderSettings from './AiProviderSettings'
 import ProjectWorkspace from './ProjectWorkspace'
+import MangaAssistant from './MangaAssistant'
 import { getActiveTasks, getProjects } from '../api/projectApi'
 import { useLanguage } from '../i18n/LanguageContext'
 
@@ -413,6 +414,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
           </>
         )}
       </main>
+      {!isGuest && <MangaAssistant accessToken={accessToken} userId={authSession?.user?.id} projectId={selectedProjectId} />}
     </div>
   )
 }

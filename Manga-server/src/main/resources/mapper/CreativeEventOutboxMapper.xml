@@ -1,7 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.manga.mapper.CreativeEventOutboxMapper">
-    <select id="findPending" resultType="com.manga.entity.CreativeEventOutbox">
+    <resultMap id="eventOutboxResultMap" type="com.manga.entity.CreativeEventOutbox">
+        <id property="id" column="id"/>
+        <result property="runId" column="run_id"/>
+        <result property="sequenceNo" column="sequence_no"/>
+        <result property="status" column="status" javaType="com.manga.agent.domain.CreativeOutboxStatus"/>
+        <result property="claimOwner" column="claim_owner"/>
+        <result property="claimUntil" column="claim_until"/>
+        <result property="nextAttemptAt" column="next_attempt_at"/>
+        <result property="publishedAt" column="published_at"/>
+        <result property="attempts" column="attempts"/>
+        <result property="lastError" column="last_error"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+    </resultMap>
+
+    <select id="findClaimCandidates" resultMap="eventOutboxResultMap">
         SELECT id,
                run_id,
                sequence_no,
@@ -17,8 +34,32 @@
                created_by,
                updated_by
         FROM manga_creative_event_outbox
-        WHERE status = 'PENDING'
+        WHERE (status = 'PENDING' AND (next_attempt_at IS NULL OR next_attempt_at &lt;= #{now}))
+           OR (status = 'CLAIMED' AND claim_until &lt;= #{now})
         ORDER BY id ASC
         LIMIT #{limit}
     </select>
+
+    <update id="claim">
+        UPDATE manga_creative_event_outbox
+        SET status = 'CLAIMED', claim_owner = #{claimOwner}, claim_until = #{claimUntil},
+            attempts = attempts + 1, updated_by = #{updatedBy}
+        WHERE id = #{id}
+          AND ((status = 'PENDING' AND (next_attempt_at IS NULL OR next_attempt_at &lt;= #{now}))
+            OR (status = 'CLAIMED' AND claim_until &lt;= #{now}))
+    </update>
+
+    <update id="markPublished">
+        UPDATE manga_creative_event_outbox
+        SET status = 'PUBLISHED', published_at = #{publishedAt}, claim_until = NULL,
+            next_attempt_at = NULL, last_error = NULL, updated_by = #{updatedBy}
+        WHERE id = #{id} AND status = 'CLAIMED' AND claim_owner = #{claimOwner}
+    </update>
+
+    <update id="markRetry">
+        UPDATE manga_creative_event_outbox
+        SET status = 'PENDING', claim_owner = NULL, claim_until = NULL,
+            next_attempt_at = #{nextAttemptAt}, last_error = #{lastError}, updated_by = #{updatedBy}
+        WHERE id = #{id} AND status = 'CLAIMED' AND claim_owner = #{claimOwner}
+    </update>
 </mapper>

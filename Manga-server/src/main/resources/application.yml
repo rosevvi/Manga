@@ -106,6 +106,17 @@ manga:
     redis-listener-retry-interval: ${MANGA_CREATIVE_REDIS_RETRY_INTERVAL:5s}
     event-outbox:
       publish-interval: ${MANGA_CREATIVE_OUTBOX_PUBLISH_INTERVAL:1s}
+    dispatch-outbox:
+      publish-interval: ${MANGA_CREATIVE_DISPATCH_OUTBOX_PUBLISH_INTERVAL:1s}
+    reconciliation:
+      interval: ${MANGA_CREATIVE_RECONCILIATION_INTERVAL:5s}
+    execution:
+      step-lease: ${MANGA_CREATIVE_STEP_LEASE:30s}
+      outbox-claim-lease: ${MANGA_CREATIVE_OUTBOX_CLAIM_LEASE:15s}
+      outbox-retry-base: ${MANGA_CREATIVE_OUTBOX_RETRY_BASE:1s}
+      outbox-retry-max: ${MANGA_CREATIVE_OUTBOX_RETRY_MAX:1m}
+      fake-delta-interval: ${MANGA_CREATIVE_FAKE_DELTA_INTERVAL:100ms}
+      batch-size: ${MANGA_CREATIVE_BATCH_SIZE:100}
     runtime:
       engine-version: durable-v1
       workflow-version: v1

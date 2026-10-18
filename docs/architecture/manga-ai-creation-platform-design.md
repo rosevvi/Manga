@@ -2114,12 +2114,12 @@ ADR 与 API/事件契约
 - [x] Run、Step、Event、ErrorCode、PermissionPolicy 与状态机契约已冻结，并提供稳定机器编码。
 - [x] `/api/v1/creative-runs` 创建、查询、取消和支持游标恢复的 SSE 接口已提供；不存在并行的旧接口。
 - [x] Run 创建时固化 engine、workflow 和 permission 信息；ID、系统操作者、错误消息与 Redis key 职责已集中。
-- [x] V2 已建立阶段 0 所需的 Conversation、Run、Event 和 Event Outbox；表字段注释、审计字段、索引及约束已校验。
+- [x] V2 已建立 Conversation、Run、Step、Dispatch Outbox、Event 和 Event Outbox；表字段注释、审计字段、索引及约束已校验。
 - [x] 事件推送和异步执行使用按职责命名的受控业务线程池，不依赖 Reactor 默认弹性线程池。
 - [x] 状态机、枚举持久化、DTO 校验、受理幂等、SSE 回放/唤醒、Redis key、Flyway 元数据与 OpenAPI 均有自动化测试。
 - [x] Flyway V1→V2 已在测试环境的全新 MySQL 兼容数据库完成建库、元数据和真实 Mapper 写入测试。
 
-阶段 0 到此关闭。`DurableCreativeRuntime` 当前负责幂等受理、查询、取消和事件流，实际 Step 领取、恢复与调度属于阶段 1。
+阶段 0 到此关闭。`DurableCreativeRuntime` 保持为单一门面，受理、取消、调度、执行和恢复职责由独立应用服务承担。
 
 ---
 
@@ -2131,35 +2131,36 @@ ADR 与 API/事件契约
 
 #### 后端任务
 
-- 实现 `RunAdmissionService`。
-- 实现 `FakeCreativeExecutor`，先验证完整状态和事件链路，不调用真实模型。
-- 实现 Run/Step Repository 和复杂 Mapper XML。
-- 实现 `CreativeEventJournal` 和事务内序号分配。
-- 实现 Event Outbox 批量领取、Redis 发布和退避重试。
-- 实现 Dispatch Outbox、Step 原子领取、owner epoch 和过期 Lease 恢复。
-- 实现 `CreativeEventStreamService`：回放、实时唤醒、补偿轮询和终态结束。
-- 实现查询、取消请求和基础 Reconciliation。
+- [x] 实现 `RunAdmissionService`，事务内创建 Run、根 Step 和 Dispatch Outbox，并在提交后立即调度。
+- [x] 实现 `FakeCreativeExecutor`，验证 `READY → RUNNING → COMPLETED` 和流式事件链路，不调用真实模型。
+- [x] 实现 Run/Step Repository 和复杂 Mapper XML，原子领取使用 owner epoch 围栏和可续租 Lease。
+- [x] 实现事务内事件序号分配与 Event Outbox 写入。
+- [x] 实现 Event Outbox 竞争领取、Redis 发布和指数退避重试。
+- [x] 实现 Dispatch Outbox、提交后立即调度、过期 Lease 恢复和重试耗尽失败收敛。
+- [x] 实现 `CreativeEventStreamService`：回放、实时唤醒、补偿轮询、终态结束和终态 cursor 重连。
+- [x] 实现 Run 聚合、取消传播和基础 Reconciliation。
 
 #### 前端任务
 
-- `POST /api/v1/creative-runs` 后保存 runId。
-- 使用独立 SSE 接口。
-- 持久化最新 sequence，并支持刷新重连。
-- 展示 Run/Step 基础状态。
+- [x] `POST /api/v1/creative-runs` 后保存 runId、conversationId 和 Run 状态。
+- [x] 使用独立、带认证请求头的 SSE 接口。
+- [x] 持久化最新 sequence 和增量文本，并支持刷新及断线重连。
+- [x] 助手展示 Run 状态，章节编辑页支持手动创建分镜 Run。
 
 #### 测试任务
 
-- Run 启动幂等。
-- 同一 Conversation 活跃 Run 唯一。
-- 并发事件序号稳定。
-- Redis 故障时事件仍可查询。
-- SSE 断线重连无丢失、无重复终态。
+- [x] Run 启动幂等和同一 Conversation 活跃 Run 唯一。
+- [x] 并发 Step 原子领取只产生一个 owner，owner epoch 阻止旧实例提交。
+- [x] 并发事件序号由 Run 行锁串行分配，不产生重复或空洞。
+- [x] 进程重启场景能够恢复过期 Lease 并创建新调度版本。
+- [x] Redis 故障时 Event Outbox 进入退避重试，本实例 SSE 仍被唤醒。
+- [x] SSE 按 cursor 回放，断线重连无丢失、无重复终态。
 
 #### 验收标准
 
-- 模拟执行器能够每秒写入事件，前端实时显示。
-- 关闭页面再打开能够从 cursor 补齐。
-- 服务重启后 Run 状态和事件仍完整。
+- [x] 模拟执行器按配置间隔写入事件，前端实时显示。
+- [x] 关闭页面再打开能够从 cursor 补齐。
+- [x] 服务重启后 Run、Step、Outbox 和 Event 仍可从数据库恢复。
 
 ---
 

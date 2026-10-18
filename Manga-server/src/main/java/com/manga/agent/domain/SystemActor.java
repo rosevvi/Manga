@@ -11,6 +11,12 @@ public enum SystemActor {
     /** Event Outbox 发布任务。 */
     EVENT_OUTBOX("system:event-outbox"),
 
+    /** Step 调度、执行和租约恢复任务。 */
+    STEP_EXECUTION("system:step-execution"),
+
+    /** Run 与 Step 周期性对账任务。 */
+    RECONCILIATION("system:reconciliation"),
+
     /** 外部生成作业轮询任务。 */
     GENERATION_POLLER("system:generation-poller"),
 

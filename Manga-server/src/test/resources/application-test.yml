@@ -7,6 +7,14 @@ spring:
 manga:
   creative:
     redis-listener-enabled: false
+    event-outbox:
+      publish-interval: 1h
+    dispatch-outbox:
+      publish-interval: 1h
+    reconciliation:
+      interval: 1h
+    execution:
+      fake-delta-interval: 25ms
   storage:
     aliyun-oss:
       enabled: false

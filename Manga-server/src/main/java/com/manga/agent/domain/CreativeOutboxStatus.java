@@ -8,6 +8,9 @@ public enum CreativeOutboxStatus {
     /** 记录等待领取或重试。 */
     PENDING,
 
+    /** 记录已被一个实例临时领取。 */
+    CLAIMED,
+
     /** 记录已经成功投递。 */
     PUBLISHED
 }

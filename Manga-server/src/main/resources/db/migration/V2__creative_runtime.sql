@@ -76,6 +76,61 @@ CREATE TABLE manga_creative_run (
     CONSTRAINT fk_manga_creative_run_project FOREIGN KEY (project_id) REFERENCES manga_project (id) ON DELETE SET NULL
 ) COMMENT = 'AI 漫剧创作运行表';
 
+CREATE TABLE manga_creative_step (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '创作步骤数据库主键',
+    step_id CHAR(36) NOT NULL COMMENT '创作步骤唯一标识',
+    run_id CHAR(36) NOT NULL COMMENT '所属创作运行标识',
+    parent_step_id CHAR(36) NULL COMMENT '可选的父步骤标识',
+    step_type VARCHAR(64) NOT NULL COMMENT '步骤执行器类型',
+    status VARCHAR(32) NOT NULL COMMENT '步骤生命周期状态',
+    schedule_version BIGINT NOT NULL DEFAULT 1 COMMENT '每次重新调度递增的版本号',
+    owner_instance_id VARCHAR(128) NULL COMMENT '当前领取步骤的运行时实例标识',
+    owner_epoch BIGINT NOT NULL DEFAULT 0 COMMENT '每次成功领取递增的围栏代次',
+    lease_until TIMESTAMP NULL COMMENT '当前执行权租约截止时间',
+    attempt_no INT NOT NULL DEFAULT 0 COMMENT '累计成功领取次数',
+    max_attempts INT NOT NULL DEFAULT 3 COMMENT '最大允许领取次数',
+    input_json LONGTEXT NOT NULL COMMENT '创建步骤时固化的输入快照',
+    output_json LONGTEXT NULL COMMENT '步骤成功输出快照',
+    error_code VARCHAR(64) NULL COMMENT '失败错误机器编码',
+    error_message VARCHAR(2000) NULL COMMENT '脱敏后的失败摘要',
+    started_at TIMESTAMP NULL COMMENT '首次开始执行时间',
+    finished_at TIMESTAMP NULL COMMENT '进入终态时间',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录最后更新时间',
+    created_by VARCHAR(128) NOT NULL DEFAULT 'system:database-migration' COMMENT '记录创建操作者',
+    updated_by VARCHAR(128) NOT NULL DEFAULT 'system:database-migration' COMMENT '记录最后更新操作者',
+    PRIMARY KEY (id),
+    CONSTRAINT uk_manga_creative_step_id UNIQUE (step_id),
+    CONSTRAINT ck_manga_creative_step_status CHECK (status IN ('PENDING', 'READY', 'RUNNING', 'WAITING_APPROVAL', 'WAITING_JOB', 'WAITING_CHILDREN', 'WAITING_RETRY', 'COMPLETED', 'FAILED', 'CANCEL_REQUESTED', 'CANCELLED', 'SKIPPED')),
+    CONSTRAINT ck_manga_creative_step_attempt CHECK (attempt_no >= 0 AND max_attempts > 0),
+    INDEX idx_manga_creative_step_run_status (run_id, status, id),
+    INDEX idx_manga_creative_step_recovery (status, lease_until, id),
+    CONSTRAINT fk_manga_creative_step_run FOREIGN KEY (run_id) REFERENCES manga_creative_run (run_id) ON DELETE CASCADE,
+    CONSTRAINT fk_manga_creative_step_parent FOREIGN KEY (parent_step_id) REFERENCES manga_creative_step (step_id) ON DELETE CASCADE
+) COMMENT = 'AI 漫剧创作可恢复步骤表';
+
+CREATE TABLE manga_creative_dispatch_outbox (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '步骤调度出站记录主键',
+    step_id CHAR(36) NOT NULL COMMENT '待调度创作步骤标识',
+    schedule_version BIGINT NOT NULL COMMENT '待投递的步骤调度版本',
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '调度投递状态',
+    claim_owner VARCHAR(128) NULL COMMENT '当前领取投递记录的实例标识',
+    claim_until TIMESTAMP NULL COMMENT '当前投递领取截止时间',
+    next_attempt_at TIMESTAMP NULL COMMENT '下一次允许投递时间',
+    dispatched_at TIMESTAMP NULL COMMENT '完成调度投递时间',
+    attempts INT NOT NULL DEFAULT 0 COMMENT '累计投递次数',
+    last_error VARCHAR(1000) NULL COMMENT '最近一次投递错误摘要',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录最后更新时间',
+    created_by VARCHAR(128) NOT NULL DEFAULT 'system:database-migration' COMMENT '记录创建操作者',
+    updated_by VARCHAR(128) NOT NULL DEFAULT 'system:database-migration' COMMENT '记录最后更新操作者',
+    PRIMARY KEY (id),
+    CONSTRAINT uk_manga_creative_dispatch_version UNIQUE (step_id, schedule_version),
+    CONSTRAINT ck_manga_creative_dispatch_status CHECK (status IN ('PENDING', 'CLAIMED', 'DISPATCHED')),
+    INDEX idx_manga_creative_dispatch_claim (status, next_attempt_at, claim_until, id),
+    CONSTRAINT fk_manga_creative_dispatch_step FOREIGN KEY (step_id) REFERENCES manga_creative_step (step_id) ON DELETE CASCADE
+) COMMENT = 'AI 漫剧创作步骤调度投递箱表';
+
 CREATE TABLE manga_creative_event (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '创作事件数据库主键',
     run_id CHAR(36) NOT NULL COMMENT '所属创作运行标识',
@@ -115,7 +170,7 @@ CREATE TABLE manga_creative_event_outbox (
     updated_by VARCHAR(128) NOT NULL DEFAULT 'system:database-migration' COMMENT '记录最后更新操作者',
     PRIMARY KEY (id),
     CONSTRAINT uk_manga_creative_event_outbox_event UNIQUE (run_id, sequence_no),
-    CONSTRAINT ck_manga_creative_event_outbox_status CHECK (status IN ('PENDING', 'PUBLISHED')),
+    CONSTRAINT ck_manga_creative_event_outbox_status CHECK (status IN ('PENDING', 'CLAIMED', 'PUBLISHED')),
     INDEX idx_manga_creative_event_outbox_claim (status, next_attempt_at, claim_until, id),
     CONSTRAINT fk_manga_creative_event_outbox_event FOREIGN KEY (run_id, sequence_no) REFERENCES manga_creative_event (run_id, sequence_no) ON DELETE CASCADE
 ) COMMENT = 'AI 漫剧创作事件投递箱表';

@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.CreativeStepMapper">
+    <resultMap id="creativeStepResultMap" type="com.manga.entity.CreativeStep">
+        <id property="id" column="id"/>
+        <result property="stepId" column="step_id"/>
+        <result property="runId" column="run_id"/>
+        <result property="parentStepId" column="parent_step_id"/>
+        <result property="stepType" column="step_type" javaType="com.manga.agent.domain.CreativeStepType"/>
+        <result property="status" column="status" javaType="com.manga.agent.domain.CreativeStepStatus"/>
+        <result property="scheduleVersion" column="schedule_version"/>
+        <result property="ownerInstanceId" column="owner_instance_id"/>
+        <result property="ownerEpoch" column="owner_epoch"/>
+        <result property="leaseUntil" column="lease_until"/>
+        <result property="attemptNo" column="attempt_no"/>
+        <result property="maxAttempts" column="max_attempts"/>
+        <result property="inputJson" column="input_json"/>
+        <result property="outputJson" column="output_json"/>
+        <result property="errorCode" column="error_code"/>
+        <result property="errorMessage" column="error_message"/>
+        <result property="startedAt" column="started_at"/>
+        <result property="finishedAt" column="finished_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+    </resultMap>
+
+    <select id="findByStepId" resultMap="creativeStepResultMap">
+        SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
+               owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
+               input_json, output_json, error_code, error_message, started_at, finished_at,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_step
+        WHERE step_id = #{stepId}
+    </select>
+
+    <select id="findByRunId" resultMap="creativeStepResultMap">
+        SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
+               owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
+               input_json, output_json, error_code, error_message, started_at, finished_at,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_step
+        WHERE run_id = #{runId}
+        ORDER BY id ASC
+    </select>
+
+    <select id="findReady" resultMap="creativeStepResultMap">
+        SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
+               owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
+               input_json, output_json, error_code, error_message, started_at, finished_at,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_step
+        WHERE status = 'READY'
+        ORDER BY id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findExpired" resultMap="creativeStepResultMap">
+        SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
+               owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
+               input_json, output_json, error_code, error_message, started_at, finished_at,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_step
+        WHERE status IN ('RUNNING', 'CANCEL_REQUESTED')
+          AND lease_until IS NOT NULL
+          AND lease_until &lt;= #{now}
+        ORDER BY lease_until ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="claimReady">
+        UPDATE manga_creative_step
+        SET status = 'RUNNING',
+            owner_instance_id = #{ownerInstanceId},
+            owner_epoch = owner_epoch + 1,
+            lease_until = #{leaseUntil},
+            attempt_no = attempt_no + 1,
+            started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
+            updated_by = #{updatedBy}
+        WHERE step_id = #{stepId}
+          AND schedule_version = #{scheduleVersion}
+          AND status = 'READY'
+          AND attempt_no &lt; max_attempts
+    </update>
+
+    <update id="completeOwned">
+        UPDATE manga_creative_step
+        SET status = 'COMPLETED', output_json = #{outputJson}, lease_until = NULL,
+            finished_at = #{finishedAt}, updated_by = #{updatedBy}
+        WHERE step_id = #{stepId} AND status = 'RUNNING'
+          AND owner_instance_id = #{ownerInstanceId} AND owner_epoch = #{ownerEpoch}
+    </update>
+
+    <update id="renewLease">
+        UPDATE manga_creative_step
+        SET lease_until = #{leaseUntil}, updated_by = #{updatedBy}
+        WHERE step_id = #{stepId} AND status = 'RUNNING'
+          AND owner_instance_id = #{ownerInstanceId} AND owner_epoch = #{ownerEpoch}
+          AND lease_until &gt; #{now}
+    </update>
+
+    <update id="failOwned">
+        UPDATE manga_creative_step
+        SET status = 'FAILED', error_code = #{errorCode}, error_message = #{errorMessage},
+            lease_until = NULL, finished_at = #{finishedAt}, updated_by = #{updatedBy}
+        WHERE step_id = #{stepId} AND status = 'RUNNING'
+          AND owner_instance_id = #{ownerInstanceId} AND owner_epoch = #{ownerEpoch}
+    </update>
+
+    <update id="cancelOwned">
+        UPDATE manga_creative_step
+        SET status = 'CANCELLED', lease_until = NULL, finished_at = #{finishedAt}, updated_by = #{updatedBy}
+        WHERE step_id = #{stepId} AND status = 'CANCEL_REQUESTED'
+          AND owner_instance_id = #{ownerInstanceId} AND owner_epoch = #{ownerEpoch}
+    </update>
+
+    <update id="cancelWaitingByRunId">
+        UPDATE manga_creative_step
+        SET status = 'CANCELLED', lease_until = NULL, finished_at = #{finishedAt}, updated_by = #{updatedBy}
+        WHERE run_id = #{runId}
+          AND status IN ('PENDING', 'READY', 'WAITING_APPROVAL', 'WAITING_JOB', 'WAITING_CHILDREN', 'WAITING_RETRY')
+    </update>
+
+    <update id="requestCancelRunningByRunId">
+        UPDATE manga_creative_step
+        SET status = 'CANCEL_REQUESTED', updated_by = #{updatedBy}
+        WHERE run_id = #{runId} AND status = 'RUNNING'
+    </update>
+
+    <update id="recoverExpired">
+        UPDATE manga_creative_step
+        SET status = 'READY', schedule_version = schedule_version + 1,
+            owner_instance_id = NULL, lease_until = NULL, updated_by = #{updatedBy}
+        WHERE step_id = #{stepId} AND status = 'RUNNING'
+          AND owner_epoch = #{ownerEpoch} AND lease_until &lt;= #{now}
+          AND attempt_no &lt; max_attempts
+    </update>
+
+    <update id="cancelExpired">
+        UPDATE manga_creative_step
+        SET status = 'CANCELLED', lease_until = NULL, finished_at = #{now}, updated_by = #{updatedBy}
+        WHERE step_id = #{stepId} AND status = 'CANCEL_REQUESTED'
+          AND owner_epoch = #{ownerEpoch} AND lease_until &lt;= #{now}
+    </update>
+
+    <update id="failExpiredExhausted">
+        UPDATE manga_creative_step
+        SET status = 'FAILED', lease_until = NULL, finished_at = #{now},
+            error_code = #{errorCode}, error_message = #{errorMessage}, updated_by = #{updatedBy}
+        WHERE step_id = #{stepId} AND status = 'RUNNING'
+          AND owner_epoch = #{ownerEpoch} AND lease_until &lt;= #{now}
+          AND attempt_no &gt;= max_attempts
+    </update>
+
+    <select id="countNonTerminal" resultType="int">
+        SELECT COUNT(*) FROM manga_creative_step
+        WHERE run_id = #{runId}
+          AND status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED', 'SKIPPED')
+    </select>
+
+    <select id="countFailed" resultType="int">
+        SELECT COUNT(*) FROM manga_creative_step WHERE run_id = #{runId} AND status = 'FAILED'
+    </select>
+
+    <select id="countCancelled" resultType="int">
+        SELECT COUNT(*) FROM manga_creative_step WHERE run_id = #{runId} AND status = 'CANCELLED'
+    </select>
+</mapper>

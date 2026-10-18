@@ -11,4 +11,7 @@ public interface CreativeIdentifierGenerator {
     /** 生成新的助手会话标识。 */
     String nextConversationId();
 
+    /** 生成新的 Step 标识。 */
+    String nextStepId();
+
 }
