@@ -7,6 +7,8 @@ public final class CreativeActor {
 
     /** 用户操作者编码格式。 */
     private static final String USER_ACTOR_FORMAT = "user:%d";
+    /** AgentScope 状态存储执行的系统审计操作者。 */
+    public static final String AGENT_STATE_STORE = "system:agent-state-store";
 
     /** 禁止实例化无状态工具类。 */
     private CreativeActor() {

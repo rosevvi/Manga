@@ -10,6 +10,7 @@ import com.manga.agent.domain.SystemActor;
 import com.manga.agent.event.ContentDeltaEventPayload;
 import com.manga.agent.event.CreativeEventSources;
 import com.manga.agent.event.StepCompletedEventPayload;
+import com.manga.agent.harness.AgentRuntimeException;
 import com.manga.entity.CreativeStep;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.CreativeStepRepository;
@@ -82,8 +83,11 @@ public class CreativeStepLifecycleService {
     public void fail(ClaimedCreativeStep claimed, Throwable failure) {
         runRepository.lockByRunId(claimed.runId());
         String errorMessage = failure.getClass().getSimpleName();
+        CreativeErrorCode errorCode = failure instanceof AgentRuntimeException runtimeException
+                ? runtimeException.errorCode()
+                : CreativeErrorCode.CAPABILITY_EXECUTION_FAILED;
         boolean failed = stepRepository.failOwned(claimed.stepId(), claimed.ownerInstanceId(),
-                claimed.ownerEpoch(), CreativeErrorCode.CAPABILITY_EXECUTION_FAILED.code(), errorMessage,
+                claimed.ownerEpoch(), errorCode.code(), errorMessage,
                 LocalDateTime.now(), SystemActor.STEP_EXECUTION.code());
         if (!failed) {
             acknowledgeCancellation(claimed);

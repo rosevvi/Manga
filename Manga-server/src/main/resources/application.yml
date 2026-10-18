@@ -102,6 +102,16 @@ manga:
       password: ${MANGA_INITIAL_ADMIN_PASSWORD:}
       display-name: Manga Administrator
   creative:
+    agent:
+      director-prompt-resource: classpath:agent/profiles/manga-director-system.md
+      director-profile-version: 1
+      director-max-turns: 12
+      context-window: ${MANGA_CREATIVE_AGENT_CONTEXT_WINDOW:32768}
+      harness:
+        session-lease: ${MANGA_CREATIVE_AGENT_SESSION_LEASE:30s}
+        max-kernels: ${MANGA_CREATIVE_AGENT_MAX_KERNELS:8}
+        kernel-acquire-timeout: ${MANGA_CREATIVE_AGENT_KERNEL_ACQUIRE_TIMEOUT:5s}
+        shutdown-drain-timeout: ${MANGA_CREATIVE_AGENT_SHUTDOWN_DRAIN_TIMEOUT:30s}
     redis-listener-enabled: ${MANGA_CREATIVE_REDIS_LISTENER_ENABLED:true}
     redis-listener-retry-interval: ${MANGA_CREATIVE_REDIS_RETRY_INTERVAL:5s}
     event-outbox:

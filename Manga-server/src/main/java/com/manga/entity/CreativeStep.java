@@ -49,6 +49,12 @@ public class CreativeStep {
     private Integer maxAttempts;
     /** 创建时固化的输入 JSON。 */
     private String inputJson;
+    /** Agent Step 执行前固化的不含密钥 Blueprint 快照。 */
+    private String blueprintSnapshotJson;
+    /** Blueprint 快照的 SHA-256 指纹。 */
+    private String blueprintFingerprint;
+    /** AgentScope 状态恢复使用的会话标识。 */
+    private String stateSessionId;
     /** 成功时固化的输出 JSON。 */
     private String outputJson;
     /** 失败错误机器编码。 */

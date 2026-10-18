@@ -26,6 +26,11 @@ public class AiProviderConfigRepository {
         return Optional.ofNullable(aiProviderConfigMapper.findOwnedById(configId, ownerUserId));
     }
 
+    /** 运行时按 Blueprint 中已固化的全局配置主键查询模型配置。 */
+    public Optional<AiProviderConfig> findById(long configId) {
+        return Optional.ofNullable(aiProviderConfigMapper.selectById(configId));
+    }
+
     /** 查询用户默认的 AI 服务配置。 */
     public Optional<AiProviderConfig> findDefaultOwnedBy(long ownerUserId) {
         return Optional.ofNullable(aiProviderConfigMapper.findDefaultOwnedBy(ownerUserId));

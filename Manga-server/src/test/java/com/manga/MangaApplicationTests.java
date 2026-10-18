@@ -5,6 +5,9 @@ import com.manga.agent.application.CreativeRunStartResult;
 import com.manga.agent.application.CreativeRuntime;
 import com.manga.agent.application.StartCreativeRunCommand;
 import com.manga.agent.domain.CreativeRunStatus;
+import io.agentscope.core.state.AgentState;
+import io.agentscope.core.state.AgentStateStore;
+import io.agentscope.core.state.VersionedState;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,6 +40,9 @@ class MangaApplicationTests {
 
     @Autowired
     private CreativeRuntime creativeRuntime;
+
+    @Autowired
+    private AgentStateStore agentStateStore;
 
     /**
      * 确认基础 Bean 配置不存在启动错误。
@@ -118,6 +124,62 @@ class MangaApplicationTests {
                   AND CONSTRAINT_TYPE = 'CHECK'
                 """, Integer.class);
         assertThat(checkConstraintCount).isGreaterThanOrEqualTo(4);
+    }
+
+    /**
+     * 确认阶段二 Blueprint 快照字段和 AgentScope 状态表已由 Flyway 创建。
+     */
+    @Test
+    void flywayCreatesAgentRuntimeStateContract() {
+        Integer stateTableCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE LOWER(TABLE_NAME) = 'manga_agent_state'
+                """, Integer.class);
+        Integer stepSnapshotColumnCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE LOWER(TABLE_NAME) = 'manga_creative_step'
+                  AND LOWER(COLUMN_NAME) IN (
+                    'blueprint_snapshot_json', 'blueprint_fingerprint', 'state_session_id'
+                  )
+                """, Integer.class);
+        Integer stateAuditColumnCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE LOWER(TABLE_NAME) = 'manga_agent_state'
+                  AND LOWER(COLUMN_NAME) IN ('created_at', 'updated_at', 'created_by', 'updated_by')
+                """, Integer.class);
+
+        assertThat(stateTableCount).isEqualTo(1);
+        assertThat(stepSnapshotColumnCount).isEqualTo(3);
+        assertThat(stateAuditColumnCount).isEqualTo(4);
+    }
+
+    /**
+     * 使用真实 Mapper 验证 AgentScope 状态可写入、覆盖递增版本并恢复。
+     */
+    @Test
+    void agentStateStorePersistsAndRestoresVersionedState() {
+        String sessionId = "test-state-" + UUID.randomUUID();
+        String userKey = "1";
+        String stateKey = "director";
+        agentStateStore.save(userKey, sessionId, stateKey, AgentState.builder()
+                .userId(userKey)
+                .sessionId(sessionId)
+                .summary("first")
+                .build());
+        agentStateStore.save(userKey, sessionId, stateKey, AgentState.builder()
+                .userId(userKey)
+                .sessionId(sessionId)
+                .summary("second")
+                .build());
+
+        VersionedState<AgentState> restored = agentStateStore.getVersioned(
+                userKey, sessionId, stateKey, AgentState.class);
+
+        assertThat(restored.version()).isEqualTo(2L);
+        assertThat(restored.value().getSummary()).isEqualTo("second");
     }
 
     /**

@@ -27,6 +27,8 @@ public class RedisKeyFactory {
     private static final String CREATIVE_RUN_EVENT_CHANNEL_PREFIX = "%s:creative:run:";
     /** 创作 Run 事件频道固定后缀。 */
     private static final String CREATIVE_RUN_EVENT_CHANNEL_SUFFIX = ":events";
+    /** Agent 状态会话串行闸门键模板。 */
+    private static final String CREATIVE_AGENT_SESSION_GATE_KEY = "%s:creative:agent-session:%s:gate";
 
     private final MangaRedisProperties properties;
 
@@ -66,5 +68,10 @@ public class RedisKeyFactory {
             return Optional.empty();
         }
         return Optional.of(channel.substring(prefix.length(), end));
+    }
+
+    /** 生成指定 Agent 状态会话的串行闸门键。 */
+    public String creativeAgentSessionGate(String stateSessionId) {
+        return CREATIVE_AGENT_SESSION_GATE_KEY.formatted(properties.keyPrefix(), stateSessionId);
     }
 }

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.MangaAgentStateMapper">
+    <resultMap id="mangaAgentStateResultMap" type="com.manga.entity.MangaAgentState">
+        <id property="id" column="id"/>
+        <result property="userKey" column="user_key"/>
+        <result property="stateSessionId" column="state_session_id"/>
+        <result property="stateKey" column="state_key"/>
+        <result property="stateKind" column="state_kind" javaType="com.manga.agent.state.AgentStateKind"/>
+        <result property="stateType" column="state_type"/>
+        <result property="stateJson" column="state_json"/>
+        <result property="stateVersion" column="state_version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+    </resultMap>
+
+    <select id="findOne" resultMap="mangaAgentStateResultMap">
+        SELECT id,
+               user_key,
+               state_session_id,
+               state_key,
+               state_kind,
+               state_type,
+               state_json,
+               state_version,
+               created_at,
+               updated_at,
+               created_by,
+               updated_by
+        FROM manga_agent_state
+        WHERE user_key = #{userKey}
+          AND state_session_id = #{stateSessionId}
+          AND state_key = #{stateKey}
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO manga_agent_state (
+            user_key,
+            state_session_id,
+            state_key,
+            state_kind,
+            state_type,
+            state_json,
+            state_version,
+            created_by,
+            updated_by
+        ) VALUES (
+            #{userKey},
+            #{stateSessionId},
+            #{stateKey},
+            #{stateKind},
+            #{stateType},
+            #{stateJson},
+            1,
+            #{createdBy},
+            #{updatedBy}
+        )
+        ON DUPLICATE KEY UPDATE
+            state_kind = VALUES(state_kind),
+            state_type = VALUES(state_type),
+            state_json = VALUES(state_json),
+            state_version = state_version + 1,
+            updated_by = VALUES(updated_by)
+    </insert>
+
+    <insert id="insertInitial">
+        INSERT INTO manga_agent_state (
+            user_key,
+            state_session_id,
+            state_key,
+            state_kind,
+            state_type,
+            state_json,
+            state_version,
+            created_by,
+            updated_by
+        ) VALUES (
+            #{userKey},
+            #{stateSessionId},
+            #{stateKey},
+            #{stateKind},
+            #{stateType},
+            #{stateJson},
+            1,
+            #{createdBy},
+            #{updatedBy}
+        )
+    </insert>
+
+    <update id="updateIfVersion">
+        UPDATE manga_agent_state
+        SET state_kind = #{stateKind},
+            state_type = #{stateType},
+            state_json = #{stateJson},
+            state_version = state_version + 1,
+            updated_by = #{updatedBy}
+        WHERE user_key = #{userKey}
+          AND state_session_id = #{stateSessionId}
+          AND state_key = #{stateKey}
+          AND state_version = #{stateVersion}
+    </update>
+
+    <select id="countSession" resultType="int">
+        SELECT COUNT(*)
+        FROM manga_agent_state
+        WHERE user_key = #{userKey}
+          AND state_session_id = #{stateSessionId}
+    </select>
+
+    <delete id="deleteSession">
+        DELETE FROM manga_agent_state
+        WHERE user_key = #{userKey}
+          AND state_session_id = #{stateSessionId}
+    </delete>
+
+    <delete id="deleteState">
+        DELETE FROM manga_agent_state
+        WHERE user_key = #{userKey}
+          AND state_session_id = #{stateSessionId}
+          AND state_key = #{stateKey}
+    </delete>
+
+    <select id="listSessionIds" resultType="string">
+        SELECT DISTINCT state_session_id
+        FROM manga_agent_state
+        WHERE user_key = #{userKey}
+        ORDER BY state_session_id ASC
+    </select>
+</mapper>

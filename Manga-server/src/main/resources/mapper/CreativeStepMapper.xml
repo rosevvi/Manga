@@ -15,6 +15,9 @@
         <result property="attemptNo" column="attempt_no"/>
         <result property="maxAttempts" column="max_attempts"/>
         <result property="inputJson" column="input_json"/>
+        <result property="blueprintSnapshotJson" column="blueprint_snapshot_json"/>
+        <result property="blueprintFingerprint" column="blueprint_fingerprint"/>
+        <result property="stateSessionId" column="state_session_id"/>
         <result property="outputJson" column="output_json"/>
         <result property="errorCode" column="error_code"/>
         <result property="errorMessage" column="error_message"/>
@@ -29,7 +32,8 @@
     <select id="findByStepId" resultMap="creativeStepResultMap">
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
-               input_json, output_json, error_code, error_message, started_at, finished_at,
+               input_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
+               output_json, error_code, error_message, started_at, finished_at,
                created_at, updated_at, created_by, updated_by
         FROM manga_creative_step
         WHERE step_id = #{stepId}
@@ -38,7 +42,8 @@
     <select id="findByRunId" resultMap="creativeStepResultMap">
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
-               input_json, output_json, error_code, error_message, started_at, finished_at,
+               input_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
+               output_json, error_code, error_message, started_at, finished_at,
                created_at, updated_at, created_by, updated_by
         FROM manga_creative_step
         WHERE run_id = #{runId}
@@ -48,7 +53,8 @@
     <select id="findReady" resultMap="creativeStepResultMap">
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
-               input_json, output_json, error_code, error_message, started_at, finished_at,
+               input_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
+               output_json, error_code, error_message, started_at, finished_at,
                created_at, updated_at, created_by, updated_by
         FROM manga_creative_step
         WHERE status = 'READY'
@@ -59,7 +65,8 @@
     <select id="findExpired" resultMap="creativeStepResultMap">
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
-               input_json, output_json, error_code, error_message, started_at, finished_at,
+               input_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
+               output_json, error_code, error_message, started_at, finished_at,
                created_at, updated_at, created_by, updated_by
         FROM manga_creative_step
         WHERE status IN ('RUNNING', 'CANCEL_REQUESTED')

@@ -17,6 +17,14 @@ public enum CreativeErrorCode {
     ACTIVE_RUN_CONFLICT,
     /** 指定运行时尚未启用。 */
     RUNTIME_UNAVAILABLE,
+    /** Run 固化的 Agent、模型或能力配置已经不可用。 */
+    RUN_CONFIG_UNAVAILABLE,
+    /** Agent 状态存储不可用，运行时已拒绝继续调用模型。 */
+    STATE_STORE_UNAVAILABLE,
+    /** 同一 Agent 状态会话已由其他执行租约独占。 */
+    STATE_SESSION_BUSY,
+    /** KernelPool 在限定时间内无法提供执行容量。 */
+    KERNEL_CAPACITY_EXHAUSTED,
     /** 模型调用失败。 */
     MODEL_INVOCATION_FAILED,
     /** 工具或能力执行失败。 */
@@ -29,6 +37,8 @@ public enum CreativeErrorCode {
     INVALID_STATE_TRANSITION,
     /** 用户取消了运行。 */
     CANCELLED_BY_USER,
+    /** Agent 事件入口超过有界容量，执行已主动停止。 */
+    EVENT_BACKPRESSURE_OVERFLOW,
     /** 未归类的内部执行错误。 */
     INTERNAL_ERROR;
 
