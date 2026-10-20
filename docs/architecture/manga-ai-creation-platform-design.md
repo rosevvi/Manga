@@ -186,9 +186,10 @@ flowchart TB
 
     SUPERVISOR --> JOURNAL[Run Event Journal]
     JOURNAL --> MYSQL[(MySQL)]
-    JOURNAL --> OUTBOX[Event Outbox]
-    OUTBOX --> REDIS[(Redis)]
+    JOURNAL --> SIGNAL[事务提交后发布 sequence]
+    SIGNAL --> REDIS[(Redis Pub/Sub)]
     REDIS --> QUERY
+    MYSQL --> QUERY
     QUERY --> UI
 
     GEN --> PROVIDER[图片 / 视频供应商]
@@ -266,7 +267,7 @@ com.manga.agent
 │   └── generation
 ├── event
 │   ├── CreativeEventJournal
-│   ├── CreativeEventOutboxPublisher
+│   ├── CreativeEventRedisSignalService
 │   ├── CreativeEventStreamService
 │   └── CreativeMessageProjector
 ├── persistence
@@ -1343,7 +1344,6 @@ manga_creative_run
 manga_creative_step
 manga_creative_step_dependency
 manga_creative_event
-manga_creative_event_outbox
 manga_creative_dispatch_outbox
 manga_creative_message
 manga_creative_change_set
@@ -1495,25 +1495,6 @@ event_created_at
 - `run_id + sequence_no` 唯一。
 - `run_id + raw_event_id` 唯一，用于 Provider/Harness 事件去重。
 - payload 写入前脱敏，禁止密钥、Token、完整第三方错误正文和内部路径。
-
-### 20.6 `manga_creative_event_outbox`
-
-核心字段：
-
-```text
-event_id
-run_id
-sequence_no
-status
-claim_owner
-claim_until
-next_attempt_at
-attempts
-published_at
-last_error
-```
-
-多实例 Publisher 使用批量领取和 claim lease；发布失败按退避策略重试。
 
 ### 20.7 `manga_creative_dispatch_outbox`
 
@@ -1684,11 +1665,12 @@ status
 → 创建 Run
 → 创建 Root Step
 → 写入会话消息或手动操作的类型化输入
+→ 写 Root Step Dispatch Outbox
 → 写 RUN_ACCEPTED 事件
-→ 写 Event Outbox
 ```
 
-事务提交后再调度，不在事务内调用模型。
+事务提交后立即调度 Root Step，并把已提交事件的 sequence 发布到该 Run 独立的 Redis Pub/Sub
+频道；不在事务内调用模型或访问 Redis。
 
 ### 21.2 Step 领取
 
@@ -1715,8 +1697,12 @@ READY，或 RUNNING 且 lease 已过期
 → 获取 next_sequence
 → 插入 Event
 → 更新 next_sequence
-→ 插入 Outbox
+→ 事务提交后发布 Redis sequence 唤醒提示
 ```
+
+Redis 只承担低延迟唤醒，不保存事件正文。SSE 先通过 `listenToChannelLater` 确认该 Run 的频道订阅
+已经生效，再按 cursor 回放 MySQL；实时阶段收到 sequence 后继续读取 MySQL，并以 300ms 轻量轮询
+补偿 Redis 短暂不可用或 Pub/Sub 消息丢失。MySQL Event Journal 始终是唯一事实源。
 
 ### 21.4 消息投影
 
@@ -2107,17 +2093,17 @@ ADR 与 API/事件契约
 - 所有状态和错误均有稳定机器编码。
 - Run 创建时固定 `engine_version` 和 `workflow_version`，确保恢复执行时使用一致的工作流语义。
 
-#### 当前实现状态（2026-09-28）
+#### 当前实现状态（2026-10-20）
 
 - [x] 唯一的 `CreativeRuntime` 门面和 `DurableCreativeRuntime` 实现已落地，无兼容适配器和灰度路由。
 - [x] 会话触发与用户手动触发使用同一 Run 契约，手动操作显式携带 operation、target 和 permission policy。
 - [x] Run、Step、Event、ErrorCode、PermissionPolicy 与状态机契约已冻结，并提供稳定机器编码。
 - [x] `/api/v1/creative-runs` 创建、查询、取消和支持游标恢复的 SSE 接口已提供；不存在并行的旧接口。
 - [x] Run 创建时固化 engine、workflow 和 permission 信息；ID、系统操作者、错误消息与 Redis key 职责已集中。
-- [x] V2 已建立 Conversation、Run、Step、Dispatch Outbox、Event 和 Event Outbox；表字段注释、审计字段、索引及约束已校验。
+- [x] V2 建立 Conversation、Run、Step、Dispatch Outbox、Event 和原 Event Outbox；V3 增加 Blueprint 与 Agent State，V4 删除不再使用的 Event Outbox。
 - [x] 事件推送和异步执行使用按职责命名的受控业务线程池，不依赖 Reactor 默认弹性线程池。
 - [x] 状态机、枚举持久化、DTO 校验、受理幂等、SSE 回放/唤醒、Redis key、Flyway 元数据与 OpenAPI 均有自动化测试。
-- [x] Flyway V1→V2 已在测试环境的全新 MySQL 兼容数据库完成建库、元数据和真实 Mapper 写入测试。
+- [x] Flyway V1→V4 已在测试环境的全新 MySQL 兼容数据库完成建库、元数据和真实 Mapper 写入测试。
 
 阶段 0 到此关闭。`DurableCreativeRuntime` 保持为单一门面，受理、取消、调度、执行和恢复职责由独立应用服务承担。
 
@@ -2134,8 +2120,8 @@ ADR 与 API/事件契约
 - [x] 实现 `RunAdmissionService`，事务内创建 Run、根 Step 和 Dispatch Outbox，并在提交后立即调度。
 - [x] 实现 `FakeCreativeExecutor`，验证 `READY → RUNNING → COMPLETED` 和流式事件链路，不调用真实模型。
 - [x] 实现 Run/Step Repository 和复杂 Mapper XML，原子领取使用 owner epoch 围栏和可续租 Lease。
-- [x] 实现事务内事件序号分配与 Event Outbox 写入。
-- [x] 实现 Event Outbox 竞争领取、Redis 发布和指数退避重试。
+- [x] 实现事务内事件序号分配，提交后立即发布每 Run 独立的 Redis sequence 唤醒提示。
+- [x] SSE 在回放前确认 Redis 订阅已建立，并通过 MySQL 补偿轮询覆盖 Pub/Sub 消息丢失。
 - [x] 实现 Dispatch Outbox、提交后立即调度、过期 Lease 恢复和重试耗尽失败收敛。
 - [x] 实现 `CreativeEventStreamService`：回放、实时唤醒、补偿轮询、终态结束和终态 cursor 重连。
 - [x] 实现 Run 聚合、取消传播和基础 Reconciliation。
@@ -2153,7 +2139,7 @@ ADR 与 API/事件契约
 - [x] 并发 Step 原子领取只产生一个 owner，owner epoch 阻止旧实例提交。
 - [x] 并发事件序号由 Run 行锁串行分配，不产生重复或空洞。
 - [x] 进程重启场景能够恢复过期 Lease 并创建新调度版本。
-- [x] Redis 故障时 Event Outbox 进入退避重试，本实例 SSE 仍被唤醒。
+- [x] Redis 故障时 SSE 自动退化为 MySQL 补偿轮询，事件正文和终态不会丢失。
 - [x] SSE 按 cursor 回放，断线重连无丢失、无重复终态。
 
 #### 验收标准

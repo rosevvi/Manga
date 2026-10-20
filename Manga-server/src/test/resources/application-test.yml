@@ -6,9 +6,6 @@ spring:
 
 manga:
   creative:
-    redis-listener-enabled: false
-    event-outbox:
-      publish-interval: 1h
     dispatch-outbox:
       publish-interval: 1h
     reconciliation:

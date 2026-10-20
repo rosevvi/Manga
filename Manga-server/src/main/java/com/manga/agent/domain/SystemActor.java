@@ -8,9 +8,6 @@ public enum SystemActor {
     /** Creative Runtime 受理、执行和收敛任务。 */
     CREATIVE_RUNTIME("system:creative-runtime"),
 
-    /** Event Outbox 发布任务。 */
-    EVENT_OUTBOX("system:event-outbox"),
-
     /** Step 调度、执行和租约恢复任务。 */
     STEP_EXECUTION("system:step-execution"),
 

@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 
 /**
- * 统一计算 Dispatch/Event Outbox 的有上限指数退避。
+ * 计算 Dispatch Outbox 的有上限指数退避。
  */
 @Component
 @RequiredArgsConstructor

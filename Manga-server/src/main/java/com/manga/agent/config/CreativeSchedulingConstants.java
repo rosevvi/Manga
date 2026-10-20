@@ -5,8 +5,6 @@ package com.manga.agent.config;
  */
 public final class CreativeSchedulingConstants {
 
-    /** Event Outbox 发布周期配置。 */
-    public static final String EVENT_OUTBOX_INTERVAL = "${manga.creative.event-outbox.publish-interval:1s}";
     /** Dispatch Outbox 发布周期配置。 */
     public static final String DISPATCH_OUTBOX_INTERVAL = "${manga.creative.dispatch-outbox.publish-interval:1s}";
     /** Run 和 Step 对账周期配置。 */

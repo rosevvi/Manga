@@ -5,34 +5,36 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.config.CreativeRuntimeProperties;
 import com.manga.agent.domain.CreativeEventType;
-import com.manga.agent.domain.CreativeOutboxStatus;
 import com.manga.agent.domain.CreativeRuntimeMessages;
 import com.manga.agent.domain.SystemActor;
 import com.manga.agent.event.CreativeEventSources;
+import com.manga.agent.event.CreativeEventRedisSignalService;
 import com.manga.entity.CreativeEvent;
-import com.manga.entity.CreativeEventOutbox;
 import com.manga.entity.CreativeRun;
-import com.manga.repository.CreativeEventOutboxRepository;
 import com.manga.repository.CreativeEventRepository;
 import com.manga.repository.CreativeRunRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 /**
- * 以运行级递增序号提交 Creative Event 和对应 Outbox 记录。
+ * 以运行级递增序号提交 Creative Event，并在事务提交后发布 Redis 唤醒提示。
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CreativeEventService {
 
     private final CreativeRunRepository runRepository;
     private final CreativeEventRepository eventRepository;
-    private final CreativeEventOutboxRepository outboxRepository;
+    private final CreativeEventRedisSignalService redisSignalService;
     private final ObjectMapper objectMapper;
     private final CreativeRuntimeProperties runtimeProperties;
 
@@ -42,7 +44,7 @@ public class CreativeEventService {
         return append(runId, null, eventType, CreativeEventSources.RUNTIME, null, payload);
     }
 
-    /** 在同一事务内分配序号、追加事件并建立可靠实时唤醒记录。 */
+    /** 在同一事务内分配序号、追加事件，并注册提交后的实时唤醒。 */
     @Transactional
     public CreativeEvent append(String runId, String stepId, CreativeEventType eventType,
             String source, String correlationId, Object payload) {
@@ -70,15 +72,31 @@ public class CreativeEventService {
         }
         run.setUpdatedBy(actor);
         runRepository.update(run);
-        outboxRepository.create(CreativeEventOutbox.builder()
-                .runId(runId)
-                .sequenceNo(sequence)
-                .status(CreativeOutboxStatus.PENDING)
-                .attempts(0)
-                .createdBy(actor)
-                .updatedBy(actor)
-                .build());
+        publishAfterCommit(runId, sequence);
         return event;
+    }
+
+    /**
+     * 只在数据库事务成功提交后发布。Redis 发布失败不会回滚事实数据，SSE 会通过 MySQL 补偿查询恢复。
+     */
+    private void publishAfterCommit(String runId, long sequence) {
+        Runnable publish = () -> redisSignalService.publishWakeup(runId, sequence)
+                .subscribe(
+                        ignored -> { },
+                        failure -> log.debug(
+                                "Creative event Redis wake-up unavailable; MySQL polling will recover runId={} sequence={} type={}",
+                                runId, sequence, failure.getClass().getSimpleName()));
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publish.run();
+                }
+            });
+            return;
+        }
+        publish.run();
     }
 
     /** 查询指定序号之后已经提交的事件。 */

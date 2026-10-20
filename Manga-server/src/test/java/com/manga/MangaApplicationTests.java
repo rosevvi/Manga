@@ -81,7 +81,7 @@ class MangaApplicationTests {
                 """, String.class);
 
         assertThat(tableCount).isEqualTo(1);
-        assertThat(migrationCount).isGreaterThanOrEqualTo(2);
+        assertThat(migrationCount).isGreaterThanOrEqualTo(4);
         assertThat(triggerColumnCount).isEqualTo(4);
         assertThat(contractColumnCount).isEqualTo(8);
         assertThat(conversationNullable).isEqualTo("YES");
@@ -97,8 +97,7 @@ class MangaApplicationTests {
                 "manga_creative_run",
                 "manga_creative_step",
                 "manga_creative_dispatch_outbox",
-                "manga_creative_event",
-                "manga_creative_event_outbox"
+                "manga_creative_event"
         );
         List<String> actualTables = jdbcTemplate.queryForList("""
                 SELECT LOWER(TABLE_NAME)

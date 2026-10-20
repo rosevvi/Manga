@@ -1,0 +1,1 @@
+DROP TABLE manga_creative_event_outbox;
