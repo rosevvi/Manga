@@ -1,6 +1,7 @@
 package com.manga.agent.execution;
 
 import com.manga.agent.domain.CreativeStepType;
+import com.manga.agent.domain.CreativeRuntimeMessages;
 import org.springframework.stereotype.Component;
 
 import java.util.EnumMap;
@@ -22,7 +23,9 @@ public class CreativeStepExecutorRegistry {
         for (CreativeStepExecutor candidate : candidates) {
             CreativeStepExecutor previous = indexed.put(candidate.stepType(), candidate);
             if (Objects.nonNull(previous)) {
-                throw new IllegalStateException("Duplicate creative step executor: " + candidate.stepType());
+                throw new IllegalStateException(
+                        CreativeRuntimeMessages.AGENT_STEP_EXECUTOR_DUPLICATED_TEMPLATE
+                                .formatted(candidate.stepType()));
             }
         }
         executors = Map.copyOf(indexed);
@@ -32,7 +35,8 @@ public class CreativeStepExecutorRegistry {
     public CreativeStepExecutor require(CreativeStepType stepType) {
         CreativeStepExecutor executor = executors.get(stepType);
         if (Objects.isNull(executor)) {
-            throw new IllegalStateException("Creative step executor is not registered: " + stepType);
+            throw new IllegalStateException(
+                    CreativeRuntimeMessages.AGENT_STEP_EXECUTOR_NOT_FOUND_TEMPLATE.formatted(stepType));
         }
         return executor;
     }

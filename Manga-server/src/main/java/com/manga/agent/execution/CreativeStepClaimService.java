@@ -1,5 +1,6 @@
 package com.manga.agent.execution;
 
+import com.manga.agent.application.CreativeEventService;
 import com.manga.agent.config.CreativeExecutionProperties;
 import com.manga.agent.domain.CreativeEventType;
 import com.manga.agent.domain.CreativeRunStatus;
@@ -10,7 +11,6 @@ import com.manga.entity.CreativeRun;
 import com.manga.entity.CreativeStep;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.CreativeStepRepository;
-import com.manga.agent.application.CreativeEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,17 +65,39 @@ public class CreativeStepClaimService {
         eventService.append(step.getRunId(), step.getStepId(), CreativeEventType.STEP_STARTED,
                 CreativeEventSources.RUNTIME, null,
                 new StepStartedEventPayload(step.getStepId(), step.getOwnerEpoch(), step.getAttemptNo()));
-        return Optional.of(new ClaimedCreativeStep(step.getStepId(), step.getRunId(), step.getStepType(),
-                step.getOwnerInstanceId(), step.getOwnerEpoch(), step.getInputJson()));
+        return Optional.of(toClaim(step, run));
     }
 
     /** 查询当前实例仍持有的执行权，供执行异常后的围栏失败提交使用。 */
     @Transactional(readOnly = true)
     public Optional<ClaimedCreativeStep> findOwnedClaim(String stepId) {
-        return stepRepository.findByStepId(stepId)
-                .filter(step -> instanceIdentity.value().equals(step.getOwnerInstanceId()))
-                .filter(step -> step.getStatus() == com.manga.agent.domain.CreativeStepStatus.RUNNING)
-                .map(step -> new ClaimedCreativeStep(step.getStepId(), step.getRunId(), step.getStepType(),
-                        step.getOwnerInstanceId(), step.getOwnerEpoch(), step.getInputJson()));
+        CreativeStep step = stepRepository.findByStepId(stepId)
+                .filter(candidate -> instanceIdentity.value().equals(candidate.getOwnerInstanceId()))
+                .filter(candidate -> candidate.getStatus() == com.manga.agent.domain.CreativeStepStatus.RUNNING)
+                .orElse(null);
+        if (Objects.isNull(step)) {
+            return Optional.empty();
+        }
+        CreativeRun run = runRepository.findByRunId(step.getRunId()).orElse(null);
+        return Objects.isNull(run) ? Optional.empty() : Optional.of(toClaim(step, run));
+    }
+
+    /** 将已领取 Step 与所属 Run 的冻结上下文组合为执行权快照。 */
+    private ClaimedCreativeStep toClaim(CreativeStep step, CreativeRun run) {
+        return new ClaimedCreativeStep(
+                step.getStepId(),
+                step.getRunId(),
+                step.getStepType(),
+                step.getOwnerInstanceId(),
+                step.getOwnerEpoch(),
+                step.getInputJson(),
+                run.getUserId(),
+                run.getProjectId(),
+                run.getConversationId(),
+                run.getDeadlineAt(),
+                run.getPermissionPolicy(),
+                step.getBlueprintSnapshotJson(),
+                step.getBlueprintFingerprint(),
+                step.getStateSessionId());
     }
 }

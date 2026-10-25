@@ -16,7 +16,9 @@ spring:
     validate-on-migrate: true
   servlet:
     multipart:
+      # 单个剧本上传文件的大小上限，支持 MB 等容量单位。
       max-file-size: ${MANGA_SCRIPT_UPLOAD_MAX_FILE_SIZE:20MB}
+      # 整个上传请求的大小上限，需容纳文件内容及表单开销。
       max-request-size: ${MANGA_SCRIPT_UPLOAD_MAX_REQUEST_SIZE:21MB}
   jackson:
     default-property-inclusion: non_null
@@ -44,89 +46,170 @@ server:
     include-stacktrace: never
 
 manga:
+  # API 文档展示信息。
   openapi:
+    # OpenAPI 文档标题。
     title: Manga AI Platform API
+    # OpenAPI 文档中的平台业务说明。
     description: Manga AI 漫剧生成平台后端接口
+    # API 文档版本，与创作引擎和工作流版本分别维护。
     version: v1
+  # 剧本导入后台任务。
   script:
     task:
+      # 导入任务原始输入的临时存储目录，相对路径基于进程工作目录解析。
       input-directory: data/script-tasks
+      # 单次导入输入的最大字节数，同时约束文本和文件输入。
       max-input-size: ${MANGA_SCRIPT_TASK_MAX_INPUT_SIZE:20000000}
+      # 导入任务允许的最大尝试次数，包含首次处理。
       max-attempts: 3
+  # 平台访问外部服务的通用 HTTP 超时，时长需携带 s、m 等单位。
   external-http:
+    # 建立外部 HTTP 连接的最长等待时间。
     connect-timeout: 10s
+    # 外部 HTTP 请求允许等待的最长时间。
     request-timeout: 30s
+  # 用户 AI 服务商配置的敏感凭据保护。
   ai:
     secrets:
-      # 生产环境建议使用独立密钥；未单独配置时复用现有 JWT 密钥以便本地启动。
+      # 加密数据库中的 AI API Key；生产环境使用独立密钥，本地未配置时回退到 JWT 密钥。
       encryption-key: ${MANGA_AI_SECRET_ENCRYPTION_KEY:${MANGA_JWT_SECRET:}}
+  # Step 执行和后台任务共用的受控线程池。
   executors:
     common:
+      # 通用业务线程池核心线程数，单位：个。
       core-pool-size: 4
+      # 通用业务线程池最大线程数，不应小于核心线程数。
       max-pool-size: 16
+      # 等待执行的任务队列容量，单位：条任务。
       queue-capacity: 200
+      # 非核心线程空闲后的保留时长。
       keep-alive: 60s
+      # 应用关闭时等待已提交任务完成的最长时间。
       await-termination: 30s
+      # 业务工作线程名称前缀，用于日志和线程排障。
       thread-name-prefix: manga-common-
+      # 定时扫描与租约心跳共用调度器的线程数，单位：个。
       scheduled-pool-size: 2
+      # 定时调度线程名称前缀。
       scheduled-thread-name-prefix: manga-scheduled-
+  # 外部身份登录的临时会话存储。
   auth:
     storage:
+      # 扫码等外部登录会话的存储实现，可选 redis 或 jdbc。
       external-login-session: redis
+  # 本地上传文件保存位置与图片限制。
   upload:
+    # 本地上传目录，相对路径基于进程工作目录解析。
     directory: ${MANGA_UPLOAD_DIR:uploads}
+    # 本地上传文件映射到 HTTP 的公开路径前缀。
     public-path: ${MANGA_UPLOAD_PUBLIC_PATH:/uploads}
+    # 单张上传图片的大小上限，支持 MB 等容量单位。
     max-image-size: ${MANGA_UPLOAD_MAX_IMAGE_SIZE:8MB}
+  # 媒体文件的对象存储配置。
   storage:
     aliyun-oss:
+      # 是否启用阿里云 OSS 存储策略，客户端创建还要求凭据配置完整。
       enabled: ${MANGA_OSS_ENABLED:true}
+      # OSS Bucket 所在地域的服务 Endpoint。
       endpoint: ${MANGA_OSS_ENDPOINT:}
+      # 接收平台媒体文件的 Bucket 名称。
       bucket-name: ${MANGA_OSS_BUCKET_NAME:manga-ai}
+      # OSS 访问凭据标识，通过环境变量提供。
       access-key-id: ${MANGA_OSS_ACCESS_KEY_ID:}
+      # OSS 访问密钥，通过环境变量提供，不写入源码或日志。
       access-key-secret: ${MANGA_OSS_ACCESS_KEY_SECRET:}
+      # 上传对象在 Bucket 内的统一路径前缀。
       object-prefix: ${MANGA_OSS_OBJECT_PREFIX:mannga}
+      # 可选的 OSS 自定义访问域名或 CDN 地址，用于生成媒体公开链接。
       public-domain: ${MANGA_OSS_PUBLIC_DOMAIN:}
+  # Redis 业务键命名和临时登录数据保留策略。
   redis:
+    # 平台 Redis 键的统一前缀，用于隔离业务键空间。
     key-prefix: manga
+    # 登录会话失效后继续保留记录的时长，用于区分过期与不存在。
     external-login-expired-retention: 10m
+  # 浏览器跨域、登录令牌和首次管理员初始化。
   security:
+    # 允许跨域请求的前端来源列表，多个来源以逗号分隔。
     allowed-origins: ${MANGA_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+    # 浏览器可缓存 CORS 预检结果的时长。
     cors-max-age: ${MANGA_CORS_MAX_AGE:1h}
     jwt:
+      # 登录令牌签名密钥，通过环境变量提供。
       secret: ${MANGA_JWT_SECRET:}
+      # 平台签发并校验登录令牌时使用的 issuer 标识。
       issuer: manga-server
+      # 正式用户访问令牌的有效期。
       access-token-ttl: 2h
+      # 游客访问令牌的有效期。
       guest-token-ttl: 30m
     initial-admin:
+      # 初始化管理员账号的登录名。
       username: ${MANGA_INITIAL_ADMIN_USERNAME:admin}
+      # 创建初始管理员时使用的密码，通过环境变量提供。
       password: ${MANGA_INITIAL_ADMIN_PASSWORD:}
+      # 初始化管理员账号的展示名称。
       display-name: Manga Administrator
+  # 可恢复创作运行、Agent 执行与调度补偿。
   creative:
+    # 内置 Agent Profile 的提示词、定义版本和推理限制。
     agent:
+      # Director 的系统提示词资源位置。
       director-prompt-resource: classpath:agent/profiles/manga-director-system.md
+      # Director 定义的语义版本；提示词或行为契约变化时递增，并参与 Blueprint 指纹。
       director-profile-version: 1
+      # Director 单次调用允许的最大模型推理轮次，达到限制后失败。
       director-max-turns: 12
+      # 只读剧本解析 Agent 的系统提示词资源位置。
+      script-parser-prompt-resource: classpath:agent/profiles/script-parser-system.md
+      # 剧本解析 Profile 的语义版本，参与 Blueprint 指纹计算。
+      script-parser-profile-version: 1
+      # 剧本解析单次调用允许的最大模型推理轮次，需覆盖章节读取与报告生成。
+      script-parser-max-turns: 24
+      # 内置 Agent 声明给模型适配器的上下文窗口，单位：token，最小值为 1024。
       context-window: ${MANGA_CREATIVE_AGENT_CONTEXT_WINDOW:32768}
+      # 请求级 Harness 隔离、状态会话互斥及共享 Kernel 资源限制。
       harness:
+        # 同一 StateSession 的独占租约时长，由心跳续签，防止并发使用同一会话状态。
         session-lease: ${MANGA_CREATIVE_AGENT_SESSION_LEASE:30s}
+        # 单实例允许缓存的最大共享 Kernel 数量，单位：个。
         max-kernels: ${MANGA_CREATIVE_AGENT_MAX_KERNELS:8}
+        # Kernel 容量用尽时等待空闲资源的最长时间。
         kernel-acquire-timeout: ${MANGA_CREATIVE_AGENT_KERNEL_ACQUIRE_TIMEOUT:5s}
+        # 应用关闭时等待活跃 KernelHandle 和 HarnessLease 释放的最长时间。
         shutdown-drain-timeout: ${MANGA_CREATIVE_AGENT_SHUTDOWN_DRAIN_TIMEOUT:30s}
+    # 事务提交后立即调度之外的持久化补偿投递。
     dispatch-outbox:
+      # 扫描待投递 Dispatch Outbox 的间隔，用于补偿遗漏或失败的调度信号。
       publish-interval: ${MANGA_CREATIVE_DISPATCH_OUTBOX_PUBLISH_INTERVAL:1s}
+    # 租约过期与待调度步骤的恢复扫描。
     reconciliation:
+      # 执行恢复扫描的间隔。
       interval: ${MANGA_CREATIVE_RECONCILIATION_INTERVAL:5s}
+    # Step 执行权、调度领取、重试退避与批处理限制。
     execution:
+      # 数据库 Step 执行权租约时长，Agent 执行期间按该时长的三分之一周期续签。
       step-lease: ${MANGA_CREATIVE_STEP_LEASE:30s}
+      # 单条 Dispatch Outbox 被投递实例独占领取的有效期。
       outbox-claim-lease: ${MANGA_CREATIVE_DISPATCH_OUTBOX_CLAIM_LEASE:15s}
+      # 调度投递失败后的首次退避时长，后续按指数增长。
       outbox-retry-base: ${MANGA_CREATIVE_DISPATCH_OUTBOX_RETRY_BASE:1s}
+      # 调度投递重试退避允许达到的最大时长。
       outbox-retry-max: ${MANGA_CREATIVE_DISPATCH_OUTBOX_RETRY_MAX:1m}
+      # 阶段一模拟执行器两段输出之间的间隔，设为 0ms 可取消模拟等待。
       fake-delta-interval: ${MANGA_CREATIVE_FAKE_DELTA_INTERVAL:100ms}
+      # 单轮 Outbox 投递或恢复扫描的最大记录数，单位：条。
       batch-size: ${MANGA_CREATIVE_BATCH_SIZE:100}
+    # 创建 Run 和事件时冻结的契约版本及运行期限。
     runtime:
+      # 写入新 Run 的创作执行引擎版本标识。
       engine-version: durable-v1
+      # 写入新 Run 的工作流定义版本标识。
       workflow-version: v1
+      # Event Envelope 的结构版本，供持久化事件和 SSE 消费者识别协议。
       event-schema-version: 1
+      # 单次 Run 从受理到结束的最长允许时长，用于生成 deadline_at。
       run-timeout: ${MANGA_CREATIVE_RUN_TIMEOUT:30m}
 
 management:
@@ -163,12 +246,21 @@ logging:
     com.manga: INFO
 
 wx:
+  # 微信公众号扫码登录与服务端事件回调。
   gzh:
+    # 用于申请接口访问令牌和二维码的公众号 AppID。
     app-id: ${MANGA_WECHAT_GZH_APP_ID:}
+    # 公众号 AppSecret，通过环境变量提供，不写入源码或日志。
     secret: ${MANGA_WECHAT_GZH_SECRET:}
+    # 微信服务器回调签名校验使用的自定义 Token。
     token: ${MANGA_WECHAT_GZH_TOKEN:}
+    # 微信公众号接口服务基础地址。
     api-base-url: ${MANGA_WECHAT_API_BASE_URL:https://api.weixin.qq.com}
+    # 展示登录二维码的基础地址，后续拼接二维码 ticket。
     qr-code-base-url: ${MANGA_WECHAT_QR_CODE_BASE_URL:https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=}
+    # 平台登录二维码使用的微信场景值前缀。
     scene-prefix: manga_login_
+    # 单次扫码登录会话及二维码的有效期。
     qr-login-ttl: 5m
+    # 返回给前端的扫码登录状态建议轮询间隔。
     poll-interval: 2s

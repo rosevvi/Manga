@@ -2152,6 +2152,21 @@ ADR 与 API/事件契约
 
 ### 阶段 2：单 Director Agent 与受控 Kernel
 
+#### 当前实现状态（2026-10-25）
+
+阶段二已经打通首个真实 AgentScope 垂直切片。当前选择 `SCRIPT_PARSER` 作为首个业务 Agent，
+由用户在剧本页手动发起 `PARSE_SCRIPT`。该 Agent 只读取剧本结构和章节正文，输出流式解析报告，
+不会直接修改剧本、章节或分镜；业务写入仍留到阶段四的 ChangeSet 和审批链路。
+
+- [x] 受理事务校验剧本归属，并冻结 Blueprint Snapshot、指纹和 StateSession。
+- [x] `AGENT_INVOCATION` Step 通过原子领取、owner epoch、lease 和 deadline 执行。
+- [x] AgentScope 文本与工具状态映射到 Event Journal，并通过 SSE cursor 可恢复消费。
+- [x] KernelPool、HarnessLease、SessionSerialGate 和 StateStore preflight 接入真实 Step 执行器。
+- [x] 剧本页提供手动解析入口、流式报告、工具状态、失败提示和重试。
+- [x] Blueprint、受理冻结、事件映射、租约丢失和持久化围栏测试通过。
+- [ ] 使用真实模型配置完成开发环境端到端验收和长剧本 token/轮次压测。
+- [ ] 是否把会话助手从阶段一 Fake 执行器切换到 Director Profile，留待端到端验收后决定。
+
 #### 目标
 
 接入 AgentScope，但只提供一个 Director 和只读能力。

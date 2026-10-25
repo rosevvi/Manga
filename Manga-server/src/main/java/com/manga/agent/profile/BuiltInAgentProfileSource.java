@@ -36,6 +36,17 @@ public class BuiltInAgentProfileSource implements AgentProfileSource {
                 properties.directorMaxTurns()
         );
         register(indexed, director);
+        AgentProfile scriptParser = new AgentProfile(
+                AgentProfileKey.SCRIPT_PARSER,
+                properties.scriptParserProfileVersion(),
+                "剧本解析师",
+                "读取项目剧本和章节正文，输出结构化的剧本分析报告。",
+                readPrompt(resourceLoader, properties.scriptParserPromptResource()),
+                CapabilityName.scriptParserCapabilities(),
+                AgentPermissionPolicy.READ_ONLY,
+                properties.scriptParserMaxTurns()
+        );
+        register(indexed, scriptParser);
         profiles = Map.copyOf(indexed);
     }
 

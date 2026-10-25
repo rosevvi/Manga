@@ -37,6 +37,17 @@
         <result property="updatedBy" column="updated_by"/>
     </resultMap>
 
+    <select id="findByRunId" resultMap="creativeRunResultMap">
+        SELECT id, run_id, request_id, request_fingerprint, conversation_id, user_id, project_id,
+               engine_version, workflow_type, workflow_version, permission_policy, budget_json,
+               trigger_source, operation_type, target_type, target_id, status, active_conversation_id,
+               owner_instance_id, owner_epoch, lease_until, deadline_at, next_sequence, terminal_sequence,
+               cancel_requested_at, error_code, error_message, started_at, finished_at,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_run
+        WHERE run_id = #{runId}
+    </select>
+
     <select id="findOwned" resultMap="creativeRunResultMap">
         SELECT id, run_id, request_id, request_fingerprint, conversation_id, user_id, project_id,
                engine_version, workflow_type, workflow_version, permission_policy, budget_json,

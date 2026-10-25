@@ -9,6 +9,9 @@ import org.apache.ibatis.annotations.Param;
  */
 public interface CreativeRunMapper extends BaseMapper<CreativeRun> {
 
+    /** 按稳定 Run 标识查询运行快照。 */
+    CreativeRun findByRunId(@Param("runId") String runId);
+
     /** 查询用户拥有的指定 Run。 */
     CreativeRun findOwned(@Param("runId") String runId, @Param("userId") long userId);
 

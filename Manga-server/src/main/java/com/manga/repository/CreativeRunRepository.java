@@ -22,6 +22,11 @@ public class CreativeRunRepository {
         return run;
     }
 
+    /** 按稳定 Run 标识查询运行快照。 */
+    public Optional<CreativeRun> findByRunId(String runId) {
+        return Optional.ofNullable(mapper.findByRunId(runId));
+    }
+
     /** 查询用户拥有的指定 Run。 */
     public Optional<CreativeRun> findOwned(String runId, long userId) {
         return Optional.ofNullable(mapper.findOwned(runId, userId));

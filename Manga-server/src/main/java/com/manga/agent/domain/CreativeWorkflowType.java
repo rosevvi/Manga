@@ -8,6 +8,9 @@ public enum CreativeWorkflowType {
     /** 单 Director 助手对话工作流。 */
     ASSISTANT_CHAT,
 
+    /** 只读剧本解析工作流。 */
+    SCRIPT_PARSE,
+
     /** 针对指定章节生成分镜的工作流。 */
     CHAPTER_STORYBOARD;
 
@@ -15,6 +18,7 @@ public enum CreativeWorkflowType {
     public static CreativeWorkflowType fromOperation(CreativeOperationType operationType) {
         return switch (operationType) {
             case ASSISTANT_CHAT -> ASSISTANT_CHAT;
+            case PARSE_SCRIPT -> SCRIPT_PARSE;
             case GENERATE_CHAPTER_STORYBOARD -> CHAPTER_STORYBOARD;
         };
     }

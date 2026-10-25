@@ -3,6 +3,9 @@ package com.manga.agent.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.api.CreativeRuntimeResponseCode;
+import com.manga.agent.blueprint.AgentBlueprintCompileRequest;
+import com.manga.agent.blueprint.AgentBlueprintCompiler;
+import com.manga.agent.blueprint.CompiledAgentBlueprint;
 import com.manga.agent.config.CreativeRuntimeProperties;
 import com.manga.agent.domain.CreativeActor;
 import com.manga.agent.domain.CreativeConversationStatus;
@@ -20,6 +23,7 @@ import com.manga.agent.event.CreativeEventSources;
 import com.manga.agent.event.RunAcceptedEventPayload;
 import com.manga.agent.event.StepCreatedEventPayload;
 import com.manga.agent.execution.CreativeStepDispatcher;
+import com.manga.agent.profile.AgentOperationBinding;
 import com.manga.common.enums.CommonResponseCode;
 import com.manga.common.exception.BusinessException;
 import com.manga.entity.CreativeConversation;
@@ -30,6 +34,7 @@ import com.manga.repository.CreativeConversationRepository;
 import com.manga.repository.CreativeDispatchOutboxRepository;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.CreativeStepRepository;
+import com.manga.repository.ProjectScriptRepository;
 import com.manga.service.ProjectService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +50,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -55,7 +61,9 @@ import java.util.Objects;
 @Slf4j
 public class RunAdmissionService {
 
+    /** 从用户指令生成会话标题时允许保留的最大字符数。 */
     private static final int CONVERSATION_TITLE_MAX_LENGTH = 80;
+    /** 根 Step 因租约过期而重新领取时允许的最大累计执行次数。 */
     private static final int ROOT_STEP_MAX_ATTEMPTS = 3;
 
     private final CreativeConversationRepository conversationRepository;
@@ -67,6 +75,8 @@ public class RunAdmissionService {
     private final CreativeRuntimeProperties properties;
     private final CreativeIdentifierGenerator identifierGenerator;
     private final CreativeStepDispatcher stepDispatcher;
+    private final AgentBlueprintCompiler blueprintCompiler;
+    private final ProjectScriptRepository scriptRepository;
     private final ObjectMapper objectMapper;
 
     /**
@@ -89,13 +99,14 @@ public class RunAdmissionService {
         if (Objects.nonNull(projectId) && !projectId.equals(command.projectId())) {
             projectService.requireAccessibleProject(projectId, command.userId());
         }
+        AgentStepConfiguration agentStep = resolveAgentStep(command, projectId);
         CreativeRun run = createRun(command, conversation, projectId, requestFingerprint);
         try {
             runRepository.create(run);
         } catch (DuplicateKeyException exception) {
             throw new BusinessException(CreativeRuntimeResponseCode.ACTIVE_RUN_CONFLICT, HttpStatus.CONFLICT);
         }
-        CreativeStep rootStep = createRootStep(command, run);
+        CreativeStep rootStep = createRootStep(command, run, agentStep);
         stepRepository.create(rootStep);
         dispatchOutboxRepository.create(CreativeDispatchOutbox.builder()
                 .stepId(rootStep.getStepId())
@@ -119,21 +130,66 @@ public class RunAdmissionService {
     }
 
     /** 创建初始 READY 根 Step，并将类型化输入序列化为 JSON。 */
-    private CreativeStep createRootStep(StartCreativeRunCommand command, CreativeRun run) {
+    private CreativeStep createRootStep(
+            StartCreativeRunCommand command,
+            CreativeRun run,
+            AgentStepConfiguration agentStep) {
         String actor = CreativeActor.user(command.userId());
         return CreativeStep.builder()
                 .stepId(identifierGenerator.nextStepId())
                 .runId(run.getRunId())
-                .stepType(CreativeStepType.ROOT_WORKFLOW)
+                .stepType(Objects.isNull(agentStep)
+                        ? CreativeStepType.ROOT_WORKFLOW
+                        : CreativeStepType.AGENT_INVOCATION)
                 .status(CreativeStepStatus.READY)
                 .scheduleVersion(1L)
                 .ownerEpoch(0L)
                 .attemptNo(0)
                 .maxAttempts(ROOT_STEP_MAX_ATTEMPTS)
                 .inputJson(write(new CreativeStepInput(command.instruction(), command.operationType(), command.target())))
+                .blueprintSnapshotJson(Objects.isNull(agentStep) ? null : agentStep.blueprint().snapshotJson())
+                .blueprintFingerprint(Objects.isNull(agentStep)
+                        ? null
+                        : agentStep.blueprint().blueprint().fingerprint())
+                .stateSessionId(Objects.isNull(agentStep) ? null : agentStep.stateSessionId())
                 .createdBy(actor)
                 .updatedBy(actor)
                 .build();
+    }
+
+    /**
+     * 为真实 Agent 操作校验目标资源并冻结执行 Blueprint；非 Agent 操作继续使用阶段一执行器。
+     */
+    private AgentStepConfiguration resolveAgentStep(StartCreativeRunCommand command, Long projectId) {
+        AgentOperationBinding binding = AgentOperationBinding.find(command.operationType()).orElse(null);
+        if (Objects.isNull(binding)) {
+            return null;
+        }
+        if (Objects.isNull(command.target()) || command.target().resourceType() != binding.targetType()) {
+            throw new BusinessException(
+                    CreativeRuntimeResponseCode.TARGET_RESOURCE_INVALID,
+                    CreativeRuntimeMessages.AGENT_OPERATION_TARGET_TYPE_INVALID_TEMPLATE
+                            .formatted(command.operationType(), binding.targetType()),
+                    HttpStatus.BAD_REQUEST);
+        }
+        boolean validScript = Objects.nonNull(projectId)
+                && scriptRepository.findByProjectId(projectId)
+                .filter(script -> Objects.equals(script.getId(), command.target().resourceId()))
+                .isPresent();
+        if (!validScript) {
+            throw new BusinessException(
+                    CreativeRuntimeResponseCode.TARGET_RESOURCE_INVALID,
+                    CreativeRuntimeMessages.AGENT_OPERATION_SCRIPT_TARGET_INVALID,
+                    HttpStatus.BAD_REQUEST);
+        }
+        CompiledAgentBlueprint compiled = blueprintCompiler.compile(new AgentBlueprintCompileRequest(
+                command.userId(),
+                binding.profileKey(),
+                command.permissionPolicy(),
+                null,
+                Map.of()
+        ));
+        return new AgentStepConfiguration(compiled, identifierGenerator.nextStateSessionId());
     }
 
     /** 注册事务提交回调，避免执行器读取到尚未提交的 Step。 */
@@ -269,5 +325,12 @@ public class RunAdmissionService {
         String normalized = instruction.trim().replaceAll("\\s+", " ");
         return normalized.length() <= CONVERSATION_TITLE_MAX_LENGTH
                 ? normalized : normalized.substring(0, CONVERSATION_TITLE_MAX_LENGTH);
+    }
+
+    /** 保存创建 Agent Step 所需的不可变配置。 */
+    private record AgentStepConfiguration(
+            /** 已编译且不含密钥的 Blueprint。 */ CompiledAgentBlueprint blueprint,
+            /** AgentScope 状态隔离会话标识。 */ String stateSessionId
+    ) {
     }
 }

@@ -117,7 +117,7 @@ public class AgentBlueprintCompiler {
         );
     }
 
-    /** 阶段二只允许与只读 Director Profile 完全一致的权限。 */
+    /** 阶段二只允许请求权限与对应只读 Profile 完全一致。 */
     private void requirePermission(AgentProfile profile, AgentPermissionPolicy requested) {
         if (!Objects.equals(profile.permissionPolicy(), requested)) {
             throw new IllegalArgumentException(CreativeRuntimeMessages.AGENT_PERMISSION_EXCEEDS_PROFILE);

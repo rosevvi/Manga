@@ -33,7 +33,9 @@ import static org.mockito.Mockito.when;
  */
 class AgentBlueprintCompilerTests {
 
+    /** 用于验证模型配置归属和请求数据不进入 Blueprint 的测试用户。 */
     private static final long USER_ID = 18L;
+    /** 用于断言敏感密文不会进入 Blueprint 快照的测试标记。 */
     private static final String API_KEY_CIPHERTEXT = "encrypted-api-key-material";
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -130,7 +132,9 @@ class AgentBlueprintCompilerTests {
         AiProviderConfigRepository repository = mock(AiProviderConfigRepository.class);
         when(repository.findDefaultOwnedBy(USER_ID)).thenReturn(Optional.of(config));
         CreativeAgentProperties properties = new CreativeAgentProperties(
-                "classpath:unused", 1, 12, 32768);
+                "classpath:unused", 1, 12,
+                "classpath:unused", 1, 12,
+                32768);
         return new AgentBlueprintCompiler(
                 profileSource,
                 registry,

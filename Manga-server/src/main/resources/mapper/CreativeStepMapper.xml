@@ -97,6 +97,7 @@
             finished_at = #{finishedAt}, updated_by = #{updatedBy}
         WHERE step_id = #{stepId} AND status = 'RUNNING'
           AND owner_instance_id = #{ownerInstanceId} AND owner_epoch = #{ownerEpoch}
+          AND lease_until &gt; #{finishedAt}
     </update>
 
     <update id="renewLease">
@@ -113,6 +114,7 @@
             lease_until = NULL, finished_at = #{finishedAt}, updated_by = #{updatedBy}
         WHERE step_id = #{stepId} AND status = 'RUNNING'
           AND owner_instance_id = #{ownerInstanceId} AND owner_epoch = #{ownerEpoch}
+          AND lease_until &gt; #{finishedAt}
     </update>
 
     <update id="cancelOwned">

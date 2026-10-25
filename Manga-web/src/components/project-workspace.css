@@ -387,6 +387,56 @@
   font-size: 11px;
 }
 
+.script-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.script-analysis-panel {
+  display: grid;
+  gap: 9px;
+  padding: 16px;
+  border: 1px solid rgba(112, 68, 169, 0.55);
+  border-radius: 9px;
+  background: linear-gradient(145deg, rgba(36, 24, 51, 0.9), rgba(14, 12, 16, 0.96));
+}
+
+.script-analysis-panel .script-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.script-analysis-panel .script-panel-title h3 {
+  margin-right: auto;
+}
+
+.script-analysis-panel small,
+.script-analysis-status {
+  color: #9d8cab;
+  font-size: 9px;
+}
+
+.script-analysis-status.completed { color: #7bdaa5; }
+.script-analysis-status.failed,
+.script-analysis-status.cancelled { color: #f3a2b7; }
+
+.script-analysis-panel .script-analysis-error { color: #f3a2b7; }
+
+.script-analysis-panel pre {
+  max-height: 420px;
+  margin: 0;
+  padding: 13px;
+  overflow: auto;
+  border: 1px solid #30273a;
+  border-radius: 7px;
+  color: #d9cbea;
+  background: #0b0a0e;
+  font: 10px/1.7 "Cascadia Code", Consolas, monospace;
+  white-space: pre-wrap;
+}
+
 .script-import-button {
   position: relative;
   overflow: hidden;

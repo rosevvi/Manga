@@ -14,4 +14,7 @@ public interface CreativeIdentifierGenerator {
     /** 生成新的 Step 标识。 */
     String nextStepId();
 
+    /** 生成新的 AgentScope 状态会话标识。 */
+    String nextStateSessionId();
+
 }

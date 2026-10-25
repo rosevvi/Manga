@@ -41,6 +41,17 @@ class CreateCreativeRunRequestValidationTests {
     }
 
     @Test
+    void shouldAcceptManualScriptParseRequest() {
+        CreateCreativeRunRequest request = new CreateCreativeRunRequest(
+                "request-script-parse", CreativeRunTriggerSource.MANUAL,
+                CreativeOperationType.PARSE_SCRIPT, null, 101L,
+                new CreativeTargetRequest(CreativeResourceType.SCRIPT, 303L),
+                AgentPermissionPolicy.READ_ONLY, "解析剧本结构与连续性");
+
+        assertThat(validator.validate(request)).isEmpty();
+    }
+
+    @Test
     void shouldRejectManualRequestWithoutTarget() {
         CreateCreativeRunRequest request = new CreateCreativeRunRequest(
                 "request-storyboard", CreativeRunTriggerSource.MANUAL,

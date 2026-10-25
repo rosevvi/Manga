@@ -24,6 +24,7 @@ public enum CapabilityName {
     /** AgentScope 工具和快照使用的稳定名称。 */
     private final String code;
 
+    /** 绑定模型工具调用和 Blueprint 快照共同使用的能力名称。 */
     CapabilityName(String code) {
         this.code = code;
     }
@@ -47,5 +48,10 @@ public enum CapabilityName {
     /** 返回阶段二允许注册的完整只读能力集合。 */
     public static Set<CapabilityName> phaseTwoReadOnlyCapabilities() {
         return Set.of(values());
+    }
+
+    /** 返回剧本解析 Agent 所需的最小只读能力集合。 */
+    public static Set<CapabilityName> scriptParserCapabilities() {
+        return Set.of(GET_SCRIPT_STRUCTURE, GET_CHAPTER_CONTENT);
     }
 }
