@@ -35,7 +35,7 @@ class MangaAgentStateStoreTests {
     void shouldCreateInitialVersionWithCompareAndSwap() {
         MangaAgentStateRepository repository = mock(MangaAgentStateRepository.class);
         when(repository.insertInitial(any(MangaAgentState.class))).thenReturn(true);
-        MangaAgentStateStore store = new MangaAgentStateStore(repository, new ObjectMapper());
+        MangaAgentStateStore store = new MangaAgentStateStore(repository, new ObjectMapper(), mock(AgentStateSessionService.class));
 
         long version = store.saveIfVersion(USER_KEY, SESSION_ID, STATE_KEY, state("draft"), 0L);
 
@@ -51,7 +51,7 @@ class MangaAgentStateStoreTests {
     void shouldRejectMismatchedExpectedVersion() {
         MangaAgentStateRepository repository = mock(MangaAgentStateRepository.class);
         when(repository.updateIfVersion(any(MangaAgentState.class))).thenReturn(false);
-        MangaAgentStateStore store = new MangaAgentStateStore(repository, new ObjectMapper());
+        MangaAgentStateStore store = new MangaAgentStateStore(repository, new ObjectMapper(), mock(AgentStateSessionService.class));
 
         assertThatThrownBy(() -> store.saveIfVersion(
                 USER_KEY, SESSION_ID, STATE_KEY, state("new"), 3L))
@@ -72,7 +72,7 @@ class MangaAgentStateStoreTests {
                 .stateVersion(5L)
                 .build();
         when(repository.find(USER_KEY, SESSION_ID, STATE_KEY)).thenReturn(Optional.of(row));
-        MangaAgentStateStore store = new MangaAgentStateStore(repository, new ObjectMapper());
+        MangaAgentStateStore store = new MangaAgentStateStore(repository, new ObjectMapper(), mock(AgentStateSessionService.class));
 
         VersionedState<AgentState> restored = store.getVersioned(
                 USER_KEY, SESSION_ID, STATE_KEY, AgentState.class);
@@ -86,7 +86,7 @@ class MangaAgentStateStoreTests {
         MangaAgentStateRepository repository = mock(MangaAgentStateRepository.class);
         when(repository.find(USER_KEY, SESSION_ID, STATE_KEY))
                 .thenThrow(new DataAccessResourceFailureException("test database unavailable"));
-        MangaAgentStateStore store = new MangaAgentStateStore(repository, new ObjectMapper());
+        MangaAgentStateStore store = new MangaAgentStateStore(repository, new ObjectMapper(), mock(AgentStateSessionService.class));
 
         assertThatThrownBy(() -> store.get(USER_KEY, SESSION_ID, STATE_KEY, AgentState.class))
                 .isInstanceOfSatisfying(AgentRuntimeException.class, exception ->

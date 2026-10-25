@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.AgentStateSessionMapper">
+    <select id="lockSession" resultType="com.manga.entity.AgentStateSession">
+        SELECT id, state_session_id, run_id, user_key, generation, status, expires_at, created_at, updated_at, created_by, updated_by FROM manga_agent_session
+        WHERE user_key = #{userKey} AND state_session_id = #{sessionId} FOR UPDATE
+    </select>
+    <update id="retireRun">
+        UPDATE manga_agent_session SET status = 'RETIRED', updated_by = #{actor}
+        WHERE run_id = #{runId} AND status = 'ACTIVE'
+    </update>
+    <select id="expired" resultType="com.manga.entity.AgentStateSession">
+        SELECT id, state_session_id, run_id, user_key, generation, status, expires_at, created_at, updated_at, created_by, updated_by FROM manga_agent_session
+        WHERE expires_at &lt; #{before} ORDER BY expires_at, id LIMIT #{limit}
+    </select>
+    <delete id="deleteSession">DELETE FROM manga_agent_session WHERE state_session_id = #{sessionId}</delete>
+</mapper>

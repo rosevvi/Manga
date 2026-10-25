@@ -7,6 +7,8 @@ public final class CreativeApiConstants {
 
     /** Creative Run API 根路径。 */
     public static final String CREATIVE_RUNS_PATH = "/api/v1/creative-runs";
+    /** 会话列表、消息历史和投影重建 API 根路径。 */
+    public static final String CREATIVE_CONVERSATIONS_PATH = "/api/v1/creative-conversations";
     /** SSE 断点恢复请求头名称。 */
     public static final String LAST_EVENT_ID_HEADER = "Last-Event-ID";
     /** Creative Run SSE 业务事件名称。 */

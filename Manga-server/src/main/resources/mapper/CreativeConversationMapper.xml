@@ -8,6 +8,9 @@
                project_id,
                title,
                status,
+               state_generation,
+               memory_summary,
+               summarized_through_message_id,
                created_at,
                updated_at,
                created_by,
@@ -16,4 +19,19 @@
         WHERE conversation_id = #{conversationId}
           AND user_id = #{userId}
     </select>
+    <select id="lockOwned" resultType="com.manga.entity.CreativeConversation">
+        SELECT id, conversation_id, user_id, project_id, title, status, state_generation, memory_summary, summarized_through_message_id, created_at, updated_at, created_by, updated_by FROM manga_creative_conversation
+        WHERE conversation_id = #{conversationId} AND user_id = #{userId} FOR UPDATE
+    </select>
+    <select id="listOwned" resultType="com.manga.entity.CreativeConversation">
+        SELECT id, conversation_id, user_id, project_id, title, status, state_generation, memory_summary, summarized_through_message_id, created_at, updated_at, created_by, updated_by FROM manga_creative_conversation WHERE user_id = #{userId}
+        <if test="projectId != null">AND project_id = #{projectId}</if>
+        <if test="beforeId != null">AND id &lt; #{beforeId}</if>
+        ORDER BY id DESC LIMIT #{limit}
+    </select>
+    <update id="advanceGeneration">
+        UPDATE manga_creative_conversation SET state_generation = state_generation + 1,
+            updated_by = #{actor}
+        WHERE conversation_id = #{conversationId} AND state_generation = #{generation}
+    </update>
 </mapper>

@@ -5,6 +5,7 @@ import com.manga.mapper.CreativeConversationMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -15,6 +16,18 @@ import java.util.Optional;
 public class CreativeConversationRepository {
 
     private final CreativeConversationMapper mapper;
+    /** 加锁读取当前用户的会话。 */
+    public Optional<CreativeConversation> lockOwned(String conversationId, long userId) {
+        return Optional.ofNullable(mapper.lockOwned(conversationId, userId));
+    }
+    /** 分页读取用户会话。 */
+    public List<CreativeConversation> listOwned(long userId, Long projectId, Long beforeId, int limit) {
+        return mapper.listOwned(userId, projectId, beforeId, limit);
+    }
+    /** 幂等推进失败或取消轮次的状态代次。 */
+    public void advanceGeneration(String conversationId, long generation, String actor) {
+        mapper.advanceGeneration(conversationId, generation, actor);
+    }
 
     /** 查询用户拥有的指定会话。 */
     public Optional<CreativeConversation> findOwned(String conversationId, long userId) {

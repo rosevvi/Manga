@@ -14,3 +14,11 @@
 .assistant-send { color: #fff; background: #7c3aed; }
 .assistant-send:disabled { opacity: .45; cursor: default; }
 .assistant-cancel { color: #d8cfdf; background: #2b2332; }
+.assistant-conversations { display: flex; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #2d2435; }
+.assistant-conversations select { min-width: 0; flex: 1; padding: 8px; border: 1px solid #392f43; border-radius: 6px; color: #ded6e8; background: #211a28; }
+.assistant-conversations button, .assistant-history-more { display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid #392f43; border-radius: 6px; color: #c4b5fd; background: #211a28; cursor: pointer; }
+.assistant-message { margin: 0 0 12px; padding: 10px; border-radius: 9px; background: #211a28; }
+.assistant-message.user { margin-left: 24px; background: #30203f; }
+.assistant-message strong { font-size: 11px; color: #a78bfa; }
+.assistant-message p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.assistant-tool { padding: 5px 10px; margin-bottom: 6px; color: #9f95ac; font-size: 10px; }

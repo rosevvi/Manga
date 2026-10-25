@@ -5,6 +5,7 @@ import com.manga.mapper.CreativeRunMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -15,6 +16,22 @@ import java.util.Optional;
 public class CreativeRunRepository {
 
     private final CreativeRunMapper mapper;
+    /** 查找需要推进消息投影的会话 Run。 */
+    public List<String> findUnprojected(String conversationId, int limit) {
+        return mapper.findUnprojected(conversationId, limit);
+    }
+    /** 查找会话当前活动运行。 */
+    public Optional<CreativeRun> findActiveConversation(String conversationId) {
+        return Optional.ofNullable(mapper.findActiveConversation(conversationId));
+    }
+    /** 按受理顺序读取会话运行标识。 */
+    public List<String> findConversationRunIds(String conversationId) {
+        return mapper.findConversationRunIds(conversationId);
+    }
+    /** 持有 Run 行锁时原子保存消息投影水位。 */
+    public void updateProjectionCursor(String runId, long sequence, String actor) {
+        mapper.updateProjectionCursor(runId, sequence, actor);
+    }
 
     /** 新增 Creative Run 并回填数据库主键。 */
     public CreativeRun create(CreativeRun run) {

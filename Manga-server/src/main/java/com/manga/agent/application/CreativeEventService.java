@@ -7,8 +7,9 @@ import com.manga.agent.config.CreativeRuntimeProperties;
 import com.manga.agent.domain.CreativeEventType;
 import com.manga.agent.domain.CreativeRuntimeMessages;
 import com.manga.agent.domain.SystemActor;
-import com.manga.agent.event.CreativeEventSources;
 import com.manga.agent.event.CreativeEventRedisSignalService;
+import com.manga.agent.event.CreativeEventSources;
+import com.manga.agent.state.AgentStateSessionService;
 import com.manga.entity.CreativeEvent;
 import com.manga.entity.CreativeRun;
 import com.manga.repository.CreativeEventRepository;
@@ -37,6 +38,8 @@ public class CreativeEventService {
     private final CreativeEventRedisSignalService redisSignalService;
     private final ObjectMapper objectMapper;
     private final CreativeRuntimeProperties runtimeProperties;
+    private final CreativeMessageProjector messageProjector;
+    private final AgentStateSessionService stateSessions;
 
     /** 在同一事务内追加由 Creative Runtime 产生的事件。 */
     @Transactional
@@ -72,6 +75,11 @@ public class CreativeEventService {
         }
         run.setUpdatedBy(actor);
         runRepository.update(run);
+        // 写入事实后同步推进可重建投影；批次游标和消息使用同一事务提交。
+        messageProjector.project(runId);
+        if (eventType == CreativeEventType.RUN_CANCEL_REQUESTED || isTerminal(eventType)) {
+            stateSessions.retire(run, eventType != CreativeEventType.RUN_COMPLETED);
+        }
         publishAfterCommit(runId, sequence);
         return event;
     }

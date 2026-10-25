@@ -1,6 +1,8 @@
 package com.manga.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.manga.agent.domain.AgentPermissionPolicy;
@@ -62,12 +64,14 @@ public class CreativeRun {
     /** 当前运行状态。 */
     private CreativeRunStatus status;
     /** 仅活跃会话 Run 使用的并发唯一键。 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String activeConversationId;
     /** 后续执行器领取运行时写入的实例标识。 */
     private String ownerInstanceId;
     /** 每次重新领取执行权时递增的租约代次。 */
     private Long ownerEpoch;
     /** 当前执行租约截止时间。 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private LocalDateTime leaseUntil;
     /** 整次运行允许执行的最晚时间。 */
     private LocalDateTime deadlineAt;
@@ -75,6 +79,10 @@ public class CreativeRun {
     private Long nextSequence;
     /** 唯一终态事件序号。 */
     private Long terminalSequence;
+    /** 消息投影已原子消费到的事件序号。 */
+    private Long projectedThroughSequence;
+    /** 受理时冻结的 Director 状态代次。 */
+    private Long stateGeneration;
     /** 首次收到取消请求的时间。 */
     private LocalDateTime cancelRequestedAt;
     /** 终态错误机器编码。 */

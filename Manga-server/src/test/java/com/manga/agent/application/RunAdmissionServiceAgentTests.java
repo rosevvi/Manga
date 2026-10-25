@@ -13,6 +13,7 @@ import com.manga.agent.domain.CreativeResourceType;
 import com.manga.agent.domain.CreativeStepType;
 import com.manga.agent.execution.CreativeStepDispatcher;
 import com.manga.agent.profile.AgentProfileKey;
+import com.manga.agent.state.AgentStateSessionService;
 import com.manga.entity.CreativeStep;
 import com.manga.entity.ProjectScript;
 import com.manga.repository.CreativeConversationRepository;
@@ -31,6 +32,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -63,6 +65,10 @@ class RunAdmissionServiceAgentTests {
         when(identifierGenerator.nextStateSessionId()).thenReturn("state-session-1");
         when(blueprintCompiler.compile(any())).thenReturn(new CompiledAgentBlueprint(
                 blueprint(), "{\"profileKey\":\"SCRIPT_PARSER\"}"));
+        CreativeConversationMemory memory = mock(CreativeConversationMemory.class);
+        when(memory.compose(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
+        when(memory.compose(isNull(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         RunAdmissionService service = new RunAdmissionService(
                 conversationRepository,
                 runRepository,
@@ -75,7 +81,9 @@ class RunAdmissionServiceAgentTests {
                 dispatcher,
                 blueprintCompiler,
                 scriptRepository,
-                objectMapper);
+                objectMapper,
+                memory,
+                mock(AgentStateSessionService.class));
         StartCreativeRunCommand command = StartCreativeRunCommand.manual(
                 11L,
                 "request-1",

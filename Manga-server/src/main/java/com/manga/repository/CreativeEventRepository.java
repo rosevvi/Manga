@@ -15,6 +15,10 @@ import java.util.List;
 public class CreativeEventRepository {
 
     private final CreativeEventMapper mapper;
+    /** 按序读取一批消息投影源事件。 */
+    public List<CreativeEvent> findBatchAfter(String runId, long afterSequence, int limit) {
+        return mapper.findBatchAfter(runId, afterSequence, limit);
+    }
 
     /** 追加一条已分配序号的事件。 */
     public CreativeEvent create(CreativeEvent event) {

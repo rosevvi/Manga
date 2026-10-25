@@ -18,6 +18,7 @@ class AgentOperationBindingTests {
 
         assertThat(binding.profileKey()).isEqualTo(AgentProfileKey.SCRIPT_PARSER);
         assertThat(binding.targetType()).isEqualTo(CreativeResourceType.SCRIPT);
-        assertThat(AgentOperationBinding.find(CreativeOperationType.ASSISTANT_CHAT)).isEmpty();
+        assertThat(AgentOperationBinding.find(CreativeOperationType.ASSISTANT_CHAT).orElseThrow().profileKey())
+                .isEqualTo(AgentProfileKey.MANGA_DIRECTOR);
     }
 }

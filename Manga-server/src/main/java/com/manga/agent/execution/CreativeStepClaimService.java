@@ -4,6 +4,7 @@ import com.manga.agent.application.CreativeEventService;
 import com.manga.agent.config.CreativeExecutionProperties;
 import com.manga.agent.domain.CreativeEventType;
 import com.manga.agent.domain.CreativeRunStatus;
+import com.manga.agent.domain.CreativeStepStatus;
 import com.manga.agent.domain.SystemActor;
 import com.manga.agent.event.CreativeEventSources;
 import com.manga.agent.event.StepStartedEventPayload;
@@ -73,7 +74,8 @@ public class CreativeStepClaimService {
     public Optional<ClaimedCreativeStep> findOwnedClaim(String stepId) {
         CreativeStep step = stepRepository.findByStepId(stepId)
                 .filter(candidate -> instanceIdentity.value().equals(candidate.getOwnerInstanceId()))
-                .filter(candidate -> candidate.getStatus() == com.manga.agent.domain.CreativeStepStatus.RUNNING)
+                .filter(candidate -> candidate.getStatus() == CreativeStepStatus.RUNNING
+                        || candidate.getStatus() == CreativeStepStatus.CANCEL_REQUESTED)
                 .orElse(null);
         if (Objects.isNull(step)) {
             return Optional.empty();

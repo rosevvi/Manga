@@ -153,6 +153,22 @@ manga:
       display-name: Manga Administrator
   # 可恢复创作运行、Agent 执行与调度补偿。
   creative:
+    # 消息投影、连续对话上下文和内部状态保留策略。
+    memory:
+      # 单批投影的最大事件条数，消息与 cursor 在同一事务提交。
+      projection-batch-size: 200
+      # 消息历史单页上限，也是上下文构建每批读取的最大消息数。
+      history-page-size: 100
+      # 历史上下文字符预算，不包含本轮用户指令、系统提示词和本轮工具结果。
+      context-max-chars: 24000
+      # 提取式摘要字符预算，必须小于 context-max-chars。
+      summary-max-chars: 6000
+      # 摘要之外最多保留的近期完整消息条数，超预算时继续压缩。
+      recent-messages: 12
+      # Run 到期后保留内部 AgentState 的时长，不清理业务消息和事件日志。
+      state-retention: 7d
+      # 投影补偿与内部状态清理任务的执行间隔。
+      maintenance-interval: 1m
     # 内置 Agent Profile 的提示词、定义版本和推理限制。
     agent:
       # Director 的系统提示词资源位置。
@@ -167,7 +183,7 @@ manga:
       script-parser-profile-version: 1
       # 剧本解析单次调用允许的最大模型推理轮次，需覆盖章节读取与报告生成。
       script-parser-max-turns: 24
-      # 内置 Agent 声明给模型适配器的上下文窗口，单位：token，最小值为 1024。
+      # 模型上下文窗口，单位：token，最小值为 1024；Harness 在约 75% 窗口时执行语义压缩。
       context-window: ${MANGA_CREATIVE_AGENT_CONTEXT_WINDOW:32768}
       # 请求级 Harness 隔离、状态会话互斥及共享 Kernel 资源限制。
       harness:

@@ -34,6 +34,12 @@ public class CreativeConversation {
     private String title;
     /** 会话当前状态。 */
     private CreativeConversationStatus status;
+    /** 失败或取消后递增的 Director 状态隔离代次。 */
+    private Long stateGeneration;
+    /** 已完成历史的有界提取式摘要。 */
+    private String memorySummary;
+    /** 摘要已覆盖的消息主键水位。 */
+    private Long summarizedThroughMessageId;
     /** 记录创建时间。 */
     private LocalDateTime createdAt;
     /** 记录最后更新时间。 */

@@ -37,12 +37,15 @@ public class MangaAgentStateStore implements AgentStateStore {
 
     private final MangaAgentStateRepository repository;
     private final ObjectMapper objectMapper;
+    private final AgentStateSessionService stateSessions;
     private final JsonCodec jsonCodec = JsonUtils.getJsonCodec();
 
     /** 无条件保存单对象状态；同一组件已存在时递增版本。 */
+    @Transactional
     @Override
     public void save(String userId, String sessionId, String key, State state) {
         requireCoordinates(userId, sessionId, key);
+        stateSessions.requireWritable(userId, sessionId);
         Objects.requireNonNull(state, CreativeRuntimeMessages.AGENT_STATE_VALUE_REQUIRED);
         try {
             repository.upsert(toStateRow(
@@ -103,6 +106,7 @@ public class MangaAgentStateStore implements AgentStateStore {
             State state,
             long expectedVersion) {
         requireCoordinates(userId, sessionId, key);
+        stateSessions.requireWritable(userId, sessionId);
         Objects.requireNonNull(state, CreativeRuntimeMessages.AGENT_STATE_VALUE_REQUIRED);
         if (expectedVersion < UNVERSIONED) {
             throw new IllegalArgumentException(CreativeRuntimeMessages.AGENT_STATE_VERSION_INVALID);
@@ -137,9 +141,11 @@ public class MangaAgentStateStore implements AgentStateStore {
     }
 
     /** 无条件保存完整列表状态；空列表仍保留列表类型。 */
+    @Transactional
     @Override
     public void save(String userId, String sessionId, String key, List<? extends State> states) {
         requireCoordinates(userId, sessionId, key);
+        stateSessions.requireWritable(userId, sessionId);
         Objects.requireNonNull(states, CreativeRuntimeMessages.AGENT_STATE_VALUE_REQUIRED);
         if (states.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException(CreativeRuntimeMessages.AGENT_STATE_VALUE_REQUIRED);
@@ -221,10 +227,12 @@ public class MangaAgentStateStore implements AgentStateStore {
     }
 
     /** 删除指定用户会话的全部状态。 */
+    @Transactional
     @Override
     public void delete(String userId, String sessionId) {
         requireCoordinate(userId, CreativeRuntimeMessages.AGENT_STATE_USER_KEY_REQUIRED);
         requireCoordinate(sessionId, CreativeRuntimeMessages.AGENT_STATE_SESSION_ID_REQUIRED);
+        stateSessions.requireWritable(userId, sessionId);
         try {
             repository.deleteSession(userId, sessionId);
         } catch (DataAccessException exception) {
@@ -233,9 +241,11 @@ public class MangaAgentStateStore implements AgentStateStore {
     }
 
     /** 删除指定用户会话的单个组件状态。 */
+    @Transactional
     @Override
     public void delete(String userId, String sessionId, String key) {
         requireCoordinates(userId, sessionId, key);
+        stateSessions.requireWritable(userId, sessionId);
         try {
             repository.deleteState(userId, sessionId, key);
         } catch (DataAccessException exception) {

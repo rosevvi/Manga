@@ -12,6 +12,8 @@ public record RunAcceptedEventPayload(
         /** Run 的触发来源。 */
         CreativeRunTriggerSource triggerSource,
         /** Run 需要完成的业务操作。 */
-        CreativeOperationType operationType
+        CreativeOperationType operationType,
+        /** 原始用户指令；消息可独立从事件重建，不读取执行上下文。 */
+        String instruction
 ) {
 }

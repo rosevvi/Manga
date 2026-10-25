@@ -2165,7 +2165,7 @@ ADR 与 API/事件契约
 - [x] 剧本页提供手动解析入口、流式报告、工具状态、失败提示和重试。
 - [x] Blueprint、受理冻结、事件映射、租约丢失和持久化围栏测试通过。
 - [ ] 使用真实模型配置完成开发环境端到端验收和长剧本 token/轮次压测。
-- [ ] 是否把会话助手从阶段一 Fake 执行器切换到 Director Profile，留待端到端验收后决定。
+- [x] 阶段三已将会话助手接入 Director Profile，连续对话使用成功消息投影构造上下文。
 
 #### 目标
 
@@ -2209,35 +2209,96 @@ ADR 与 API/事件契约
 
 ### 阶段 3：消息投影与对话记忆
 
+#### 当前实现状态（2026-10-25）
+
+阶段三已实现服务端消息投影、Director 连续对话与状态隔离。四类数据的职责如下：
+
+| 数据 | 职责 | 恢复来源 |
+| --- | --- | --- |
+| Conversation | 用户归属、项目绑定、标题、状态 generation、压缩摘要与摘要水位 | 数据库会话记录 |
+| CreativeMessage | 用户正文、助手正文、工具状态及本轮终态，供 UI 分页读取 | Creative Event 全量重放 |
+| AgentState | 单次 Harness 的内部组件状态，不直接展示，也不作为跨轮记忆真相 | 当前 Run 的 StateSession |
+| Creative Event | 按 Run 递增的事实日志，也是消息投影和 SSE 的共同来源 | 追加事件日志 |
+
+- [x] 实现 `CreativeMessageProjector`，以 Run + 逻辑消息标识的 SHA-256 作为 projection key。
+- [x] 每个 Run 保存 `projected_through_sequence`；消息更新与 cursor 推进在同一事务提交。
+- [x] 事件提交事务内推进消息投影，周期扫描补偿遗留投影，支持完整重建。
+- [x] Director 会话失败或首次取消时推进 generation，Run 冻结受理时的 generation。
+- [x] 每个 Run 独占一个新的 StateSession；成功轮次也不直接共享可变的 Harness 状态。
+- [x] StateStore 的普通写入、列表写入、版本写入和删除都校验并锁定状态会话许可。
+- [x] 取消请求立即撤销旧会话写入权；失败和完成终态同样撤销，晚到写入不能重建状态。
+- [x] 到期且超过保留窗口的内部状态与会话登记由维护任务清理，消息和事实事件继续保留。
+- [x] 跨轮上下文只采用已完成成功 Run 的用户与助手消息，排除工具及失败、取消轮次。
+- [x] 超出历史字符预算或近期消息数量时执行有界摘录，保存摘要和已覆盖消息主键。
+- [x] 单次 Harness 启用 AgentScope 语义 Compaction，约到模型窗口的 75% 时触发，
+  保留约 25% 窗口的近期内容；关闭压缩前长期记忆刷新、文件卸载及工具结果文件驱逐。
+- [x] 前端提供会话切换、新会话、历史分页和工具状态，正文统一读取服务端 Message。
+- [x] 前端只在本地保存所选会话 ID；刷新、重连不依赖临时正文拼接。
+- [x] 集成测试覆盖重复/并发投影、批次回滚续传、按事件重建、跨代次隔离、清理和 HTTP 历史一致性。
+
+跨轮摘要采用确定性的首尾摘录与近期原文，不额外调用模型生成摘要；摘要是上下文优化，
+不是完整业务事实。单次执行过程中累积的工具和模型消息由 Harness 的语义压缩处理。
+两层压缩均不删除原始 Message 或 Creative Event。
+
+#### 一次连续对话请求的执行链路
+
+1. 前端提交原始用户指令和可选 Conversation ID。
+2. 受理事务锁定已有会话，校验用户和项目，冻结当前 generation 与 Director Blueprint。
+3. 从成功消息投影组织历史；超预算时保存摘要与消息水位，再将完整执行输入冻结到 Step。
+4. 同一事务创建 Run、Agent Step、独立 StateSession 许可、Dispatch Outbox 和受理事件。
+5. 受理事件携带原始用户指令；Projector 生成 USER、ASSISTANT 消息，并提交投影 cursor。
+6. 事务提交后立即领取 Step，打开独立 Harness，流式追加正文与工具事件，同时更新 Message。
+7. 前端以 SSE 作为刷新信号，合并连续唤醒后读取消息快照；投影水位用于断线续接。
+8. 完成事件收敛消息终态并撤销状态写入权。失败或取消还会幂等推进会话 generation；
+   下一轮从成功消息重建上下文，旧状态写入无法污染下一轮。
+
+#### 新增接口
+
+- `GET /api/v1/creative-conversations?projectId=&beforeId=`：按创建主键倒序分页查询当前用户会话。
+- `GET /api/v1/creative-conversations/{conversationId}/messages?beforeId=`：返回消息页和活动 Run 的投影 cursor。
+- `POST /api/v1/creative-conversations/{conversationId}/messages/rebuild`：无活动 Run 时按事件原子重建，
+  清空旧摘要与摘要水位；重建不修改原始事件及状态 generation。
+
+#### 数据库与运行配置
+
+`V5__conversation_message_memory.sql` 新增 `manga_creative_message` 和 `manga_agent_session`，
+并扩展 Conversation 的 generation/摘要字段及 Run 的 generation/投影 cursor 字段。
+所有新增表与字段包含注释和审计信息，Mapper XML 不使用 SQL 片段。
+
+`manga.creative.memory` 配置投影批次、历史分页、历史字符预算、摘要预算、近期消息数、
+状态保留窗口和维护周期。默认内部状态在 Run 到期后保留 7 天；清理不删除消息和事件。
+当前数据库迁移及并发场景已在 H2 MySQL 模式验证，生产 MySQL 与真实模型的联调需单独执行。
+
 #### 目标
 
 让 Conversation、Message、AgentState 和运行事件职责清晰，并支持稳定连续对话。
 
 #### 后端任务
 
-- 实现 `CreativeMessageProjector` 和 projection key。
-- 保存 `projected_through_sequence`。
-- 实现 Director StateSession generation。
-- 实现状态保留和清理策略。
-- 失败/取消后的新 generation 隔离晚到 StateStore 写入。
-- 控制上下文长度和 Compaction。
+- [x] 实现 `CreativeMessageProjector` 和 projection key。
+- [x] 保存 `projected_through_sequence`。
+- [x] 实现 Director StateSession generation。
+- [x] 实现状态保留和清理策略。
+- [x] 失败/取消后的新 generation 隔离晚到 StateStore 写入。
+- [x] 控制上下文长度和 Compaction。
 
 #### 前端任务
 
-- Conversation 列表和消息历史。
-- 从消息投影恢复 UI，不依赖临时本地拼接。
+- [x] Conversation 列表和消息历史。
+- [x] 从消息投影恢复 UI，不依赖临时本地拼接。
 
 #### 测试任务
 
-- 投影重复执行不重复消息。
-- 投影中断后从断点恢复。
-- 失败/取消 Run 不污染下一次对话。
-- 长对话触发 Compaction 后仍可继续。
+- [x] 投影重复执行不重复消息。
+- [x] 投影中断后从断点恢复。
+- [x] 失败/取消 Run 不污染下一次对话。
+- [x] 长对话触发 Compaction 后仍可继续。
 
 #### 验收标准
 
-- 刷新页面后历史消息、工具状态和最终结果一致。
-- 消息投影可从事件重建。
+- [x] 历史接口重复读取返回一致消息、工具状态和最终结果，前端从该接口恢复。
+- [x] 消息投影可从事件重建。
+- [ ] 真实供应商模型与生产 MySQL 环境的连续对话和浏览器刷新联调。
 
 ---
 

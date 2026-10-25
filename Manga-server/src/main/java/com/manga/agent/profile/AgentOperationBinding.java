@@ -10,6 +10,8 @@ import java.util.Optional;
  * 将可由 AgentScope 执行的业务操作绑定到 Profile 和目标资源契约。
  */
 public enum AgentOperationBinding {
+    /** 由会话消息触发 Director 的只读对话，允许不绑定项目。 */
+    DIRECTOR_CHAT(CreativeOperationType.ASSISTANT_CHAT, AgentProfileKey.MANGA_DIRECTOR, null),
 
     /** 将手动剧本解析操作绑定到只读解析 Profile，并要求目标为剧本。 */
     SCRIPT_PARSE(CreativeOperationType.PARSE_SCRIPT, AgentProfileKey.SCRIPT_PARSER, CreativeResourceType.SCRIPT);

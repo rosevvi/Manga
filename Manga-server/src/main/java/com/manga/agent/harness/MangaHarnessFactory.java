@@ -63,6 +63,8 @@ public class MangaHarnessFactory {
                 .toolkit(toolkit)
                 .stateStore(stateStore)
                 .maxIters(blueprint.maxTurns())
+                .compaction(AgentCompactionPolicy.forContextWindow(blueprint.model().contextWindow()))
+                .disableToolResultEviction()
                 .disableFilesystemTools()
                 .disableShellTool()
                 .disableWebTools()

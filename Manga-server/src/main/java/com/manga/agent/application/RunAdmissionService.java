@@ -24,6 +24,7 @@ import com.manga.agent.event.RunAcceptedEventPayload;
 import com.manga.agent.event.StepCreatedEventPayload;
 import com.manga.agent.execution.CreativeStepDispatcher;
 import com.manga.agent.profile.AgentOperationBinding;
+import com.manga.agent.state.AgentStateSessionService;
 import com.manga.common.enums.CommonResponseCode;
 import com.manga.common.exception.BusinessException;
 import com.manga.entity.CreativeConversation;
@@ -41,6 +42,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -78,12 +80,15 @@ public class RunAdmissionService {
     private final AgentBlueprintCompiler blueprintCompiler;
     private final ProjectScriptRepository scriptRepository;
     private final ObjectMapper objectMapper;
+    private final CreativeConversationMemory conversationMemory;
+    private final AgentStateSessionService stateSessions;
 
     /**
      * 幂等受理会话或手动创作请求。新请求会原子创建 Run、READY 根 Step 和 Dispatch Outbox，
-     * 仅在事务提交成功后向本实例执行器发送低延迟调度信号。
+     * 仅在事务提交成功后向本实例执行器发送低延迟调度信号。READ_COMMITTED 保证等待会话锁后，
+     * 上下文读取能够看到刚结束的上一轮消息，避免 MySQL 可重复读的旧快照遗漏最近回答。
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public CreativeRunStartResult admit(StartCreativeRunCommand command) {
         String requestFingerprint = requestFingerprint(command);
         CreativeRun existing = runRepository.findByRequestId(command.userId(), command.requestId()).orElse(null);
@@ -101,13 +106,17 @@ public class RunAdmissionService {
         }
         AgentStepConfiguration agentStep = resolveAgentStep(command, projectId);
         CreativeRun run = createRun(command, conversation, projectId, requestFingerprint);
+        String executionInstruction = conversationMemory.compose(conversation, command.instruction());
         try {
             runRepository.create(run);
         } catch (DuplicateKeyException exception) {
             throw new BusinessException(CreativeRuntimeResponseCode.ACTIVE_RUN_CONFLICT, HttpStatus.CONFLICT);
         }
-        CreativeStep rootStep = createRootStep(command, run, agentStep);
+        CreativeStep rootStep = createRootStep(command, run, agentStep, executionInstruction);
         stepRepository.create(rootStep);
+        if (Objects.nonNull(agentStep)) {
+            stateSessions.register(run, agentStep.stateSessionId());
+        }
         dispatchOutboxRepository.create(CreativeDispatchOutbox.builder()
                 .stepId(rootStep.getStepId())
                 .scheduleVersion(rootStep.getScheduleVersion())
@@ -117,7 +126,7 @@ public class RunAdmissionService {
                 .updatedBy(rootStep.getUpdatedBy())
                 .build());
         eventService.append(run.getRunId(), CreativeEventType.RUN_ACCEPTED,
-                new RunAcceptedEventPayload(command.requestId(), command.triggerSource(), command.operationType()));
+                new RunAcceptedEventPayload(command.requestId(), command.triggerSource(), command.operationType(), command.instruction()));
         eventService.append(run.getRunId(), rootStep.getStepId(), CreativeEventType.STEP_CREATED,
                 CreativeEventSources.RUNTIME, null,
                 new StepCreatedEventPayload(rootStep.getStepId(), rootStep.getStepType(),
@@ -133,7 +142,8 @@ public class RunAdmissionService {
     private CreativeStep createRootStep(
             StartCreativeRunCommand command,
             CreativeRun run,
-            AgentStepConfiguration agentStep) {
+            AgentStepConfiguration agentStep,
+            String executionInstruction) {
         String actor = CreativeActor.user(command.userId());
         return CreativeStep.builder()
                 .stepId(identifierGenerator.nextStepId())
@@ -146,7 +156,7 @@ public class RunAdmissionService {
                 .ownerEpoch(0L)
                 .attemptNo(0)
                 .maxAttempts(ROOT_STEP_MAX_ATTEMPTS)
-                .inputJson(write(new CreativeStepInput(command.instruction(), command.operationType(), command.target())))
+                .inputJson(write(new CreativeStepInput(executionInstruction, command.operationType(), command.target())))
                 .blueprintSnapshotJson(Objects.isNull(agentStep) ? null : agentStep.blueprint().snapshotJson())
                 .blueprintFingerprint(Objects.isNull(agentStep)
                         ? null
@@ -165,7 +175,8 @@ public class RunAdmissionService {
         if (Objects.isNull(binding)) {
             return null;
         }
-        if (Objects.isNull(command.target()) || command.target().resourceType() != binding.targetType()) {
+        if (Objects.nonNull(binding.targetType())
+                && (Objects.isNull(command.target()) || command.target().resourceType() != binding.targetType())) {
             throw new BusinessException(
                     CreativeRuntimeResponseCode.TARGET_RESOURCE_INVALID,
                     CreativeRuntimeMessages.AGENT_OPERATION_TARGET_TYPE_INVALID_TEMPLATE
@@ -173,10 +184,11 @@ public class RunAdmissionService {
                     HttpStatus.BAD_REQUEST);
         }
         boolean validScript = Objects.nonNull(projectId)
+                && Objects.nonNull(command.target())
                 && scriptRepository.findByProjectId(projectId)
                 .filter(script -> Objects.equals(script.getId(), command.target().resourceId()))
                 .isPresent();
-        if (!validScript) {
+        if (Objects.nonNull(binding.targetType()) && !validScript) {
             throw new BusinessException(
                     CreativeRuntimeResponseCode.TARGET_RESOURCE_INVALID,
                     CreativeRuntimeMessages.AGENT_OPERATION_SCRIPT_TARGET_INVALID,
@@ -214,7 +226,7 @@ public class RunAdmissionService {
         }
         if (StringUtils.hasText(command.conversationId())) {
             CreativeConversation conversation = conversationRepository
-                    .findOwned(command.conversationId(), command.userId())
+                    .lockOwned(command.conversationId(), command.userId())
                     .orElseThrow(() -> new BusinessException(CommonResponseCode.FORBIDDEN, HttpStatus.FORBIDDEN));
             bindProjectIfNecessary(conversation, command.projectId(), command.userId());
             return conversation;
@@ -226,6 +238,8 @@ public class RunAdmissionService {
                 .projectId(command.projectId())
                 .title(title(command.instruction()))
                 .status(CreativeConversationStatus.ACTIVE)
+                .stateGeneration(1L)
+                .summarizedThroughMessageId(0L)
                 .createdBy(actor)
                 .updatedBy(actor)
                 .build());
@@ -278,6 +292,8 @@ public class RunAdmissionService {
                 .ownerEpoch(0L)
                 .deadlineAt(now.plus(properties.runTimeout()))
                 .nextSequence(1L)
+                .projectedThroughSequence(0L)
+                .stateGeneration(Objects.isNull(conversation) ? 1L : conversation.getStateGeneration())
                 .createdBy(actor)
                 .updatedBy(actor)
                 .build();

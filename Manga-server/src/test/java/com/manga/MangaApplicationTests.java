@@ -1,25 +1,39 @@
 package com.manga;
 
+import com.manga.agent.CreativeAgentTestSupport;
 import com.manga.agent.application.CancelCreativeRunCommand;
 import com.manga.agent.application.CreativeRunStartResult;
 import com.manga.agent.application.CreativeRuntime;
 import com.manga.agent.application.StartCreativeRunCommand;
+import com.manga.agent.blueprint.AgentBlueprintCompiler;
 import com.manga.agent.domain.CreativeRunStatus;
+import com.manga.agent.harness.MangaAgentInvoker;
+import com.manga.agent.state.AgentStateSessionService;
+import com.manga.entity.CreativeRun;
+import com.manga.repository.CreativeRunRepository;
+import io.agentscope.core.event.AgentEvent;
+import io.agentscope.core.event.TextBlockDeltaEvent;
 import io.agentscope.core.state.AgentState;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.core.state.VersionedState;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import reactor.core.publisher.Flux;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -31,6 +45,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class MangaApplicationTests {
+    @MockitoBean
+    private AgentBlueprintCompiler blueprintCompiler;
+    @MockitoBean
+    private MangaAgentInvoker invoker;
+    @Autowired
+    private CreativeRunRepository runRepository;
+    @Autowired
+    private AgentStateSessionService stateSessions;
+
+    /** 只替换外部模型边界，受理、投影、数据库和执行器仍使用真实实现。 */
+    @BeforeEach
+    void prepareModelBoundary() {
+        when(blueprintCompiler.compile(any()))
+                .thenReturn(CreativeAgentTestSupport.blueprint());
+        when(invoker.invoke(any(),
+                any(), any()))
+                .thenReturn(Flux.just(
+                        new TextBlockDeltaEvent("reply", "block", "测试回答"))
+                        .delayElements(Duration.ofMillis(150)).cast(AgentEvent.class));
+    }
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -94,6 +128,7 @@ class MangaApplicationTests {
     void flywayCreatesCreativeRuntimeContractTables() {
         List<String> expectedTables = List.of(
                 "manga_creative_conversation",
+                "manga_creative_message",
                 "manga_creative_run",
                 "manga_creative_step",
                 "manga_creative_dispatch_outbox",
@@ -163,6 +198,9 @@ class MangaApplicationTests {
         String sessionId = "test-state-" + UUID.randomUUID();
         String userKey = "1";
         String stateKey = "director";
+        CreativeRun stateRun = runRepository.create(
+                CreativeAgentTestSupport.run(1L));
+        stateSessions.register(stateRun, sessionId);
         agentStateStore.save(userKey, sessionId, stateKey, AgentState.builder()
                 .userId(userKey)
                 .sessionId(sessionId)
@@ -213,7 +251,7 @@ class MangaApplicationTests {
                 .isEqualTo("COMPLETED");
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM manga_creative_event WHERE run_id = ?", Integer.class, started.runId()))
-                .isGreaterThanOrEqualTo(8);
+                .isGreaterThanOrEqualTo(7);
     }
 
     /**
