@@ -11,6 +11,7 @@ import com.manga.repository.CreativeEventRepository;
 import com.manga.repository.CreativeRunRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import reactor.core.publisher.Mono;
@@ -52,7 +53,7 @@ class CreativeEventServiceTests {
                 new ObjectMapper(),
                 new CreativeRuntimeProperties("durable-v1", "v1", 1, Duration.ofMinutes(30)),
                 mock(CreativeMessageProjector.class),
-                mock(AgentStateSessionService.class));
+                mock(AgentStateSessionService.class), mock(ApplicationEventPublisher.class));
         TransactionSynchronizationManager.setActualTransactionActive(true);
         TransactionSynchronizationManager.initSynchronization();
 

@@ -27,6 +27,8 @@ public class MangaProject {
     private Long id;
     /** 项目所有者用户主键。 */
     private Long ownerUserId;
+    /** 项目内容聚合版本，用于审批乐观冲突检测。 */
+    private Long revision;
     /** 项目名称。 */
     private String name;
     /** 项目描述。 */

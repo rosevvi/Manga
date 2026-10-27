@@ -35,4 +35,8 @@ public class ProjectScriptDialogue {
     private LocalDateTime createdAt;
     /** 最后更新时间。 */
     private LocalDateTime updatedAt;
+    /** 创建操作者，审批写入时为实际审批人。 */
+    private String createdBy;
+    /** 最后更新操作者。 */
+    private String updatedBy;
 }

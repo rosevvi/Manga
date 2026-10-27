@@ -7,6 +7,7 @@ import com.manga.agent.capability.CapabilityCommand;
 import com.manga.agent.capability.CapabilityDescriptor;
 import com.manga.agent.capability.CapabilityResult;
 import com.manga.agent.capability.MangaAgentCapability;
+import com.manga.agent.domain.CreativeErrorCode;
 import com.manga.agent.domain.CreativeRuntimeMessages;
 import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.tool.ToolBase;
@@ -48,7 +49,7 @@ public final class MangaCapabilityTool extends ToolBase {
             }
             if (!context.permissionPolicy().allows(descriptor.requiredPermission())) {
                 throw new AgentRuntimeException(
-                        com.manga.agent.domain.CreativeErrorCode.PERMISSION_DENIED,
+                        CreativeErrorCode.PERMISSION_DENIED,
                         CreativeRuntimeMessages.CAPABILITY_PERMISSION_DENIED_TEMPLATE
                                 .formatted(descriptor.name().code()));
             }

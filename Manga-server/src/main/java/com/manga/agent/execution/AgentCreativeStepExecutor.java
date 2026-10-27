@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.blueprint.AgentBlueprint;
 import com.manga.agent.blueprint.AgentBlueprintCodec;
 import com.manga.agent.capability.AgentRuntimeContext;
+import com.manga.agent.changeset.ChangeSetApprovalService;
+import com.manga.agent.changeset.ChangeSetConstants;
 import com.manga.agent.config.CreativeExecutionProperties;
 import com.manga.agent.domain.CreativeErrorCode;
 import com.manga.agent.domain.CreativeRuntimeMessages;
@@ -41,6 +43,7 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
     private final CreativeExecutionProperties executionProperties;
     private final TaskScheduler taskScheduler;
     private final ObjectMapper objectMapper;
+    private final ChangeSetApprovalService approvals;
 
     public AgentCreativeStepExecutor(
             AgentBlueprintCodec blueprintCodec,
@@ -48,13 +51,15 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
             CreativeStepLifecycleService lifecycleService,
             CreativeExecutionProperties executionProperties,
             @Qualifier(AsyncConstants.MANGA_COMMON_TASK_SCHEDULER) TaskScheduler taskScheduler,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ChangeSetApprovalService approvals) {
         this.blueprintCodec = blueprintCodec;
         this.agentInvoker = agentInvoker;
         this.lifecycleService = lifecycleService;
         this.executionProperties = executionProperties;
         this.taskScheduler = taskScheduler;
         this.objectMapper = objectMapper;
+        this.approvals = approvals;
     }
 
     /** 返回持久化 Agent 调用步骤类型。 */
@@ -67,16 +72,23 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
     @Override
     public void execute(ClaimedCreativeStep step) {
         AgentBlueprint blueprint = restoreBlueprint(step);
+        // 上次执行可能在草稿落库后进程退出；此时直接开放审批，不再次调用模型。
+        if (approvals.hasDraft(step.stepId()) && approvals.suspendIfProposed(step)) return;
         CreativeStepInput input = readInput(step.inputJson());
         AgentRuntimeContext context = runtimeContext(step);
         StringBuilder content = new StringBuilder();
         try (CreativeStepLeaseHeartbeat heartbeat = new CreativeStepLeaseHeartbeat(
                 step, lifecycleService, executionProperties.stepLease(), taskScheduler)) {
-            agentInvoker.invoke(blueprint, context, input.instruction())
+            String instruction = input.instruction();
+            if (Objects.nonNull(input.target())) instruction += ChangeSetConstants.TARGET_TEMPLATE
+                    .formatted(input.target().resourceType(), input.target().resourceId());
+            agentInvoker.invokeUntil(blueprint, context, approvals.instruction(step, instruction),
+                            event -> event instanceof ToolResultEndEvent && approvals.hasDraft(step.stepId()))
                     .takeUntilOther(heartbeat.lossSignal())
                     .doOnNext(event -> commitEvent(step, event, content))
                     .blockLast();
         }
+        if (approvals.suspendIfProposed(step)) return;
         if (!lifecycleService.canContinue(step)) {
             lifecycleService.acknowledgeCancellation(step);
             return;

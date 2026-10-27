@@ -1,5 +1,6 @@
 import { AUTH_CONFIG } from '../constants/auth'
 import { authorizedRequest } from './authorizedApi'
+import { CREATIVE_OPERATION, CREATIVE_PERMISSION, CREATIVE_TRIGGER } from '../constants/creative'
 
 /** Creative Run 的稳定后端路径。 */
 export const CREATIVE_RUN_ENDPOINT = '/creative-runs'
@@ -10,12 +11,12 @@ export function createConversationRun(accessToken, request) {
     method: 'POST',
     body: JSON.stringify({
       requestId: request.requestId,
-      triggerSource: 'CONVERSATION',
-      operationType: 'ASSISTANT_CHAT',
+      triggerSource: CREATIVE_TRIGGER.CONVERSATION,
+      operationType: CREATIVE_OPERATION.ASSISTANT_CHAT,
       conversationId: request.conversationId || null,
       projectId: request.projectId || null,
       target: null,
-      permissionPolicy: 'READ_ONLY',
+      permissionPolicy: request.projectId ? CREATIVE_PERMISSION.PROPOSE_CHANGES : CREATIVE_PERMISSION.READ_ONLY,
       instruction: request.instruction,
     }),
   })
@@ -25,7 +26,7 @@ export function createConversationRun(accessToken, request) {
 export function createManualRun(accessToken, request) {
   return authorizedRequest(accessToken, CREATIVE_RUN_ENDPOINT, {
     method: 'POST',
-    body: JSON.stringify({ ...request, triggerSource: 'MANUAL', conversationId: null }),
+    body: JSON.stringify({ ...request, triggerSource: CREATIVE_TRIGGER.MANUAL, conversationId: null }),
   })
 }
 

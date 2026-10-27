@@ -153,6 +153,14 @@ manga:
       display-name: Manga Administrator
   # 可恢复创作运行、Agent 执行与调度补偿。
   creative:
+    # AI 提案审批：等待期间释放 Harness 和 Kernel，业务写入只在批准事务发生。
+    approval:
+      # 从开放审批开始计算的有效期，必须大于零。
+      ttl: 24h
+      # 过期审批补偿扫描间隔，数据库事实决定最终状态。
+      maintenance-interval: 1m
+      # 单批最多处理的过期审批数量，范围 1 到 500。
+      batch-size: 100
     # 消息投影、连续对话上下文和内部状态保留策略。
     memory:
       # 单批投影的最大事件条数，消息与 cursor 在同一事务提交。
@@ -174,7 +182,7 @@ manga:
       # Director 的系统提示词资源位置。
       director-prompt-resource: classpath:agent/profiles/manga-director-system.md
       # Director 定义的语义版本；提示词或行为契约变化时递增，并参与 Blueprint 指纹。
-      director-profile-version: 1
+      director-profile-version: 2
       # Director 单次调用允许的最大模型推理轮次，达到限制后失败。
       director-max-turns: 12
       # 只读剧本解析 Agent 的系统提示词资源位置。

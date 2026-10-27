@@ -2,6 +2,8 @@ package com.manga.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manga.agent.changeset.ChangeSetConstants;
+import com.manga.agent.changeset.ScriptChangeSet;
 import com.manga.common.enums.ProjectWorkflowStage;
 import com.manga.common.enums.ScriptChapterParseStatus;
 import com.manga.common.exception.BusinessException;
@@ -27,6 +29,9 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static com.manga.common.enums.ProjectResponseCode.PROJECT_NOT_FOUND;
 import static com.manga.common.enums.ProjectResponseCode.SCRIPT_INVALID;
@@ -43,6 +48,7 @@ public class ProjectScriptService {
     private final ProjectScriptDialogueMapper dialogueMapper;
     private final ProjectWorkflowService workflowService;
     private final ObjectMapper objectMapper;
+    private final ProjectRevisionService revisionService;
 
     /** 查询剧本元数据和章节摘要，不返回正文。 */
     public ProjectScriptResponse find(long projectId) {
@@ -75,6 +81,13 @@ public class ProjectScriptService {
         return toChapterResponse(chapter, chapterNumber(script.getId(), chapter.getId()));
     }
 
+    /** 读取审批原文快照，使用显式身份并包含真实场景和对白。 */
+    public ProjectScriptChapterResponse findChapterForUser(long projectId, long chapterId, long userId) {
+        projectService.requireAccessibleProject(projectId, userId);
+        ProjectScriptChapter chapter = revisionService.chapter(projectId, chapterId);
+        return toChapterResponse(chapter, chapterNumber(chapter.getScriptId(), chapterId));
+    }
+
     /** 同步创建一个章节。 */
     @Transactional
     public ProjectScriptChapterResponse createChapter(long projectId, String title, String synopsis,
@@ -102,7 +115,7 @@ public class ProjectScriptService {
         chapter.setLastError(null);
         chapter.setUpdatedBy(SecurityUtils.requireCurrentUsername());
         chapterRepository.update(chapter);
-        replaceScenes(chapter, request.scenes());
+        replaceScenes(chapter, request.scenes(), SecurityUtils.requireCurrentUsername());
         refreshChapterCount(script);
         workflowService.advanceTo(projectId, ProjectWorkflowStage.STORYBOARD, SecurityUtils.requireCurrentUsername());
         return toChapterResponse(chapter, chapterNumber(script.getId(), chapter.getId()));
@@ -137,6 +150,7 @@ public class ProjectScriptService {
     @Transactional
     public ProjectScriptChapter createTaskChapter(long projectId, String title, String synopsis, String rawContent,
             String sourceType, int sortOrder, long ownerUserId, String actor) {
+        revisionService.edit(projectId, ownerUserId, null, actor);
         ProjectScript script = ensureScriptForOwner(projectId, ownerUserId, actor);
         ProjectScriptChapter chapter = createChapterEntity(script, title, synopsis, rawContent, sourceType, sortOrder,
                 ScriptChapterParseStatus.COMPLETED, actor);
@@ -147,6 +161,7 @@ public class ProjectScriptService {
     /** 返回插入章节的稳定排序值，并为后续章节预留空间。 */
     @Transactional
     public int prepareInsertOrder(long projectId, Long afterChapterId, int amount, long ownerUserId) {
+        revisionService.edit(projectId, ownerUserId, null, SecurityUtils.requireCurrentUsername());
         ProjectScript script = ensureScriptForOwner(projectId, ownerUserId, SecurityUtils.requireCurrentUsername());
         int sortOrder = 1;
         if (afterChapterId != null) {
@@ -174,7 +189,8 @@ public class ProjectScriptService {
                 .createdBy(actor).updatedBy(actor).build());
     }
 
-    private void replaceScenes(ProjectScriptChapter chapter, List<ProjectScriptSaveRequest.Scene> scenes) {
+    /** 替换章节结构并把真实操作者写入场景和对白审计字段。 */
+    private void replaceScenes(ProjectScriptChapter chapter, List<ProjectScriptSaveRequest.Scene> scenes, String actor) {
         dialogueMapper.deleteByChapterId(chapter.getId());
         sceneMapper.deleteByChapterId(chapter.getId());
         if (scenes == null) return;
@@ -183,23 +199,26 @@ public class ProjectScriptService {
             ProjectScriptScene entity = ProjectScriptScene.builder().chapterId(chapter.getId())
                     .sceneNumber(scene.sceneNumber() == null ? index + 1 : scene.sceneNumber()).location(normalize(scene.location()))
                     .timeDescription(normalize(scene.time())).summary(normalize(scene.summary())).content(normalize(scene.content()))
-                    .sortOrder(index + 1).build();
+                    .sortOrder(index + 1).createdBy(actor).updatedBy(actor).build();
             sceneMapper.insert(entity);
             if (scene.dialogues() == null) continue;
             for (int dialogueIndex = 0; dialogueIndex < scene.dialogues().size(); dialogueIndex++) {
                 ProjectScriptSaveRequest.Dialogue dialogue = scene.dialogues().get(dialogueIndex);
                 dialogueMapper.insert(ProjectScriptDialogue.builder().sceneId(entity.getId()).speaker(normalize(dialogue.speaker()))
                         .text(normalizeOr(dialogue.text(), "")).dialogueType(normalizeOr(dialogue.type(), "DIALOGUE"))
-                        .sortOrder(dialogueIndex + 1).build());
+                        .sortOrder(dialogueIndex + 1).createdBy(actor).updatedBy(actor).build());
             }
         }
     }
 
+    /** 一次读取章节的场景和全部对白，避免审批预览按场景产生 N+1 查询。 */
     private ProjectScriptChapterResponse toChapterResponse(ProjectScriptChapter chapter, int number) {
         List<ProjectScriptScene> scenes = sceneMapper.findByChapterId(chapter.getId());
+        Map<Long, List<ProjectScriptDialogue>> dialoguesByScene = dialogueMapper.findByChapterId(chapter.getId())
+                .stream().collect(Collectors.groupingBy(ProjectScriptDialogue::getSceneId));
         List<ProjectScriptSaveRequest.Scene> result = scenes.stream().map(scene -> new ProjectScriptSaveRequest.Scene(
                 scene.getSceneNumber(), scene.getLocation(), scene.getTimeDescription(), scene.getSummary(), scene.getContent(),
-                dialogueMapper.findByChapterId(chapter.getId()).stream().filter(d -> d.getSceneId().equals(scene.getId()))
+                dialoguesByScene.getOrDefault(scene.getId(), List.of()).stream()
                         .map(d -> new ProjectScriptSaveRequest.Dialogue(d.getSpeaker(), d.getText(), d.getDialogueType())).toList())).toList();
         return new ProjectScriptChapterResponse(chapter.getId(), chapter.getScriptId(), number, chapter.getTitle(), chapter.getSynopsis(),
                 chapter.getRawContent(), chapter.getSourceType(), chapter.getParseStatus(), chapter.getStructureVersion(), result,
@@ -221,7 +240,10 @@ public class ProjectScriptService {
     }
 
     private ProjectScript requireScript(long projectId, boolean owned) {
-        if (owned) return ensureScript(projectId);
+        if (owned) {
+            revisionService.edit(projectId, SecurityUtils.requireCurrentUserId(), null, SecurityUtils.requireCurrentUsername());
+            return ensureScript(projectId);
+        }
         projectService.requireAccessibleProject(projectId, SecurityUtils.requireCurrentUserId());
         return scriptRepository.findByProjectId(projectId)
                 .orElseThrow(() -> new BusinessException(PROJECT_NOT_FOUND, HttpStatus.NOT_FOUND));
@@ -230,6 +252,36 @@ public class ProjectScriptService {
     private String serializeStructure(List<ProjectScriptSaveRequest.Scene> scenes) {
         try { return objectMapper.writeValueAsString(scenes == null ? List.of() : scenes); }
         catch (JsonProcessingException exception) { throw new BusinessException(SCRIPT_INVALID, "章节结构序列化失败", HttpStatus.BAD_REQUEST); }
+    }
+
+    /** 在审批事务内以显式身份应用章节提案；禁止依赖执行线程的认证上下文。 */
+    @Transactional
+    public long applyApproved(long projectId, long userId, String actor, ScriptChangeSet proposal) {
+        revisionService.edit(projectId, userId, null, actor);
+        ProjectScript script = ensureScriptForOwner(projectId, userId, actor);
+        ProjectScriptChapter chapter;
+        if (Objects.isNull(proposal.chapterId())) {
+            chapter = createChapterEntity(script, proposal.title(), proposal.synopsis(), proposal.rawContent(),
+                    ChangeSetConstants.AI_APPROVED_SOURCE, nextSortOrder(script.getId()), ScriptChapterParseStatus.COMPLETED, actor);
+            chapter.setStructureJson(serializeStructure(proposal.scenes()));
+            chapterRepository.update(chapter);
+        } else {
+            chapter = revisionService.chapter(projectId, proposal.chapterId());
+            chapter.setTitle(proposal.title().trim());
+            chapter.setSynopsis(normalize(proposal.synopsis()));
+            chapter.setRawContent(proposal.rawContent().trim());
+            chapter.setSourceType(ChangeSetConstants.AI_APPROVED_SOURCE);
+            chapter.setParseStatus(ScriptChapterParseStatus.COMPLETED);
+            chapter.setStructureVersion(Objects.requireNonNullElse(chapter.getStructureVersion(), 0) + 1);
+            chapter.setStructureJson(serializeStructure(proposal.scenes()));
+            chapter.setLastError(null);
+            chapter.setUpdatedBy(actor);
+            chapterRepository.update(chapter);
+        }
+        replaceScenes(chapter, proposal.scenes(), actor);
+        refreshChapterCount(script);
+        workflowService.advanceTo(projectId, ProjectWorkflowStage.STORYBOARD, actor);
+        return chapter.getId();
     }
 
     private String normalize(String value) { return StringUtils.hasText(value) ? value.trim() : null; }

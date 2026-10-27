@@ -7,10 +7,13 @@ import com.manga.agent.blueprint.AgentBlueprintCompileRequest;
 import com.manga.agent.blueprint.AgentBlueprintCompiler;
 import com.manga.agent.blueprint.CompiledAgentBlueprint;
 import com.manga.agent.config.CreativeRuntimeProperties;
+import com.manga.agent.domain.AgentPermissionPolicy;
 import com.manga.agent.domain.CreativeActor;
 import com.manga.agent.domain.CreativeConversationStatus;
 import com.manga.agent.domain.CreativeDispatchOutboxStatus;
 import com.manga.agent.domain.CreativeEventType;
+import com.manga.agent.domain.CreativeOperationType;
+import com.manga.agent.domain.CreativeResourceType;
 import com.manga.agent.domain.CreativeRunRequestFingerprintMaterial;
 import com.manga.agent.domain.CreativeRunStatus;
 import com.manga.agent.domain.CreativeRunTriggerSource;
@@ -36,6 +39,7 @@ import com.manga.repository.CreativeDispatchOutboxRepository;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.CreativeStepRepository;
 import com.manga.repository.ProjectScriptRepository;
+import com.manga.service.ProjectRevisionService;
 import com.manga.service.ProjectService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -82,6 +86,7 @@ public class RunAdmissionService {
     private final ObjectMapper objectMapper;
     private final CreativeConversationMemory conversationMemory;
     private final AgentStateSessionService stateSessions;
+    private final ProjectRevisionService revisions;
 
     /**
      * 幂等受理会话或手动创作请求。新请求会原子创建 Run、READY 根 Step 和 Dispatch Outbox，
@@ -157,6 +162,9 @@ public class RunAdmissionService {
                 .attemptNo(0)
                 .maxAttempts(ROOT_STEP_MAX_ATTEMPTS)
                 .inputJson(write(new CreativeStepInput(executionInstruction, command.operationType(), command.target())))
+                .baseProjectRevision(Objects.nonNull(run.getProjectId())
+                        && command.permissionPolicy().allows(AgentPermissionPolicy.PROPOSE_CHANGES)
+                        ? revisions.lock(run.getProjectId(), run.getUserId()).getRevision() : null)
                 .blueprintSnapshotJson(Objects.isNull(agentStep) ? null : agentStep.blueprint().snapshotJson())
                 .blueprintFingerprint(Objects.isNull(agentStep)
                         ? null
@@ -175,6 +183,11 @@ public class RunAdmissionService {
         if (Objects.isNull(binding)) {
             return null;
         }
+        if ((command.operationType() == CreativeOperationType.GENERATE_CHAPTER_STORYBOARD
+                || command.operationType() == CreativeOperationType.GENERATE_SCRIPT_CHAPTER)
+                && !command.permissionPolicy().allows(AgentPermissionPolicy.PROPOSE_CHANGES)) {
+            throw new BusinessException(CreativeRuntimeResponseCode.TARGET_RESOURCE_INVALID, HttpStatus.BAD_REQUEST);
+        }
         if (Objects.nonNull(binding.targetType())
                 && (Objects.isNull(command.target()) || command.target().resourceType() != binding.targetType())) {
             throw new BusinessException(
@@ -183,12 +196,20 @@ public class RunAdmissionService {
                             .formatted(command.operationType(), binding.targetType()),
                     HttpStatus.BAD_REQUEST);
         }
-        boolean validScript = Objects.nonNull(projectId)
-                && Objects.nonNull(command.target())
-                && scriptRepository.findByProjectId(projectId)
-                .filter(script -> Objects.equals(script.getId(), command.target().resourceId()))
-                .isPresent();
-        if (Objects.nonNull(binding.targetType()) && !validScript) {
+        boolean validTarget = Objects.isNull(binding.targetType());
+        if (Objects.nonNull(projectId) && Objects.nonNull(command.target())) {
+            if (binding.targetType() == CreativeResourceType.SCRIPT) {
+                validTarget = scriptRepository.findByProjectId(projectId)
+                        .filter(script -> Objects.equals(script.getId(), command.target().resourceId())).isPresent();
+            } else if (binding.targetType() == CreativeResourceType.CHAPTER) {
+                revisions.lock(projectId, command.userId());
+                revisions.chapter(projectId, command.target().resourceId());
+                validTarget = true;
+            } else if (binding.targetType() == CreativeResourceType.PROJECT) {
+                validTarget = Objects.equals(projectId, command.target().resourceId());
+            }
+        }
+        if (!validTarget) {
             throw new BusinessException(
                     CreativeRuntimeResponseCode.TARGET_RESOURCE_INVALID,
                     CreativeRuntimeMessages.AGENT_OPERATION_SCRIPT_TARGET_INVALID,

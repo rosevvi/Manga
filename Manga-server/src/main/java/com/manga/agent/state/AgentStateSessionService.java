@@ -48,8 +48,9 @@ public class AgentStateSessionService {
     @Transactional
     public void retire(CreativeRun run, boolean invalidated) {
         String actor = SystemActor.CREATIVE_RUNTIME.code();
-        if (sessions.retireRun(run.getRunId(), actor) > 0 && invalidated
-                && Objects.nonNull(run.getConversationId())) {
+        sessions.retireRun(run.getRunId(), actor);
+        // 审批暂停已撤销旧许可；后续取消仍必须推进 generation，CAS 保证重复终态不会再次推进。
+        if (invalidated && Objects.nonNull(run.getConversationId())) {
             conversations.advanceGeneration(run.getConversationId(), run.getStateGeneration(), actor);
         }
     }

@@ -6,6 +6,7 @@
     <resultMap id="chapterResultMap" type="com.manga.entity.ProjectScriptChapter">
         <id property="id" column="id"/>
         <result property="scriptId" column="script_id"/>
+        <result property="revision" column="revision"/>
         <result property="title" column="title"/>
         <result property="synopsis" column="synopsis"/>
         <result property="rawContent" column="raw_content"/>
@@ -23,7 +24,7 @@
     </resultMap>
 
     <select id="findSummaries" resultMap="chapterResultMap">
-        SELECT c.id, c.script_id, c.title, c.synopsis, NULL AS raw_content, NULL AS structure_json,
+        SELECT c.id, c.script_id, c.revision, c.title, c.synopsis, NULL AS raw_content, NULL AS structure_json,
                CHAR_LENGTH(c.raw_content) AS raw_content_length,
                c.source_type, c.parse_status, c.structure_version, c.last_error,
                c.sort_order, c.created_at, c.updated_at, c.created_by, c.updated_by
@@ -33,7 +34,7 @@
     </select>
 
     <select id="findByIdAndScript" resultMap="chapterResultMap">
-        SELECT c.id, c.script_id, c.title, c.synopsis, c.raw_content, c.structure_json,
+        SELECT c.id, c.script_id, c.revision, c.title, c.synopsis, c.raw_content, c.structure_json,
                c.source_type, c.parse_status, c.structure_version, c.last_error,
                c.sort_order, c.created_at, c.updated_at, c.created_by, c.updated_by
         FROM manga_project_script_chapter c
@@ -42,14 +43,14 @@
 
     <update id="shiftSortOrders">
         UPDATE manga_project_script_chapter
-        SET sort_order = sort_order + #{delta}
+        SET sort_order = sort_order + #{delta}, revision = revision + 1
         WHERE script_id = #{scriptId} AND sort_order &gt;= #{sortOrder}
         ORDER BY sort_order DESC
     </update>
 
     <update id="updateChapter">
         UPDATE manga_project_script_chapter
-        SET title = #{chapter.title}, synopsis = #{chapter.synopsis}, raw_content = #{chapter.rawContent},
+        SET revision = revision + 1, title = #{chapter.title}, synopsis = #{chapter.synopsis}, raw_content = #{chapter.rawContent},
             structure_json = #{chapter.structureJson}, source_type = #{chapter.sourceType},
             parse_status = #{chapter.parseStatus}, structure_version = #{chapter.structureVersion},
             last_error = #{chapter.lastError}, sort_order = #{chapter.sortOrder},

@@ -1,8 +1,8 @@
 package com.manga.service;
 
 import com.manga.common.constant.ProjectConstants;
-import com.manga.common.enums.ProjectResponseCode;
 import com.manga.common.enums.ProjectMemberRole;
+import com.manga.common.enums.ProjectResponseCode;
 import com.manga.common.enums.ProjectStatus;
 import com.manga.common.enums.ProjectVisibilityScope;
 import com.manga.common.enums.ProjectWorkflowStage;
@@ -10,8 +10,8 @@ import com.manga.common.exception.BusinessException;
 import com.manga.common.security.SecurityUtils;
 import com.manga.config.ArtStylePresets;
 import com.manga.dto.ArtStylePresetResponse;
-import com.manga.dto.ProjectMemberResponse;
 import com.manga.dto.ProjectCreateRequest;
+import com.manga.dto.ProjectMemberResponse;
 import com.manga.dto.ProjectResponse;
 import com.manga.dto.ProjectUpdateRequest;
 import com.manga.entity.MangaProject;
@@ -35,6 +35,7 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final ProjectWorkflowService workflowService;
+    private final ProjectRevisionService revisionService;
 
     /** 查询当前用户可访问的项目列表。 */
     public List<ProjectResponse> findAll() {
@@ -102,6 +103,7 @@ public class ProjectService {
     @Transactional
     public ProjectResponse update(long projectId, ProjectUpdateRequest request) {
         long ownerUserId = SecurityUtils.requireCurrentUserId();
+        revisionService.edit(projectId, ownerUserId, null, SecurityUtils.requireCurrentUsername());
         requireOwnedProject(projectId, ownerUserId);
         MangaProject project = MangaProject.builder()
                 .id(projectId)
@@ -130,6 +132,7 @@ public class ProjectService {
     @Transactional
     public void delete(long projectId) {
         long ownerUserId = SecurityUtils.requireCurrentUserId();
+        revisionService.lock(projectId, ownerUserId);
         requireOwnedProject(projectId, ownerUserId);
         projectRepository.delete(projectId);
         log.info("Project deleted projectId={} ownerUserId={}", projectId, ownerUserId);

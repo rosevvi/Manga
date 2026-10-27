@@ -19,7 +19,7 @@ class BuiltInAgentProfileSourceTests {
     private static final String SCRIPT_PARSER_PROMPT_RESOURCE = "classpath:agent/profiles/script-parser-system.md";
 
     @Test
-    void shouldExposeOnlyPhaseTwoReadCapabilities() {
+    void shouldExposeProposalCapabilitiesWithoutDirectBusinessWrites() {
         CreativeAgentProperties properties = new CreativeAgentProperties(
                 PROMPT_RESOURCE, 3, 9,
                 SCRIPT_PARSER_PROMPT_RESOURCE, 2, 13,
@@ -31,10 +31,10 @@ class BuiltInAgentProfileSourceTests {
 
         assertThat(profile.version()).isEqualTo(3);
         assertThat(profile.maxTurns()).isEqualTo(9);
-        assertThat(profile.permissionPolicy()).isEqualTo(AgentPermissionPolicy.READ_ONLY);
+        assertThat(profile.permissionPolicy()).isEqualTo(AgentPermissionPolicy.PROPOSE_CHANGES);
         assertThat(profile.allowedCapabilities())
-                .containsExactlyInAnyOrderElementsOf(CapabilityName.phaseTwoReadOnlyCapabilities());
-        assertThat(profile.systemPrompt()).contains("只能使用工具白名单中的只读能力");
+                .containsExactlyInAnyOrderElementsOf(CapabilityName.directorCapabilities());
+        assertThat(profile.systemPrompt()).contains("等待用户批准", "不得代替用户批准");
     }
 
     @Test

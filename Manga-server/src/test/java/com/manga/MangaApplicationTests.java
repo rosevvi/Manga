@@ -59,8 +59,8 @@ class MangaApplicationTests {
     void prepareModelBoundary() {
         when(blueprintCompiler.compile(any()))
                 .thenReturn(CreativeAgentTestSupport.blueprint());
-        when(invoker.invoke(any(),
-                any(), any()))
+        when(invoker.invokeUntil(any(),
+                any(), any(), any()))
                 .thenReturn(Flux.just(
                         new TextBlockDeltaEvent("reply", "block", "测试回答"))
                         .delayElements(Duration.ofMillis(150)).cast(AgentEvent.class));
@@ -132,6 +132,8 @@ class MangaApplicationTests {
                 "manga_creative_run",
                 "manga_creative_step",
                 "manga_creative_dispatch_outbox",
+                "manga_creative_change_set",
+                "manga_creative_approval",
                 "manga_creative_event"
         );
         List<String> actualTables = jdbcTemplate.queryForList("""

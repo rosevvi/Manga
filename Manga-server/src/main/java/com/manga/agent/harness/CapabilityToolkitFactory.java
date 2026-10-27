@@ -3,6 +3,7 @@ package com.manga.agent.harness;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.blueprint.AgentBlueprint;
 import com.manga.agent.blueprint.CapabilityManifest;
+import com.manga.agent.capability.CapabilityName;
 import com.manga.agent.capability.CapabilityRegistry;
 import com.manga.agent.domain.CreativeErrorCode;
 import com.manga.agent.domain.CreativeRuntimeMessages;
@@ -32,7 +33,7 @@ public class CapabilityToolkitFactory {
         }
         Set<String> expected = blueprint.capabilities().stream()
                 .map(CapabilityManifest::name)
-                .map(com.manga.agent.capability.CapabilityName::code)
+                .map(CapabilityName::code)
                 .collect(Collectors.toUnmodifiableSet());
         if (!toolkit.getToolNames().equals(expected)) {
             throw new AgentRuntimeException(

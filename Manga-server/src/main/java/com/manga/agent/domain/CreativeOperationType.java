@@ -12,5 +12,7 @@ public enum CreativeOperationType {
     PARSE_SCRIPT,
 
     /** 为指定剧本章节生成分镜方案。 */
-    GENERATE_CHAPTER_STORYBOARD
+    GENERATE_CHAPTER_STORYBOARD,
+    /** 为项目生成待审批的新章节提案。 */
+    GENERATE_SCRIPT_CHAPTER
 }

@@ -4,6 +4,8 @@ import { cancelCreativeRun, createConversationRun, streamCreativeRunEvents } fro
 import { getCreativeConversationHistory, listCreativeConversations } from '../api/creativeConversationApi'
 import { CREATIVE_MESSAGE_ROLE, CREATIVE_MESSAGE_STATUS, CREATIVE_TOOL_LABEL, CREATIVE_TOOL_STATUS_LABEL } from '../constants/creative'
 import './manga-assistant.css'
+import CreativeChangeSetPanel from './CreativeChangeSetPanel'
+import { regenerationInstruction } from './changeSetPreview'
 
 /** 网络重连间隔，单位：毫秒。 */
 const RECONNECT_DELAY_MS = 1500
@@ -184,7 +186,9 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
     setError('')
     try {
       const run = await createConversationRun(accessToken, {
-        requestId: nextRequestId(), instruction: prompt, projectId, conversationId,
+        requestId: nextRequestId(), instruction: prompt,
+        projectId: projectId || conversations.find((conversation) => conversation.conversationId === conversationId)?.projectId,
+        conversationId,
       })
       if (scope !== scopeRef.current) return
       setInstruction('')
@@ -273,6 +277,9 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
               {message.role === CREATIVE_MESSAGE_ROLE.ASSISTANT && message.status === CREATIVE_MESSAGE_STATUS.CANCELLED && <small>本轮已停止。</small>}
             </article>)}
           {error && <small>{error}</small>}
+          {conversationId && <CreativeChangeSetPanel accessToken={accessToken} conversationId={conversationId}
+            onDecided={() => refreshHistory(conversationId)}
+            onRegenerate={(proposal) => setInstruction(regenerationInstruction(proposal))} />}
         </div>
         <form onSubmit={submit}>
           <textarea value={instruction} onChange={(event) => setInstruction(event.target.value)}

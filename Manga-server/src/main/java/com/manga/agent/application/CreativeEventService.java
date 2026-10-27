@@ -3,6 +3,7 @@ package com.manga.agent.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manga.agent.changeset.CreativeRunStopped;
 import com.manga.agent.config.CreativeRuntimeProperties;
 import com.manga.agent.domain.CreativeEventType;
 import com.manga.agent.domain.CreativeRuntimeMessages;
@@ -16,6 +17,7 @@ import com.manga.repository.CreativeEventRepository;
 import com.manga.repository.CreativeRunRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -40,6 +42,7 @@ public class CreativeEventService {
     private final CreativeRuntimeProperties runtimeProperties;
     private final CreativeMessageProjector messageProjector;
     private final AgentStateSessionService stateSessions;
+    private final ApplicationEventPublisher publisher;
 
     /** 在同一事务内追加由 Creative Runtime 产生的事件。 */
     @Transactional
@@ -79,6 +82,7 @@ public class CreativeEventService {
         messageProjector.project(runId);
         if (eventType == CreativeEventType.RUN_CANCEL_REQUESTED || isTerminal(eventType)) {
             stateSessions.retire(run, eventType != CreativeEventType.RUN_COMPLETED);
+            publisher.publishEvent(new CreativeRunStopped(runId));
         }
         publishAfterCommit(runId, sequence);
         return event;

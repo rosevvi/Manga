@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 在创建 Kernel 前复核持久化 Blueprint 与当前 Profile、能力实现契约。
@@ -30,14 +31,15 @@ public class AgentBlueprintPreflight {
             codec.verifyFingerprint(blueprint);
             AgentProfile profile = profileSource.require(blueprint.profileKey());
             List<CapabilityManifest> currentCapabilities = capabilityRegistry
-                    .descriptors(profile.allowedCapabilities())
+                    .descriptors(blueprint.capabilities().stream().map(CapabilityManifest::name)
+                            .collect(Collectors.toUnmodifiableSet()))
                     .stream()
                     .map(this::manifest)
                     .toList();
-            boolean matches = profile.version() == blueprint.profileVersion()
-                    && Objects.equals(profile.systemPrompt(), blueprint.systemPrompt())
-                    && profile.maxTurns() == blueprint.maxTurns()
-                    && Objects.equals(profile.permissionPolicy(), blueprint.permissionPolicy())
+            // 已受理的提示词和轮次取自冻结快照；只复核当前仍可执行的能力契约与权限上限。
+            boolean matches = profile.permissionPolicy().allows(blueprint.permissionPolicy())
+                    && profile.allowedCapabilities().containsAll(blueprint.capabilities().stream().map(CapabilityManifest::name).toList())
+                    && blueprint.capabilities().stream().allMatch(capability -> blueprint.permissionPolicy().allows(capability.requiredPermission()))
                     && Objects.equals(currentCapabilities, blueprint.capabilities());
             if (!matches) {
                 throw mismatch(null);

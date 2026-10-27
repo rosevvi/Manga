@@ -49,6 +49,10 @@ public class CreativeStep {
     private Integer maxAttempts;
     /** 创建时固化的输入 JSON。 */
     private String inputJson;
+    /** 开始生成前冻结的项目版本，防止提案覆盖生成期间的人工修改。 */
+    private Long baseProjectRevision;
+    /** 审批持久化恢复命令；空值表示尚未处理审批。 */
+    private String approvalResultJson;
     /** Agent Step 执行前固化的不含密钥 Blueprint 快照。 */
     private String blueprintSnapshotJson;
     /** Blueprint 快照的 SHA-256 指纹。 */

@@ -5,9 +5,9 @@ import com.manga.agent.capability.CapabilityRegistry;
 import com.manga.agent.config.CreativeAgentProperties;
 import com.manga.agent.domain.AgentPermissionPolicy;
 import com.manga.agent.domain.CreativeRuntimeMessages;
+import com.manga.agent.model.ModelConfigurationFingerprint;
 import com.manga.agent.profile.AgentProfile;
 import com.manga.agent.profile.AgentProfileSource;
-import com.manga.agent.model.ModelConfigurationFingerprint;
 import com.manga.entity.AiProviderConfig;
 import com.manga.repository.AiProviderConfigRepository;
 import org.springframework.stereotype.Component;
@@ -52,6 +52,7 @@ public class AgentBlueprintCompiler {
         List<CapabilityManifest> capabilities = capabilityRegistry
                 .descriptors(profile.allowedCapabilities())
                 .stream()
+                .filter(capability -> request.permissionPolicy().allows(capability.requiredPermission()))
                 .map(this::manifest)
                 .toList();
         AgentBlueprintFingerprintMaterial fingerprintMaterial = new AgentBlueprintFingerprintMaterial(
@@ -117,9 +118,9 @@ public class AgentBlueprintCompiler {
         );
     }
 
-    /** 阶段二只允许请求权限与对应只读 Profile 完全一致。 */
+    /** 请求可以缩小 Profile 权限，但不能越过其最高授权。 */
     private void requirePermission(AgentProfile profile, AgentPermissionPolicy requested) {
-        if (!Objects.equals(profile.permissionPolicy(), requested)) {
+        if (Objects.isNull(requested) || !profile.permissionPolicy().allows(requested)) {
             throw new IllegalArgumentException(CreativeRuntimeMessages.AGENT_PERMISSION_EXCEEDS_PROFILE);
         }
     }

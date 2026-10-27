@@ -13,14 +13,14 @@ import org.springframework.stereotype.Component;
 import java.util.Objects;
 
 /**
- * 按已预检 Blueprint 创建只含只读白名单能力的受控 Kernel。
+ * 按已预检 Blueprint 创建只含读取及提案白名单能力的受控 Kernel。
  */
 @Component
 @RequiredArgsConstructor
 public class MangaHarnessFactory {
 
     /** AgentScope 中只用于诊断的稳定 Director 描述。 */
-    private static final String DIRECTOR_DESCRIPTION = "Manga read-only creative director";
+    private static final String DIRECTOR_DESCRIPTION = "Manga creative director with reviewed proposals";
 
     private final AgentBlueprintPreflight blueprintPreflight;
     private final AgentModelFactory modelFactory;
@@ -61,6 +61,7 @@ public class MangaHarnessFactory {
                 .sysPrompt(blueprint.systemPrompt())
                 .model(model.model())
                 .toolkit(toolkit)
+                .permissionContext(MangaToolPermissionPolicy.forBlueprint(blueprint))
                 .stateStore(stateStore)
                 .maxIters(blueprint.maxTurns())
                 .compaction(AgentCompactionPolicy.forContextWindow(blueprint.model().contextWindow()))

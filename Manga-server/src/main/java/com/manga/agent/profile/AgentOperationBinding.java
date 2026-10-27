@@ -14,7 +14,11 @@ public enum AgentOperationBinding {
     DIRECTOR_CHAT(CreativeOperationType.ASSISTANT_CHAT, AgentProfileKey.MANGA_DIRECTOR, null),
 
     /** 将手动剧本解析操作绑定到只读解析 Profile，并要求目标为剧本。 */
-    SCRIPT_PARSE(CreativeOperationType.PARSE_SCRIPT, AgentProfileKey.SCRIPT_PARSER, CreativeResourceType.SCRIPT);
+    SCRIPT_PARSE(CreativeOperationType.PARSE_SCRIPT, AgentProfileKey.SCRIPT_PARSER, CreativeResourceType.SCRIPT),
+    /** 手动为章节生成待审批分镜，不直接写镜头表。 */
+    STORYBOARD_PROPOSAL(CreativeOperationType.GENERATE_CHAPTER_STORYBOARD, AgentProfileKey.MANGA_DIRECTOR, CreativeResourceType.CHAPTER),
+    /** 手动创建章节提案；改写既有章节也可通过会话提出。 */
+    SCRIPT_PROPOSAL(CreativeOperationType.GENERATE_SCRIPT_CHAPTER, AgentProfileKey.MANGA_DIRECTOR, CreativeResourceType.PROJECT);
 
     /** 创建 Run 时用于选择 Agent 执行链路的业务操作。 */
     private final CreativeOperationType operationType;

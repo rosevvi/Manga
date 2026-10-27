@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.CreativeChangeSetMapper">
+    <update id="updateState">
+        UPDATE manga_creative_change_set
+        SET status = #{value.status}, result_json = #{value.resultJson}, updated_by = #{value.updatedBy}, updated_at = CURRENT_TIMESTAMP
+        WHERE change_set_id = #{value.changeSetId} AND status IN ('DRAFT', 'PENDING')
+    </update>
+    <select id="findByStep" resultType="com.manga.entity.CreativeChangeSet">
+        SELECT id, change_set_id, run_id, step_id, user_id, project_id, chapter_id, kind, schema_version, instruction, status, base_project_revision, base_chapter_revision, before_json, payload_json, result_json, created_at, updated_at, created_by, updated_by
+        FROM manga_creative_change_set WHERE step_id = #{stepId}
+    </select>
+    <select id="findByRun" resultType="com.manga.entity.CreativeChangeSet">
+        SELECT id, change_set_id, run_id, step_id, user_id, project_id, chapter_id, kind, schema_version, instruction, status, base_project_revision, base_chapter_revision, before_json, payload_json, result_json, created_at, updated_at, created_by, updated_by
+        FROM manga_creative_change_set WHERE run_id = #{runId} ORDER BY id ASC
+    </select>
+    <select id="findVisible" resultType="com.manga.entity.CreativeChangeSet">
+        SELECT c.id, c.change_set_id, c.run_id, c.step_id, c.user_id, c.project_id, c.chapter_id, c.kind,
+               c.schema_version, c.instruction, c.status, c.base_project_revision, c.base_chapter_revision,
+               c.before_json, c.payload_json, c.result_json, c.created_at, c.updated_at, c.created_by, c.updated_by
+        FROM manga_creative_change_set c JOIN manga_creative_run r ON r.run_id = c.run_id
+        WHERE c.user_id = #{userId} AND c.status != 'DRAFT'
+        <if test="runId != null">AND c.run_id = #{runId}</if>
+        <if test="conversationId != null">AND r.conversation_id = #{conversationId}</if>
+        <if test="beforeId != null">AND c.id &lt; #{beforeId}</if>
+        ORDER BY c.id DESC LIMIT #{limit}
+    </select>
+</mapper>

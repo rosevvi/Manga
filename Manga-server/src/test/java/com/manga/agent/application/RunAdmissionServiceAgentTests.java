@@ -21,6 +21,7 @@ import com.manga.repository.CreativeDispatchOutboxRepository;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.CreativeStepRepository;
 import com.manga.repository.ProjectScriptRepository;
+import com.manga.service.ProjectRevisionService;
 import com.manga.service.ProjectService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -83,7 +84,7 @@ class RunAdmissionServiceAgentTests {
                 scriptRepository,
                 objectMapper,
                 memory,
-                mock(AgentStateSessionService.class));
+                mock(AgentStateSessionService.class), mock(ProjectRevisionService.class));
         StartCreativeRunCommand command = StartCreativeRunCommand.manual(
                 11L,
                 "request-1",

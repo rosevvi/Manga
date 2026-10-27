@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.CreativeApprovalMapper">
+    <update id="updateDecision">
+        UPDATE manga_creative_approval
+        SET status = #{value.status}, decided_by = #{value.decidedBy}, decided_at = #{value.decidedAt},
+            comment = #{value.comment}, updated_by = #{value.updatedBy}, updated_at = CURRENT_TIMESTAMP
+        WHERE change_set_id = #{value.changeSetId} AND status = 'PENDING'
+    </update>
+    <select id="findByChangeSet" resultType="com.manga.entity.CreativeApproval">
+        SELECT id, change_set_id, status, expires_at, decided_by, decided_at, comment,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_approval WHERE change_set_id = #{changeSetId}
+    </select>
+    <select id="findExpired" resultType="string">
+        SELECT change_set_id FROM manga_creative_approval
+        WHERE status = 'PENDING' AND expires_at &lt;= #{now}
+        ORDER BY expires_at, id LIMIT #{limit}
+    </select>
+    <select id="findAll" resultType="com.manga.entity.CreativeApproval">
+        SELECT id, change_set_id, status, expires_at, decided_by, decided_at, comment,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_approval WHERE change_set_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+</mapper>

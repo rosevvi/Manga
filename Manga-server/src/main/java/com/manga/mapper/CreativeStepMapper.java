@@ -11,6 +11,13 @@ import java.util.List;
  * 提供 Step 查询及带 owner epoch 围栏的原子状态变更。
  */
 public interface CreativeStepMapper extends BaseMapper<CreativeStep> {
+    /** 释放执行权并持久化审批等待，旧 owner epoch 立即失效。 */
+    int pauseOwned(@Param("stepId") String stepId, @Param("owner") String owner,
+            @Param("epoch") long epoch, @Param("now") LocalDateTime now, @Param("actor") String actor);
+
+    /** 审批恢复时替换状态会话，仅推进调度版本，不修改 Blueprint。 */
+    int resumeApproval(@Param("stepId") String stepId, @Param("sessionId") String sessionId,
+            @Param("result") String result, @Param("maxAttempts") int maxAttempts, @Param("actor") String actor);
 
     /** 按稳定标识查询 Step。 */
     CreativeStep findByStepId(@Param("stepId") String stepId);

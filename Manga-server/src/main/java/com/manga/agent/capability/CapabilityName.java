@@ -19,7 +19,11 @@ public enum CapabilityName {
     /** 读取项目内指定章节的正文与结构化结果。 */
     GET_CHAPTER_CONTENT("get_chapter_content"),
     /** 读取项目或章节下的分镜镜头列表。 */
-    LIST_STORYBOARD_SHOTS("list_storyboard_shots");
+    LIST_STORYBOARD_SHOTS("list_storyboard_shots"),
+    /** 保存章节变更草稿，业务写入必须等待审批。 */
+    PROPOSE_SCRIPT_CHANGE("propose_script_change"),
+    /** 保存批量分镜草稿提案，业务写入必须等待审批。 */
+    PROPOSE_STORYBOARD_CHANGE("propose_storyboard_change");
 
     /** AgentScope 工具和快照使用的稳定名称。 */
     private final String code;
@@ -47,8 +51,11 @@ public enum CapabilityName {
 
     /** 返回阶段二允许注册的完整只读能力集合。 */
     public static Set<CapabilityName> phaseTwoReadOnlyCapabilities() {
-        return Set.of(values());
+        return Set.of(GET_PROJECT_OVERVIEW, GET_SCRIPT_STRUCTURE, GET_CHAPTER_CONTENT, LIST_STORYBOARD_SHOTS);
     }
+
+    /** Director 的完整工具上限，实际 Blueprint 再按请求权限缩小。 */
+    public static Set<CapabilityName> directorCapabilities() { return Set.of(values()); }
 
     /** 返回剧本解析 Agent 所需的最小只读能力集合。 */
     public static Set<CapabilityName> scriptParserCapabilities() {

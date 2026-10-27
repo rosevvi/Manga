@@ -5,6 +5,8 @@ import com.manga.agent.blueprint.AgentBlueprint;
 import com.manga.agent.blueprint.AgentBlueprintCodec;
 import com.manga.agent.blueprint.AgentKernelKey;
 import com.manga.agent.capability.AgentRuntimeContext;
+import com.manga.agent.changeset.ChangeSetApprovalService;
+import com.manga.agent.changeset.ChangeSetConstants;
 import com.manga.agent.config.CreativeExecutionProperties;
 import com.manga.agent.domain.AgentPermissionPolicy;
 import com.manga.agent.domain.CreativeOperationType;
@@ -53,6 +55,8 @@ class AgentCreativeStepExecutorTests {
     void shouldStreamAgentEventsAndCompleteWithAuditableOutput() throws Exception {
         AgentBlueprintCodec blueprintCodec = mock(AgentBlueprintCodec.class);
         MangaAgentInvoker invoker = mock(MangaAgentInvoker.class);
+        ChangeSetApprovalService approvals = mock(ChangeSetApprovalService.class);
+        when(approvals.instruction(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
         CreativeStepLifecycleService lifecycleService = mock(CreativeStepLifecycleService.class);
         TaskScheduler scheduler = mock(TaskScheduler.class);
         @SuppressWarnings("rawtypes")
@@ -65,7 +69,8 @@ class AgentCreativeStepExecutorTests {
         doReturn(scheduledFuture).when(scheduler).scheduleAtFixedRate(
                 any(Runnable.class), any(Instant.class), eq(Duration.ofSeconds(10)));
         ArgumentCaptor<AgentRuntimeContext> context = ArgumentCaptor.forClass(AgentRuntimeContext.class);
-        when(invoker.invoke(eq(blueprint), context.capture(), eq("解析剧本"))).thenReturn(Flux.just(
+        when(invoker.invokeUntil(eq(blueprint), context.capture(),
+                eq("解析剧本" + ChangeSetConstants.TARGET_TEMPLATE.formatted(CreativeResourceType.SCRIPT, 31L)), any())).thenReturn(Flux.just(
                 new TextBlockDeltaEvent("reply-1", "block-1", "第一段"),
                 new ToolResultStartEvent("reply-1", "tool-1", "get_script_structure"),
                 new ToolResultEndEvent("reply-1", "tool-1", "get_script_structure", ToolResultState.SUCCESS),
@@ -82,7 +87,7 @@ class AgentCreativeStepExecutorTests {
                 lifecycleService,
                 properties(),
                 scheduler,
-                objectMapper);
+                objectMapper, approvals);
 
         executor.execute(claimed);
 

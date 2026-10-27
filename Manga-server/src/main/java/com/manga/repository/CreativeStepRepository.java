@@ -17,6 +17,15 @@ import java.util.Optional;
 public class CreativeStepRepository {
 
     private final CreativeStepMapper mapper;
+    /** 在 Run 锁内暂停，围栏拒绝已经过期或被取消的执行器。 */
+    public boolean pauseOwned(String stepId, String owner, long epoch, LocalDateTime now, String actor) {
+        return mapper.pauseOwned(stepId, owner, epoch, now, actor) == 1;
+    }
+
+    /** 原子恢复等待步骤，保留原 Blueprint 快照。 */
+    public boolean resumeApproval(String stepId, String sessionId, String result, int maxAttempts, String actor) {
+        return mapper.resumeApproval(stepId, sessionId, result, maxAttempts, actor) == 1;
+    }
 
     /** 创建 Step 并回填数据库主键。 */
     public CreativeStep create(CreativeStep step) {

@@ -148,7 +148,7 @@ class CreativeConversationMemoryIntegrationTests {
     @BeforeEach
     void modelBoundary() {
         when(compiler.compile(any())).thenReturn(CreativeAgentTestSupport.blueprint());
-        when(invoker.invoke(any(), any(), any())).thenReturn(Flux.<AgentEvent>just(
+        when(invoker.invokeUntil(any(), any(), any(), any())).thenReturn(Flux.<AgentEvent>just(
                 new TextBlockDeltaEvent("reply", "text", "已完成分析")));
     }
 

@@ -24,6 +24,8 @@ public class ProjectScriptChapter {
     private Long id;
     /** 所属剧本主键。 */
     private Long scriptId;
+    /** 章节正文或分镜变化时推进的业务版本。 */
+    private Long revision;
     /** 章节标题。 */
     private String title;
     /** 章节简介。 */

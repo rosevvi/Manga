@@ -29,10 +29,10 @@ public class BuiltInAgentProfileSource implements AgentProfileSource {
                 AgentProfileKey.MANGA_DIRECTOR,
                 properties.directorProfileVersion(),
                 "漫剧创作导演",
-                "读取项目、剧本和分镜内容，为用户提供分析与创作建议。",
+                "读取项目内容、提出章节和分镜变更，等待用户审批后继续。",
                 readPrompt(resourceLoader, properties.directorPromptResource()),
-                CapabilityName.phaseTwoReadOnlyCapabilities(),
-                AgentPermissionPolicy.READ_ONLY,
+                CapabilityName.directorCapabilities(),
+                AgentPermissionPolicy.PROPOSE_CHANGES,
                 properties.directorMaxTurns()
         );
         register(indexed, director);

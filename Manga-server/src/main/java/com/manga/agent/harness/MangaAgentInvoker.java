@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * AgentScope 唯一调用入口，统一执行会话串行、状态预检和两层资源释放。
@@ -47,6 +48,12 @@ public class MangaAgentInvoker {
             AgentBlueprint blueprint,
             AgentRuntimeContext context,
             String instruction) {
+        return invokeUntil(blueprint, context, instruction, event -> false);
+    }
+
+    /** 在持久化检查点满足时主动停止流；eager cleanup 保证下游完成前释放全部执行资源。 */
+    public Flux<AgentEvent> invokeUntil(AgentBlueprint blueprint, AgentRuntimeContext context,
+            String instruction, Predicate<AgentEvent> stopAfter) {
         return Flux.defer(() -> {
             InvocationResources resources = new InvocationResources();
             try {
@@ -58,9 +65,11 @@ public class MangaAgentInvoker {
                         resources.gateLease,
                         properties.sessionLease(),
                         taskScheduler);
-                return resources.harnessLease.stream(instruction)
-                        .takeUntilOther(resources.heartbeat.lossSignal())
-                        .doFinally(signalType -> resources.close());
+                return Flux.using(() -> resources,
+                        active -> active.harnessLease.stream(instruction)
+                                .takeUntilOther(active.heartbeat.lossSignal())
+                                .takeUntil(stopAfter),
+                        InvocationResources::close, true);
             } catch (RuntimeException | Error exception) {
                 resources.close();
                 return Flux.error(exception);

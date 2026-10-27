@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.ProjectRevisionMapper">
+    <select id="lockOwned" resultType="com.manga.entity.MangaProject">
+        SELECT id, owner_user_id, revision FROM manga_project
+        WHERE id = #{projectId} AND owner_user_id = #{userId} FOR UPDATE
+    </select>
+    <update id="advanceProject">
+        UPDATE manga_project SET revision = revision + 1, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{projectId} AND revision = #{revision}
+    </update>
+    <update id="advanceChapter">
+        UPDATE manga_project_script_chapter
+        SET revision = revision + 1, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{chapterId} AND script_id IN (SELECT id FROM manga_project_script WHERE project_id = #{projectId})
+    </update>
+</mapper>

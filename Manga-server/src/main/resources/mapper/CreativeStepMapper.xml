@@ -15,6 +15,8 @@
         <result property="attemptNo" column="attempt_no"/>
         <result property="maxAttempts" column="max_attempts"/>
         <result property="inputJson" column="input_json"/>
+        <result property="baseProjectRevision" column="base_project_revision"/>
+        <result property="approvalResultJson" column="approval_result_json"/>
         <result property="blueprintSnapshotJson" column="blueprint_snapshot_json"/>
         <result property="blueprintFingerprint" column="blueprint_fingerprint"/>
         <result property="stateSessionId" column="state_session_id"/>
@@ -32,7 +34,7 @@
     <select id="findByStepId" resultMap="creativeStepResultMap">
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
-               input_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
+               input_json, base_project_revision, approval_result_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
                output_json, error_code, error_message, started_at, finished_at,
                created_at, updated_at, created_by, updated_by
         FROM manga_creative_step
@@ -42,7 +44,7 @@
     <select id="findByRunId" resultMap="creativeStepResultMap">
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
-               input_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
+               input_json, base_project_revision, approval_result_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
                output_json, error_code, error_message, started_at, finished_at,
                created_at, updated_at, created_by, updated_by
         FROM manga_creative_step
@@ -53,7 +55,7 @@
     <select id="findReady" resultMap="creativeStepResultMap">
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
-               input_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
+               input_json, base_project_revision, approval_result_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
                output_json, error_code, error_message, started_at, finished_at,
                created_at, updated_at, created_by, updated_by
         FROM manga_creative_step
@@ -65,7 +67,7 @@
     <select id="findExpired" resultMap="creativeStepResultMap">
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
-               input_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
+               input_json, base_project_revision, approval_result_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
                output_json, error_code, error_message, started_at, finished_at,
                created_at, updated_at, created_by, updated_by
         FROM manga_creative_step
@@ -175,4 +177,18 @@
     <select id="countCancelled" resultType="int">
         SELECT COUNT(*) FROM manga_creative_step WHERE run_id = #{runId} AND status = 'CANCELLED'
     </select>
+    <update id="pauseOwned">
+        UPDATE manga_creative_step
+        SET status = 'WAITING_APPROVAL', owner_instance_id = NULL, lease_until = NULL,
+            owner_epoch = owner_epoch + 1, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE step_id = #{stepId} AND status = 'RUNNING'
+          AND owner_instance_id = #{owner} AND owner_epoch = #{epoch} AND lease_until &gt; #{now}
+    </update>
+    <update id="resumeApproval">
+        UPDATE manga_creative_step
+        SET status = 'READY', schedule_version = schedule_version + 1, owner_instance_id = NULL,
+            lease_until = NULL, state_session_id = #{sessionId}, approval_result_json = #{result},
+            max_attempts = attempt_no + #{maxAttempts}, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE step_id = #{stepId} AND status = 'WAITING_APPROVAL' AND approval_result_json IS NULL
+    </update>
 </mapper>
