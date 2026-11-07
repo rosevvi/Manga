@@ -42,6 +42,16 @@ export function getCreativeRun(accessToken, runId) {
   return authorizedRequest(accessToken, `${CREATIVE_RUN_ENDPOINT}/${encodeURIComponent(runId)}`)
 }
 
+/** 从数据库恢复协作计划、依赖图、当前执行角色和预算。 */
+export function getCreativeRunGraph(accessToken, runId) {
+  return authorizedRequest(accessToken, `${CREATIVE_RUN_ENDPOINT}/${encodeURIComponent(runId)}/graph`)
+}
+
+/** ALL_SUCCESS 首版停止任意未完成步骤会取消整个 Run。 */
+export function cancelCreativeStep(accessToken, runId, stepId) {
+  return authorizedRequest(accessToken, `${CREATIVE_RUN_ENDPOINT}/${encodeURIComponent(runId)}/steps/${encodeURIComponent(stepId)}/cancel`, { method: 'POST' })
+}
+
 /** 请求取消当前用户拥有的 Run。 */
 export function cancelCreativeRun(accessToken, runId) {
   return authorizedRequest(accessToken, `${CREATIVE_RUN_ENDPOINT}/${encodeURIComponent(runId)}/cancel`, {

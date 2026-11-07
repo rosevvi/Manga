@@ -54,7 +54,8 @@ public final class MangaCapabilityTool extends ToolBase {
                                 .formatted(descriptor.name().code()));
             }
             CapabilityResult result = capability.execute(
-                    new CapabilityCommand(objectMapper.valueToTree(param.getInput())),
+                    new CapabilityCommand(objectMapper.valueToTree(param.getInput()),
+                            Objects.isNull(param.getToolUseBlock()) ? null : param.getToolUseBlock().getId()),
                     context);
             return ToolResultBlock.text(result.data().toString());
         });

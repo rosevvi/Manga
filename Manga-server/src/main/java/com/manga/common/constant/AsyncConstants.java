@@ -7,6 +7,10 @@ public final class AsyncConstants {
 
     /** Manga 通用业务线程池 Bean 名称。 */
     public static final String MANGA_COMMON_TASK_EXECUTOR = "mangaCommonTaskExecutor";
+    /** 长时间模型执行使用的独立有界线程池。 */
+    public static final String MANGA_CREATIVE_TASK_EXECUTOR = "mangaCreativeTaskExecutor";
+    /** 创作执行线程的可检索名称前缀。 */
+    public static final String CREATIVE_THREAD_PREFIX = "manga-creative-";
     /** 外部媒体长请求使用的隔离线程池。 */
     public static final String MANGA_GENERATION_TASK_EXECUTOR = "mangaGenerationTaskExecutor";
     /** 媒体 worker 的可检索线程名称前缀。 */

@@ -21,6 +21,13 @@
         <result property="blueprintSnapshotJson" column="blueprint_snapshot_json"/>
         <result property="blueprintFingerprint" column="blueprint_fingerprint"/>
         <result property="stateSessionId" column="state_session_id"/>
+        <result property="delegationPlanId" column="delegation_plan_id"/>
+        <result property="nodeKey" column="node_key"/>
+        <result property="delegationDepth" column="delegation_depth"/>
+        <result property="delegationRound" column="delegation_round"/>
+        <result property="resultJson" column="result_json"/>
+        <result property="continuationJson" column="continuation_json"/>
+        <result property="reservedEpoch" column="reserved_epoch"/>
         <result property="outputJson" column="output_json"/>
         <result property="errorCode" column="error_code"/>
         <result property="errorMessage" column="error_message"/>
@@ -36,6 +43,7 @@
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
                input_json, base_project_revision, approval_result_json, generation_result_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
+               delegation_plan_id, node_key, delegation_depth, delegation_round, result_json, continuation_json, reserved_epoch,
                output_json, error_code, error_message, started_at, finished_at,
                created_at, updated_at, created_by, updated_by
         FROM manga_creative_step
@@ -46,6 +54,7 @@
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
                input_json, base_project_revision, approval_result_json, generation_result_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
+               delegation_plan_id, node_key, delegation_depth, delegation_round, result_json, continuation_json, reserved_epoch,
                output_json, error_code, error_message, started_at, finished_at,
                created_at, updated_at, created_by, updated_by
         FROM manga_creative_step
@@ -57,6 +66,7 @@
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
                input_json, base_project_revision, approval_result_json, generation_result_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
+               delegation_plan_id, node_key, delegation_depth, delegation_round, result_json, continuation_json, reserved_epoch,
                output_json, error_code, error_message, started_at, finished_at,
                created_at, updated_at, created_by, updated_by
         FROM manga_creative_step
@@ -69,6 +79,7 @@
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,
                input_json, base_project_revision, approval_result_json, generation_result_json, blueprint_snapshot_json, blueprint_fingerprint, state_session_id,
+               delegation_plan_id, node_key, delegation_depth, delegation_round, result_json, continuation_json, reserved_epoch,
                output_json, error_code, error_message, started_at, finished_at,
                created_at, updated_at, created_by, updated_by
         FROM manga_creative_step

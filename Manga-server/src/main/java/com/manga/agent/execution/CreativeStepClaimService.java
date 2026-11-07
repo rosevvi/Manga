@@ -1,6 +1,9 @@
 package com.manga.agent.execution;
 
 import com.manga.agent.application.CreativeEventService;
+import com.manga.agent.collaboration.CreativeRunBudgetService;
+import com.manga.agent.blueprint.AgentBlueprintCodec;
+import com.manga.repository.CreativeGraphRepository;
 import com.manga.agent.config.CreativeExecutionProperties;
 import com.manga.agent.domain.CreativeEventType;
 import com.manga.agent.domain.CreativeRunStatus;
@@ -32,6 +35,9 @@ public class CreativeStepClaimService {
     private final CreativeEventService eventService;
     private final CreativeRuntimeInstanceIdentity instanceIdentity;
     private final CreativeExecutionProperties properties;
+    private final CreativeRunBudgetService budgets;
+    private final CreativeGraphRepository graph;
+    private final AgentBlueprintCodec blueprintCodec;
 
     /**
      * 仅当 Step 仍为相同 scheduleVersion 的 READY 状态时取得执行权。owner epoch 的递增与
@@ -48,6 +54,16 @@ public class CreativeStepClaimService {
                 || run.getStatus() == CreativeRunStatus.CANCEL_REQUESTED) {
             return Optional.empty();
         }
+        var budget = budgets.initialize(run.getRunId());
+        var runSteps = stepRepository.findByRunId(run.getRunId());
+        long running = runSteps.stream().filter(value -> value.getStatus() == CreativeStepStatus.RUNNING
+                || value.getStatus() == CreativeStepStatus.CANCEL_REQUESTED).count();
+        if (running >= budget.getMaxParallel()) return Optional.empty();
+        boolean blocked = graph.dependencies(run.getRunId()).stream()
+                .filter(edge -> edge.getDownstreamStepId().equals(stepId))
+                .anyMatch(edge -> runSteps.stream().noneMatch(value -> value.getStepId().equals(edge.getUpstreamStepId())
+                        && value.getStatus() == CreativeStepStatus.COMPLETED));
+        if (blocked) return Optional.empty();
         String owner = instanceIdentity.value();
         String actor = SystemActor.STEP_EXECUTION.code();
         boolean claimed = stepRepository.claimReady(stepId, scheduleVersion, owner,
@@ -97,7 +113,8 @@ public class CreativeStepClaimService {
                 run.getProjectId(),
                 run.getConversationId(),
                 run.getDeadlineAt(),
-                run.getPermissionPolicy(),
+                Objects.isNull(step.getParentStepId()) ? run.getPermissionPolicy()
+                        : blueprintCodec.deserialize(step.getBlueprintSnapshotJson()).permissionPolicy(),
                 step.getBlueprintSnapshotJson(),
                 step.getBlueprintFingerprint(),
                 step.getStateSessionId());

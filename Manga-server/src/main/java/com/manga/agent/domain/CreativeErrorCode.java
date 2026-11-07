@@ -42,7 +42,11 @@ public enum CreativeErrorCode {
     /** Agent 事件入口超过有界容量，执行已主动停止。 */
     EVENT_BACKPRESSURE_OVERFLOW,
     /** 未归类的内部执行错误。 */
-    INTERNAL_ERROR;
+    INTERNAL_ERROR,
+    /** Run 冻结的步骤、修订或模型执行预算耗尽。 */ BUDGET_EXCEEDED,
+    /** ALL_SUCCESS 依赖链中存在失败节点。 */ DEPENDENCY_FAILED,
+    /** Worker 未提交合法结构化结果。 */ STEP_RESULT_REQUIRED,
+    /** 连贯性评审未通过，禁止提交最终提案。 */ REVIEW_REQUIRED;
 
     /** 返回用于数据库和 API 的稳定机器编码。 */
     public String code() {

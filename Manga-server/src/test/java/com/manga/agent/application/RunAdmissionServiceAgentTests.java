@@ -6,6 +6,7 @@ import com.manga.agent.blueprint.AgentBlueprintCompiler;
 import com.manga.agent.blueprint.AgentKernelKey;
 import com.manga.agent.blueprint.CompiledAgentBlueprint;
 import com.manga.agent.config.CreativeRuntimeProperties;
+import com.manga.agent.collaboration.CreativeRunBudgetService;
 import com.manga.agent.domain.AgentPermissionPolicy;
 import com.manga.agent.domain.CreativeOperationType;
 import com.manga.agent.domain.CreativeResourceReference;
@@ -85,7 +86,8 @@ class RunAdmissionServiceAgentTests {
                 scriptRepository,
                 objectMapper,
                 memory,
-                mock(AgentStateSessionService.class), mock(ProjectRevisionService.class), mock(StoryboardShotRepository.class));
+                mock(AgentStateSessionService.class), mock(ProjectRevisionService.class), mock(StoryboardShotRepository.class),
+                mock(CreativeRunBudgetService.class));
         StartCreativeRunCommand command = StartCreativeRunCommand.manual(
                 11L,
                 "request-1",

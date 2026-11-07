@@ -1,6 +1,7 @@
 package com.manga.agent.changeset;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.manga.agent.collaboration.CreativeReviewGate;
 import com.manga.agent.capability.AgentRuntimeContext;
 import com.manga.agent.domain.AgentPermissionPolicy;
 import com.manga.agent.domain.CreativeActor;
@@ -50,6 +51,7 @@ public class ChangeSetProposalService {
     private final ChangeSetCodec codec;
     private final ImageGenerationQuoteService generationQuotes;
     private final StoryboardShotRepository shots;
+    private final CreativeReviewGate reviewGate;
 
     /** 围栏校验、目标归属和 Schema 校验后保存单步骤唯一草稿；重试只返回原草稿。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -58,6 +60,7 @@ public class ChangeSetProposalService {
         CreativeRun run = runs.lockByRunId(context.runId());
         CreativeStep step = steps.findByStepId(context.stepId()).orElse(null);
         requireOwner(run, step, context);
+        reviewGate.requireCandidate(step, kind, input);
         CreativeChangeSet existing = proposals.findByStep(context.stepId()).orElse(null);
         if (Objects.nonNull(existing)) {
             if (existing.getStatus() != ChangeSetStatus.DRAFT) {

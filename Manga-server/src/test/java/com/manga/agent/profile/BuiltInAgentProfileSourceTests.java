@@ -2,6 +2,7 @@ package com.manga.agent.profile;
 
 import com.manga.agent.capability.CapabilityName;
 import com.manga.agent.config.CreativeAgentProperties;
+import com.manga.agent.collaboration.CollaborationProperties;
 import com.manga.agent.domain.AgentPermissionPolicy;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.DefaultResourceLoader;
@@ -25,7 +26,7 @@ class BuiltInAgentProfileSourceTests {
                 SCRIPT_PARSER_PROMPT_RESOURCE, 2, 13,
                 32768);
         BuiltInAgentProfileSource source = new BuiltInAgentProfileSource(
-                properties, new DefaultResourceLoader());
+                properties, new DefaultResourceLoader(), new CollaborationProperties(32, 3, 3, 2, 24, 256, 8, 24000, 1, 8));
 
         AgentProfile profile = source.require(AgentProfileKey.MANGA_DIRECTOR);
 
@@ -44,7 +45,7 @@ class BuiltInAgentProfileSourceTests {
                 SCRIPT_PARSER_PROMPT_RESOURCE, 2, 13,
                 32768);
         BuiltInAgentProfileSource source = new BuiltInAgentProfileSource(
-                properties, new DefaultResourceLoader());
+                properties, new DefaultResourceLoader(), new CollaborationProperties(32, 3, 3, 2, 24, 256, 8, 24000, 1, 8));
 
         AgentProfile profile = source.require(AgentProfileKey.SCRIPT_PARSER);
 

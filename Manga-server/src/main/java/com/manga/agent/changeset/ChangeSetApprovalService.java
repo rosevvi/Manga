@@ -108,7 +108,7 @@ public class ChangeSetApprovalService {
         run.setStatus(CreativeRunStatus.WAITING);
         run.setLeaseUntil(null);
         runs.update(run);
-        sessions.retire(run, false);
+        sessions.retireSession(claim.stateSessionId());
         events.append(run.getRunId(), claim.stepId(), CreativeEventType.CHANGESET_PROPOSED,
                 CreativeEventSources.RUNTIME, proposal.getChangeSetId(), new ProposalEvent(proposal.getChangeSetId(), proposal.getKind()));
         events.append(run.getRunId(), claim.stepId(), CreativeEventType.APPROVAL_REQUIRED,

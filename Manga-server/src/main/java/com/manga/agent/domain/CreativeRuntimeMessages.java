@@ -169,6 +169,9 @@ public final class CreativeRuntimeMessages {
     /** 剧本目标不存在或与当前授权项目不一致时的拒绝消息。 */
     public static final String AGENT_OPERATION_SCRIPT_TARGET_INVALID = "剧本解析目标不存在或不属于当前项目";
 
+    /** 执行租约持续过期，已经耗尽允许的重试次数。 */
+    public static final String STEP_LEASE_RETRIES_EXHAUSTED = "步骤执行租约过期且已耗尽重试次数";
+
     // 持久化与 API 枚举编码解析。
     /** 无法恢复 Run 状态；参数为未知状态编码。 */
     public static final String UNKNOWN_RUN_STATUS_TEMPLATE = "未知创作 Run 状态编码：%s";

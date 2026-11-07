@@ -20,11 +20,11 @@ public class CreativeStepDispatcher {
     private final CreativeStepLifecycleService lifecycleService;
     private final Executor taskExecutor;
 
-    /** 注入 Step 生命周期组件和 Manga 通用受控线程池。 */
+    /** 注入 Step 生命周期组件和拒绝后可补投的创作专用线程池。 */
     public CreativeStepDispatcher(CreativeStepClaimService claimService,
             CreativeStepExecutorRegistry executorRegistry,
             CreativeStepLifecycleService lifecycleService,
-            @Qualifier(AsyncConstants.MANGA_COMMON_TASK_EXECUTOR) Executor taskExecutor) {
+            @Qualifier(AsyncConstants.MANGA_CREATIVE_TASK_EXECUTOR) Executor taskExecutor) {
         this.claimService = claimService;
         this.executorRegistry = executorRegistry;
         this.lifecycleService = lifecycleService;

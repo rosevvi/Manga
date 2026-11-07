@@ -7,6 +7,7 @@ import com.manga.agent.harness.AgentRuntimeException;
 import com.manga.entity.AgentStateSession;
 import com.manga.entity.CreativeRun;
 import com.manga.repository.AgentStateSessionRepository;
+import com.manga.mapper.CreativeGraphMapper;
 import com.manga.repository.CreativeConversationRepository;
 import com.manga.repository.MangaAgentStateRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class AgentStateSessionService {
     private final AgentStateSessionRepository sessions;
     private final CreativeConversationRepository conversations;
     private final MangaAgentStateRepository states;
+    private final CreativeGraphMapper graph;
 
     /** 在受理事务中登记状态写入权，generation 由可信会话记录提供。 */
     @Transactional
@@ -42,6 +44,12 @@ public class AgentStateSessionService {
                 || !session.getExpiresAt().isAfter(LocalDateTime.now())) {
             throw new AgentRuntimeException(CreativeErrorCode.OWNER_LEASE_LOST, CreativeMemoryConstants.SESSION_RETIRED);
         }
+    }
+
+    /** 仅撤销一个 Step 的旧会话，暂停不影响同 Run 的其他 Worker。 */
+    @Transactional
+    public void retireSession(String sessionId) {
+        if (Objects.nonNull(sessionId)) graph.retireSession(sessionId, SystemActor.CREATIVE_RUNTIME.code());
     }
 
     /** 完成后撤销写入；失败或首次取消立即推进会话代次，重复通知保持幂等。 */

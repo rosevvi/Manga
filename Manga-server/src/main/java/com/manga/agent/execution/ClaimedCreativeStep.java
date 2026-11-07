@@ -29,7 +29,7 @@ public record ClaimedCreativeStep(
         String conversationId,
         /** Run 允许执行的最晚时间。 */
         LocalDateTime deadlineAt,
-        /** Run 冻结的最高 Agent 权限。 */
+        /** 当前 Step 的有效权限；Worker 从父 Run 权限继续收窄为只读。 */
         AgentPermissionPolicy permissionPolicy,
         /** 创建 Step 时冻结的 Blueprint JSON。 */
         String blueprintSnapshotJson,

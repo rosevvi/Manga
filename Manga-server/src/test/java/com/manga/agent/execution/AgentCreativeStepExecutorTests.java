@@ -8,6 +8,11 @@ import com.manga.agent.capability.AgentRuntimeContext;
 import com.manga.agent.changeset.ChangeSetApprovalService;
 import com.manga.agent.changeset.ChangeSetConstants;
 import com.manga.agent.config.CreativeExecutionProperties;
+import com.manga.agent.collaboration.CreativeDelegationService;
+import com.manga.agent.collaboration.CreativeGraphService;
+import com.manga.agent.collaboration.CreativeStepResultService;
+import com.manga.agent.collaboration.CreativeRunBudgetService;
+import com.manga.agent.collaboration.CreativeReviewGate;
 import com.manga.agent.domain.AgentPermissionPolicy;
 import com.manga.agent.domain.CreativeOperationType;
 import com.manga.agent.domain.CreativeResourceReference;
@@ -57,6 +62,8 @@ class AgentCreativeStepExecutorTests {
         MangaAgentInvoker invoker = mock(MangaAgentInvoker.class);
         ChangeSetApprovalService approvals = mock(ChangeSetApprovalService.class);
         when(approvals.instruction(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
+        CreativeGraphService graph = mock(CreativeGraphService.class);
+        when(graph.instruction(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
         CreativeStepLifecycleService lifecycleService = mock(CreativeStepLifecycleService.class);
         TaskScheduler scheduler = mock(TaskScheduler.class);
         @SuppressWarnings("rawtypes")
@@ -87,7 +94,8 @@ class AgentCreativeStepExecutorTests {
                 lifecycleService,
                 properties(),
                 scheduler,
-                objectMapper, approvals);
+                objectMapper, approvals, mock(CreativeDelegationService.class), graph,
+                mock(CreativeStepResultService.class), mock(CreativeRunBudgetService.class), mock(CreativeReviewGate.class));
 
         executor.execute(claimed);
 

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.CreativeGraphMapper">
+    <select id="plans" resultType="com.manga.entity.CreativeDelegation">
+        SELECT id, plan_id, run_id, parent_step_id, trigger_tool_call_id, owner_epoch, round_no,
+               title, status, frozen_json, request_fingerprint, join_step_id,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_delegation WHERE run_id = #{runId} ORDER BY id
+    </select>
+    <select id="dependencies" resultType="com.manga.entity.CreativeStepDependency">
+        SELECT id, run_id, upstream_step_id, downstream_step_id, join_policy,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_step_dependency WHERE run_id = #{runId} ORDER BY id
+    </select>
+    <select id="budget" resultType="com.manga.entity.CreativeRunBudget">
+        SELECT id, run_id, max_steps, max_depth, max_parallel, max_repair_rounds,
+               max_invocations, max_reserved_turns, used_invocations, reserved_turns,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_creative_run_budget WHERE run_id = #{runId}
+    </select>
+    <select id="pendingRuns" resultType="java.lang.String">
+        SELECT DISTINCT run_id FROM manga_creative_delegation
+        WHERE status IN ('DRAFT', 'MATERIALIZED') ORDER BY run_id LIMIT #{limit}
+    </select>
+    <update id="transition">
+        UPDATE manga_creative_step
+        SET status = #{to}, owner_instance_id = NULL, lease_until = NULL, owner_epoch = owner_epoch + 1,
+            schedule_version = schedule_version + CASE WHEN #{to} = 'READY' THEN 1 ELSE 0 END,
+            max_attempts = CASE WHEN #{to} = 'READY' THEN attempt_no + #{retryAttempts} ELSE max_attempts END,
+            state_session_id = COALESCE(#{sessionId}, state_session_id),
+            continuation_json = COALESCE(#{continuation}, continuation_json),
+            output_json = COALESCE(#{output}, output_json),
+            error_code = COALESCE(#{errorCode}, error_code), error_message = COALESCE(#{errorMessage}, error_message),
+            finished_at = CASE WHEN #{to} IN ('COMPLETED', 'FAILED', 'SKIPPED', 'CANCELLED') THEN CURRENT_TIMESTAMP ELSE finished_at END,
+            updated_at = CURRENT_TIMESTAMP, updated_by = #{actor}
+        WHERE step_id = #{stepId} AND status = #{from}
+    </update>
+    <update id="retireSession">
+        UPDATE manga_agent_session SET status = 'RETIRED', updated_at = CURRENT_TIMESTAMP, updated_by = #{actor}
+        WHERE state_session_id = #{sessionId} AND status = 'ACTIVE'
+    </update>
+    <update id="replaceSession">
+        UPDATE manga_creative_step SET state_session_id = #{sessionId}, updated_at = CURRENT_TIMESTAMP, updated_by = #{actor}
+        WHERE step_id = #{stepId} AND status = 'READY'
+    </update>
+</mapper>

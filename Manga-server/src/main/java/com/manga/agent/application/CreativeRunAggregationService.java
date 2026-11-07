@@ -35,13 +35,21 @@ public class CreativeRunAggregationService {
     @Transactional
     public void aggregate(String runId) {
         CreativeRun run = runRepository.lockByRunId(runId);
-        if (Objects.isNull(run) || run.getStatus().isTerminal() || stepRepository.countNonTerminal(runId) > 0) {
+        if (Objects.isNull(run) || run.getStatus().isTerminal()) return;
+        if (stepRepository.countNonTerminal(runId) > 0) {
+            if (run.getStatus() == CreativeRunStatus.CANCEL_REQUESTED || run.getStatus() == CreativeRunStatus.QUEUED) return;
+            boolean executable = stepRepository.findByRunId(runId).stream().anyMatch(step ->
+                    step.getStatus() == CreativeStepStatus.RUNNING || step.getStatus() == CreativeStepStatus.READY
+                    || step.getStatus() == CreativeStepStatus.CANCEL_REQUESTED);
+            CreativeRunStatus status = executable ? CreativeRunStatus.ACTIVE : CreativeRunStatus.WAITING;
+            if (run.getStatus() != status) {
+                run.setStatus(status); run.setUpdatedBy(SystemActor.CREATIVE_RUNTIME.code()); runRepository.update(run);
+            }
             return;
         }
         CreativeRunStatus terminalStatus;
         CreativeEventType terminalEvent;
-        if (run.getStatus() == CreativeRunStatus.CANCEL_REQUESTED
-                || stepRepository.countCancelled(runId) > 0) {
+        if (run.getStatus() == CreativeRunStatus.CANCEL_REQUESTED) {
             terminalStatus = CreativeRunStatus.CANCELLED;
             terminalEvent = CreativeEventType.RUN_CANCELLED;
         } else if (stepRepository.countFailed(runId) > 0) {
@@ -51,6 +59,9 @@ public class CreativeRunAggregationService {
                     .filter(step -> step.getStatus() == CreativeStepStatus.FAILED).findFirst().orElse(null);
             run.setErrorCode(Objects.isNull(failed) ? CreativeErrorCode.CAPABILITY_EXECUTION_FAILED.code() : failed.getErrorCode());
             run.setErrorMessage(Objects.isNull(failed) ? CreativeRuntimeMessages.AGENT_STEP_EXECUTION_FAILED : failed.getErrorMessage());
+        } else if (stepRepository.countCancelled(runId) > 0) {
+            terminalStatus = CreativeRunStatus.CANCELLED;
+            terminalEvent = CreativeEventType.RUN_CANCELLED;
         } else {
             terminalStatus = CreativeRunStatus.COMPLETED;
             terminalEvent = CreativeEventType.RUN_COMPLETED;

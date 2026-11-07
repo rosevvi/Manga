@@ -3,6 +3,7 @@ package com.manga.agent.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.api.CreativeRuntimeResponseCode;
+import com.manga.agent.collaboration.CreativeRunBudgetService;
 import com.manga.agent.blueprint.AgentBlueprintCompileRequest;
 import com.manga.agent.blueprint.AgentBlueprintCompiler;
 import com.manga.agent.blueprint.CompiledAgentBlueprint;
@@ -89,6 +90,7 @@ public class RunAdmissionService {
     private final AgentStateSessionService stateSessions;
     private final ProjectRevisionService revisions;
     private final StoryboardShotRepository shots;
+    private final CreativeRunBudgetService budgets;
 
     /**
      * 幂等受理会话或手动创作请求。新请求会原子创建 Run、READY 根 Step 和 Dispatch Outbox，
@@ -119,6 +121,7 @@ public class RunAdmissionService {
         } catch (DuplicateKeyException exception) {
             throw new BusinessException(CreativeRuntimeResponseCode.ACTIVE_RUN_CONFLICT, HttpStatus.CONFLICT);
         }
+        budgets.initialize(run.getRunId());
         CreativeStep rootStep = createRootStep(command, run, agentStep, executionInstruction);
         stepRepository.create(rootStep);
         if (Objects.nonNull(agentStep)) {
@@ -159,6 +162,7 @@ public class RunAdmissionService {
                         ? CreativeStepType.ROOT_WORKFLOW
                         : CreativeStepType.AGENT_INVOCATION)
                 .status(CreativeStepStatus.READY)
+                .delegationDepth(0).delegationRound(0).reservedEpoch(-1L)
                 .scheduleVersion(1L)
                 .ownerEpoch(0L)
                 .attemptNo(0)
@@ -232,7 +236,13 @@ public class RunAdmissionService {
 
     /** 注册事务提交回调，避免执行器读取到尚未提交的 Step。 */
     private void dispatchAfterCommit(CreativeStep step) {
-        Runnable dispatch = () -> stepDispatcher.dispatchAsync(step.getStepId(), step.getScheduleVersion());
+        Runnable dispatch = () -> {
+            try { stepDispatcher.dispatchAsync(step.getStepId(), step.getScheduleVersion()); }
+            catch (RuntimeException failure) {
+                // 受理事实已经提交；线程池饱和不能把已创建的 Run 变成 HTTP 失败。
+                log.warn("Creative root dispatch deferred to outbox runId={} stepId={}", step.getRunId(), step.getStepId(), failure);
+            }
+        };
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override

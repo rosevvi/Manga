@@ -1,6 +1,8 @@
 package com.manga.agent.execution;
 
 import com.manga.agent.config.CreativeExecutionProperties;
+import com.manga.agent.collaboration.CreativeGraphService;
+import com.manga.repository.CreativeGraphRepository;
 import com.manga.agent.config.CreativeSchedulingConstants;
 import com.manga.entity.CreativeStep;
 import com.manga.repository.CreativeStepRepository;
@@ -23,6 +25,8 @@ public class CreativeReconciliationScheduler {
     private final CreativeStepRecoveryService recoveryService;
     private final CreativeStepDispatcher stepDispatcher;
     private final CreativeExecutionProperties properties;
+    private final CreativeGraphRepository graph;
+    private final CreativeGraphService graphService;
 
     /** 扫描有限批次异常状态并补发调度信号。 */
     @Scheduled(fixedDelayString = CreativeSchedulingConstants.RECONCILIATION_INTERVAL)
@@ -31,6 +35,10 @@ public class CreativeReconciliationScheduler {
         for (CreativeStep step : stepRepository.findExpired(now, properties.batchSize())) {
             recoveryService.recover(step, now)
                     .ifPresent(signal -> stepDispatcher.dispatchAsync(signal.stepId(), signal.scheduleVersion()));
+        }
+        for (String runId : graph.pendingRuns(properties.batchSize())) {
+            try { graphService.reconcile(runId); }
+            catch (RuntimeException failure) { log.warn("Creative graph reconciliation deferred runId={}", runId, failure); }
         }
         for (CreativeStep step : stepRepository.findReady(properties.batchSize())) {
             stepDispatcher.dispatchAsync(step.getStepId(), step.getScheduleVersion());

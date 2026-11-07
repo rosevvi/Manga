@@ -6,6 +6,7 @@ import com.manga.agent.domain.CreativeRuntimeMessages;
 
 import java.util.Arrays;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 定义可进入 Agent Blueprint 白名单的稳定能力标识。
@@ -25,7 +26,10 @@ public enum CapabilityName {
     /** 保存批量分镜草稿提案，业务写入必须等待审批。 */
     PROPOSE_STORYBOARD_CHANGE("propose_storyboard_change"),
     /** 提交镜头图片提案，真实计费提交必须等待用户批准。 */
-    PROPOSE_IMAGE_GENERATION("propose_image_generation");
+    PROPOSE_IMAGE_GENERATION("propose_image_generation"),
+    /** 持久化委派计划并暂停 Director。 */ DELEGATE_CREATIVE_PLAN("delegate_creative_plan"),
+    /** Worker 提交经过 schema 校验的不可变结果。 */ SUBMIT_CREATIVE_STEP_RESULT("submit_creative_step_result"),
+    /** 读取授权范围内已完成的协作结果。 */ READ_DELEGATED_RESULT("read_delegated_result");
 
     /** AgentScope 工具和快照使用的稳定名称。 */
     private final String code;
@@ -57,7 +61,10 @@ public enum CapabilityName {
     }
 
     /** Director 的完整工具上限，实际 Blueprint 再按请求权限缩小。 */
-    public static Set<CapabilityName> directorCapabilities() { return Set.of(values()); }
+    public static Set<CapabilityName> directorCapabilities() {
+        return Arrays.stream(values()).filter(name -> name != SUBMIT_CREATIVE_STEP_RESULT)
+                .collect(Collectors.toUnmodifiableSet());
+    }
 
     /** 返回剧本解析 Agent 所需的最小只读能力集合。 */
     public static Set<CapabilityName> scriptParserCapabilities() {

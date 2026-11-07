@@ -3,6 +3,7 @@ import { cancelCreativeRun, createManualRun, getCreativeRun } from '../api/creat
 import { APPROVAL_POLL_MS, CHANGE_SET_KIND, CREATIVE_TERMINAL_STATUSES } from '../constants/changeSet'
 import CreativeChangeSetPanel from './CreativeChangeSetPanel'
 import GenerationJobsPanel from './GenerationJobsPanel'
+import CreativeRunGraph from './CreativeRunGraph'
 import { regenerationInstruction } from './changeSetPreview'
 import { CREATIVE_OPERATION, CREATIVE_PERMISSION, CREATIVE_RESOURCE } from '../constants/creative'
 
@@ -56,7 +57,8 @@ export default function ManualCreativeTaskPanel({ accessToken, projectId, runId,
   }
 
   return <section className="script-analysis-panel">
-    <h3>AI 创作任务 · {run?.status === 'WAITING' ? '等待审批或外部作业' : run?.status || '正在加载'}</h3>
+    <h3>AI 创作任务 · {run?.status === 'WAITING' ? '等待协作、审批或外部作业' : run?.status || '正在加载'}</h3>
+    <CreativeRunGraph accessToken={accessToken} runId={runId} />
     {run && !CREATIVE_TERMINAL_STATUSES.has(run.status) && <button type="button" disabled={busy} onClick={cancel}>停止任务</button>}
     <CreativeChangeSetPanel accessToken={accessToken} runId={runId} onDecided={onApplied}
       onRegenerate={CREATIVE_TERMINAL_STATUSES.has(run?.status) && !busy ? regenerate : undefined} />

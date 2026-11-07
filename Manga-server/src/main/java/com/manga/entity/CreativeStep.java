@@ -61,6 +61,20 @@ public class CreativeStep {
     private String blueprintFingerprint;
     /** AgentScope 状态恢复使用的会话标识。 */
     private String stateSessionId;
+    /** 所属委派计划，根步骤为空。 */
+    private String delegationPlanId;
+    /** 计划内节点名。 */
+    private String nodeKey;
+    /** 委派树深度，根为零。 */
+    private Integer delegationDepth;
+    /** 已物化的委派轮数。 */
+    private Integer delegationRound;
+    /** 经过校验的不可变 Worker 结果。 */
+    private String resultJson;
+    /** 汇合后给父步骤的摘要和结果引用。 */
+    private String continuationJson;
+    /** 已预留模型预算的最近执行代次。 */
+    private Long reservedEpoch;
     /** 成功时固化的输出 JSON。 */
     private String outputJson;
     /** 失败错误机器编码。 */

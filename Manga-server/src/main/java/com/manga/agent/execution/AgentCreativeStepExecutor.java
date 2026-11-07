@@ -1,6 +1,12 @@
 package com.manga.agent.execution;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.manga.agent.collaboration.CreativeDelegationService;
+import com.manga.agent.collaboration.CreativeGraphService;
+import com.manga.agent.collaboration.CreativeStepResultService;
+import com.manga.agent.collaboration.CreativeRunBudgetService;
+import com.manga.agent.collaboration.CreativeReviewGate;
+import com.manga.agent.collaboration.CollaborationMessages;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.blueprint.AgentBlueprint;
 import com.manga.agent.blueprint.AgentBlueprintCodec;
@@ -44,6 +50,11 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
     private final TaskScheduler taskScheduler;
     private final ObjectMapper objectMapper;
     private final ChangeSetApprovalService approvals;
+    private final CreativeDelegationService delegation;
+    private final CreativeGraphService graph;
+    private final CreativeStepResultService results;
+    private final CreativeRunBudgetService budgets;
+    private final CreativeReviewGate reviewGate;
 
     public AgentCreativeStepExecutor(
             AgentBlueprintCodec blueprintCodec,
@@ -52,7 +63,9 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
             CreativeExecutionProperties executionProperties,
             @Qualifier(AsyncConstants.MANGA_COMMON_TASK_SCHEDULER) TaskScheduler taskScheduler,
             ObjectMapper objectMapper,
-            ChangeSetApprovalService approvals) {
+            ChangeSetApprovalService approvals,
+            CreativeDelegationService delegation, CreativeGraphService graph, CreativeStepResultService results,
+            CreativeRunBudgetService budgets, CreativeReviewGate reviewGate) {
         this.blueprintCodec = blueprintCodec;
         this.agentInvoker = agentInvoker;
         this.lifecycleService = lifecycleService;
@@ -60,6 +73,11 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
         this.taskScheduler = taskScheduler;
         this.objectMapper = objectMapper;
         this.approvals = approvals;
+        this.delegation = delegation;
+        this.graph = graph;
+        this.results = results;
+        this.budgets = budgets;
+        this.reviewGate = reviewGate;
     }
 
     /** 返回持久化 Agent 调用步骤类型。 */
@@ -74,7 +92,12 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
         AgentBlueprint blueprint = restoreBlueprint(step);
         // 上次执行可能在草稿落库后进程退出；此时直接开放审批，不再次调用模型。
         if (approvals.hasDraft(step.stepId()) && approvals.suspendIfProposed(step)) return;
+        if (delegation.hasDraft(step.runId(), step.stepId()) && graph.suspendIfDelegated(step)) return;
+        String submitted = results.submitted(step.stepId());
+        if (Objects.nonNull(submitted)) { lifecycleService.complete(step, submitted); return; }
+        boolean worker = results.isWorker(step);
         CreativeStepInput input = readInput(step.inputJson());
+        budgets.reserve(step, blueprint);
         AgentRuntimeContext context = runtimeContext(step);
         StringBuilder content = new StringBuilder();
         try (CreativeStepLeaseHeartbeat heartbeat = new CreativeStepLeaseHeartbeat(
@@ -82,17 +105,26 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
             String instruction = input.instruction();
             if (Objects.nonNull(input.target())) instruction += ChangeSetConstants.TARGET_TEMPLATE
                     .formatted(input.target().resourceType(), input.target().resourceId());
-            agentInvoker.invokeUntil(blueprint, context, approvals.instruction(step, instruction),
-                            event -> event instanceof ToolResultEndEvent && approvals.hasDraft(step.stepId()))
+            agentInvoker.invokeUntil(blueprint, context, graph.instruction(step, approvals.instruction(step, instruction)),
+                            event -> event instanceof ToolResultEndEvent && (approvals.hasDraft(step.stepId())
+                                    || delegation.hasDraft(step.runId(), step.stepId()) || Objects.nonNull(results.submitted(step.stepId()))))
                     .takeUntilOther(heartbeat.lossSignal())
                     .doOnNext(event -> commitEvent(step, event, content))
                     .blockLast();
         }
         if (approvals.suspendIfProposed(step)) return;
+        if (graph.suspendIfDelegated(step)) return;
         if (!lifecycleService.canContinue(step)) {
             lifecycleService.acknowledgeCancellation(step);
             return;
         }
+        if (worker) {
+            String result = results.submitted(step.stepId());
+            if (Objects.isNull(result)) throw new AgentRuntimeException(CreativeErrorCode.STEP_RESULT_REQUIRED, CollaborationMessages.RESULT_REQUIRED);
+            lifecycleService.complete(step, result);
+            return;
+        }
+        reviewGate.requirePassedStep(step.stepId());
         approvals.requireGenerationResult(step, input.operationType());
         lifecycleService.complete(step, write(new AgentStepResult(content.toString())));
     }

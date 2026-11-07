@@ -6,6 +6,7 @@ import { CREATIVE_MESSAGE_ROLE, CREATIVE_MESSAGE_STATUS, CREATIVE_TOOL_LABEL, CR
 import './manga-assistant.css'
 import CreativeChangeSetPanel from './CreativeChangeSetPanel'
 import GenerationJobsPanel from './GenerationJobsPanel'
+import CreativeRunGraph from './CreativeRunGraph'
 import { regenerationInstruction } from './changeSetPreview'
 
 /** 网络重连间隔，单位：毫秒。 */
@@ -279,6 +280,7 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
               {message.role === CREATIVE_MESSAGE_ROLE.ASSISTANT && message.status === CREATIVE_MESSAGE_STATUS.CANCELLED && <small>本轮已停止。</small>}
             </article>)}
           {error && <small>{error}</small>}
+          {conversationId && <CreativeRunGraph accessToken={accessToken} runId={activeRun?.runId || messages.at(-1)?.runId} />}
           {conversationId && <CreativeChangeSetPanel accessToken={accessToken} conversationId={conversationId}
             onDecided={() => refreshHistory(conversationId)}
             onRegenerate={(proposal) => setInstruction(regenerationInstruction(proposal))} />}

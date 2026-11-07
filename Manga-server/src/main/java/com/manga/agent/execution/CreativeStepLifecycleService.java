@@ -1,6 +1,9 @@
 package com.manga.agent.execution;
 
 import com.manga.agent.application.CreativeEventService;
+import com.manga.agent.collaboration.CreativeStepSettled;
+import com.manga.agent.state.AgentStateSessionService;
+import org.springframework.context.ApplicationEventPublisher;
 import com.manga.agent.application.CreativeRunAggregationService;
 import com.manga.agent.config.CreativeExecutionProperties;
 import com.manga.agent.domain.CreativeErrorCode;
@@ -36,6 +39,8 @@ public class CreativeStepLifecycleService {
     private final CreativeEventService eventService;
     private final CreativeRunAggregationService aggregationService;
     private final CreativeExecutionProperties properties;
+    private final AgentStateSessionService sessions;
+    private final ApplicationEventPublisher publisher;
 
     /** 判断当前执行器是否仍持有有效运行权；取消或租约过期时返回 false。 */
     @Transactional(readOnly = true)
@@ -95,6 +100,9 @@ public class CreativeStepLifecycleService {
         if (!renewLease(claimed)) {
             return false;
         }
+        // Worker 的内部文本和工具噪声不投影到用户对话；结果通过步骤树提供。
+        CreativeStep current = stepRepository.findByStepId(claimed.stepId()).orElseThrow();
+        if (Objects.nonNull(current.getParentStepId())) return true;
         eventService.append(claimed.runId(), claimed.stepId(), eventType,
                 CreativeEventSources.AGENT_SCOPE, null, payload);
         return true;
@@ -113,6 +121,8 @@ public class CreativeStepLifecycleService {
         eventService.append(claimed.runId(), claimed.stepId(), CreativeEventType.STEP_COMPLETED,
                 CreativeEventSources.RUNTIME, null,
                 new StepCompletedEventPayload(claimed.stepId(), claimed.ownerEpoch()));
+        sessions.retireSession(claimed.stateSessionId());
+        publisher.publishEvent(new CreativeStepSettled(claimed.runId()));
         aggregationService.aggregate(claimed.runId());
         return true;
     }
@@ -139,6 +149,8 @@ public class CreativeStepLifecycleService {
         }
         eventService.append(claimed.runId(), claimed.stepId(), CreativeEventType.STEP_FAILED,
                 CreativeEventSources.RUNTIME, null, null);
+        sessions.retireSession(claimed.stateSessionId());
+        publisher.publishEvent(new CreativeStepSettled(claimed.runId()));
         aggregationService.aggregate(claimed.runId());
     }
 
@@ -149,6 +161,8 @@ public class CreativeStepLifecycleService {
         boolean cancelled = stepRepository.cancelOwned(claimed.stepId(), claimed.ownerInstanceId(),
                 claimed.ownerEpoch(), LocalDateTime.now(), SystemActor.STEP_EXECUTION.code());
         if (cancelled) {
+            sessions.retireSession(claimed.stateSessionId());
+            publisher.publishEvent(new CreativeStepSettled(claimed.runId()));
             aggregationService.aggregate(claimed.runId());
         }
     }

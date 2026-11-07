@@ -2393,6 +2393,8 @@ ADR 与 API/事件契约
 
 ### 阶段 6：内置多 Agent 与 DAG
 
+实现说明、请求链路和验证边界见 [阶段 6：内置多 Agent 与持久化 DAG](manga-phase6-multi-agent-dag.md)。首版采用 ALL_SUCCESS / FAIL_RUN，Worker 只产出候选，最终业务写入仍由 Director 提案并经用户批准。
+
 #### 目标
 
 加入 Director、Script Writer、Storyboard Director 和 Continuity Reviewer 的可恢复协作。

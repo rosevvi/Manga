@@ -234,7 +234,7 @@ manga:
       # Director 的系统提示词资源位置。
       director-prompt-resource: classpath:agent/profiles/manga-director-system.md
       # Director 定义的语义版本；提示词或行为契约变化时递增，并参与 Blueprint 指纹。
-      director-profile-version: 3
+      director-profile-version: 4
       # Director 单次调用允许的最大模型推理轮次，达到限制后失败。
       director-max-turns: 12
       # 只读剧本解析 Agent 的系统提示词资源位置。
@@ -255,6 +255,38 @@ manga:
         kernel-acquire-timeout: ${MANGA_CREATIVE_AGENT_KERNEL_ACQUIRE_TIMEOUT:5s}
         # 应用关闭时等待活跃 KernelHandle 和 HarnessLease 释放的最长时间。
         shutdown-drain-timeout: ${MANGA_CREATIVE_AGENT_SHUTDOWN_DRAIN_TIMEOUT:30s}
+    # 模型步骤的专用有界线程池；饱和时拒绝并由 Outbox 补投，不占用请求线程运行模型。
+    dispatch-pool:
+      # 常驻执行线程数。
+      core-pool-size: 4
+      # 最大执行线程数，需结合 Kernel 容量与模型并发限制调整。
+      max-pool-size: 8
+      # 等待队列容量，单位：个任务。
+      queue-capacity: 128
+      # 关闭时等待执行资源释放的最长时间。
+      await-termination: 30s
+    # 多 Agent 协作；预算在 Run 受理时冻结，Worker 只产出候选内容，业务写入仍须审批。
+    collaboration:
+      # 每个 Run 的步骤总数上限，包含根、Worker 和汇合节点。
+      max-steps: 32
+      # 根深度为零；首版仅允许 Director 委派，不开放 Worker 递归委派。
+      max-depth: 3
+      # 同 Run 同时持有执行租约的步骤数上限，不代表进程线程池容量。
+      max-parallel: 3
+      # 首轮计划之外的修订轮数，耗尽时不再调用模型。
+      max-repair-rounds: 2
+      # 含故障重试的模型执行次数总额。
+      max-invocations: 24
+      # 按每次 Blueprint.maxTurns + 1 保守预留，不是实际 token 或美元计费。
+      max-reserved-turns: 256
+      # 一次委派最多创建的 Worker 数量。
+      max-batch-size: 8
+      # 单份结构化结果的序列化字符上限，候选正文不会完整拼接进父上下文。
+      max-result-characters: 24000
+      # 内置编剧、分镜导演与连续性评审师的提示词语义版本。
+      worker-profile-version: 1
+      # Worker 每次执行允许的最大推理轮次。
+      worker-max-turns: 8
     # 事务提交后立即调度之外的持久化补偿投递。
     dispatch-outbox:
       # 扫描待投递 Dispatch Outbox 的间隔，用于补偿遗漏或失败的调度信号。

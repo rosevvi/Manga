@@ -11,6 +11,9 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumMap;
+import com.manga.agent.collaboration.CollaborationProperties;
+import com.manga.agent.collaboration.CollaborationMessages;
+import com.manga.agent.collaboration.StepResultKind;
 import java.util.Map;
 import java.util.Objects;
 
@@ -23,7 +26,7 @@ public class BuiltInAgentProfileSource implements AgentProfileSource {
     private final Map<AgentProfileKey, AgentProfile> profiles;
 
     /** 加载系统提示词并建立不可变 Profile 索引。 */
-    public BuiltInAgentProfileSource(CreativeAgentProperties properties, ResourceLoader resourceLoader) {
+    public BuiltInAgentProfileSource(CreativeAgentProperties properties, ResourceLoader resourceLoader, CollaborationProperties collaboration) {
         EnumMap<AgentProfileKey, AgentProfile> indexed = new EnumMap<>(AgentProfileKey.class);
         AgentProfile director = new AgentProfile(
                 AgentProfileKey.MANGA_DIRECTOR,
@@ -47,6 +50,9 @@ public class BuiltInAgentProfileSource implements AgentProfileSource {
                 properties.scriptParserMaxTurns()
         );
         register(indexed, scriptParser);
+        registerWorker(indexed, AgentProfileKey.SCRIPT_WRITER, "剧本编剧", StepResultKind.SCRIPT_DRAFT, collaboration);
+        registerWorker(indexed, AgentProfileKey.STORYBOARD_DIRECTOR, "分镜导演", StepResultKind.STORYBOARD_DRAFT, collaboration);
+        registerWorker(indexed, AgentProfileKey.CONTINUITY_REVIEWER, "连续性评审师", StepResultKind.REVIEW, collaboration);
         profiles = Map.copyOf(indexed);
     }
 
@@ -59,6 +65,15 @@ public class BuiltInAgentProfileSource implements AgentProfileSource {
                     CreativeRuntimeMessages.AGENT_PROFILE_NOT_FOUND_TEMPLATE.formatted(key));
         }
         return profile;
+    }
+
+    /** Worker 只读取项目并产出结果，实际工具清单在委派时按父权限继续收窄。 */
+    private void registerWorker(Map<AgentProfileKey, AgentProfile> target, AgentProfileKey key,
+            String name, StepResultKind kind, CollaborationProperties properties) {
+        register(target, new AgentProfile(key, properties.workerProfileVersion(), name, name,
+                CollaborationMessages.WORKER_TEMPLATE.formatted(name, kind),
+                CapabilityName.phaseTwoReadOnlyCapabilities(), AgentPermissionPolicy.READ_ONLY,
+                properties.workerMaxTurns()));
     }
 
     /** 注册 Profile 并拒绝重复机器标识。 */
