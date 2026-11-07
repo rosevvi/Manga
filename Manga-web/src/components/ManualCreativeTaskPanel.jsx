@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { cancelCreativeRun, createManualRun, getCreativeRun } from '../api/creativeRunApi'
 import { APPROVAL_POLL_MS, CHANGE_SET_KIND, CREATIVE_TERMINAL_STATUSES } from '../constants/changeSet'
 import CreativeChangeSetPanel from './CreativeChangeSetPanel'
+import GenerationJobsPanel from './GenerationJobsPanel'
 import { regenerationInstruction } from './changeSetPreview'
 import { CREATIVE_OPERATION, CREATIVE_PERMISSION, CREATIVE_RESOURCE } from '../constants/creative'
 
@@ -33,10 +34,12 @@ export default function ManualCreativeTaskPanel({ accessToken, projectId, runId,
     setBusy(true); setError('')
     try {
       const storyboard = proposal.kind === CHANGE_SET_KIND.STORYBOARD
+      const image = proposal.kind === CHANGE_SET_KIND.IMAGE_GENERATION
       const next = await createManualRun(accessToken, {
         requestId: globalThis.crypto.randomUUID(), projectId, permissionPolicy: CREATIVE_PERMISSION.PROPOSE_CHANGES,
-        operationType: storyboard ? CREATIVE_OPERATION.GENERATE_CHAPTER_STORYBOARD : CREATIVE_OPERATION.GENERATE_SCRIPT_CHAPTER,
-        target: { resourceType: storyboard ? CREATIVE_RESOURCE.CHAPTER : CREATIVE_RESOURCE.PROJECT, resourceId: storyboard ? proposal.chapterId : projectId },
+        operationType: image ? CREATIVE_OPERATION.GENERATE_SHOT_IMAGE : storyboard ? CREATIVE_OPERATION.GENERATE_CHAPTER_STORYBOARD : CREATIVE_OPERATION.GENERATE_SCRIPT_CHAPTER,
+        target: { resourceType: image ? CREATIVE_RESOURCE.STORYBOARD_SHOT : storyboard ? CREATIVE_RESOURCE.CHAPTER : CREATIVE_RESOURCE.PROJECT,
+          resourceId: image ? proposal.proposed.shotId : storyboard ? proposal.chapterId : projectId },
         instruction: regenerationInstruction(proposal),
       })
       if (scope.current === expected) onRunChanged(next.runId)
@@ -53,10 +56,11 @@ export default function ManualCreativeTaskPanel({ accessToken, projectId, runId,
   }
 
   return <section className="script-analysis-panel">
-    <h3>AI 创作任务 · {run?.status === 'WAITING' ? '等待审批' : run?.status || '正在加载'}</h3>
+    <h3>AI 创作任务 · {run?.status === 'WAITING' ? '等待审批或外部作业' : run?.status || '正在加载'}</h3>
     {run && !CREATIVE_TERMINAL_STATUSES.has(run.status) && <button type="button" disabled={busy} onClick={cancel}>停止任务</button>}
     <CreativeChangeSetPanel accessToken={accessToken} runId={runId} onDecided={onApplied}
       onRegenerate={CREATIVE_TERMINAL_STATUSES.has(run?.status) && !busy ? regenerate : undefined} />
+    <GenerationJobsPanel accessToken={accessToken} projectId={projectId} runId={runId} />
     {run?.errorMessage && <p role="alert">{run.errorMessage}</p>}
     {error && <p role="alert">{error}</p>}
   </section>

@@ -153,6 +153,42 @@ manga:
       display-name: Manga Administrator
   # 可恢复创作运行、Agent 执行与调度补偿。
   creative:
+    # 图片生成作业独立于 Agent Harness；配置预计费用后才允许真实付费提案。
+    generation:
+      # 独立媒体 worker 数，范围 1 到 32；不会占满 Agent 通用线程池。
+      worker-threads: 4
+      # 等待队列容量，满时保留数据库作业，交由扫描补偿。
+      worker-queue-capacity: 40
+      # 补偿扫描间隔，正常审批提交会立即唤醒，不等待该扫描。
+      scan-interval: 3s
+      # 每次扫描最多领取数量，范围 1 到 100。
+      batch-size: 20
+      # 每个供应商的在途和 UNKNOWN 作业上限，跨实例共享。
+      provider-concurrency: 4
+      # 同一用户、同一供应商的在途和 UNKNOWN 作业上限。
+      user-concurrency: 2
+      # worker 租约，必须大于 http-timeout 的三倍。
+      lease: 20m
+      # 异步供应商正常查询间隔；OpenAI Images API 不支持作业查询。
+      poll-interval: 10s
+      # 查询或转存故障的最大退避时间，不重提付费生成。
+      max-backoff: 5m
+      # 最长监测时间，超时进入 UNKNOWN，不能假定供应商已停止。
+      max-age: 24h
+      # Fake 模拟器完成时间，必须大于零。
+      fake-duration: 15s
+      # 单张 PNG 的最大字节数，范围 1024 到 33554432。
+      max-media-bytes: 20971520
+      # 生成请求的完整等待超时，独立于连接检测的短超时。
+      http-timeout: 5m
+      # 单张 medium 质量预计费用，单位 USD；需运维核价。空配置禁用真实生成。
+      # 这不是 OpenAI 的扣费硬上限，实际账单以供应商为准。
+      image-prices: {}
+      # 平台异步中继 HMAC 密钥，至少 32 字符；空时关闭，当前仅供 Fake 验证。
+      callback-secret: ${MANGA_GENERATION_CALLBACK_SECRET:}
+      # 签名回调允许的时间偏移，单位分钟；防止长期重放。
+      callback-clock-skew: 5m
+      # 配置示例：image-prices: { gpt-image-2: 0.10 }；示例数字不是官方报价。
     # AI 提案审批：等待期间释放 Harness 和 Kernel，业务写入只在批准事务发生。
     approval:
       # 从开放审批开始计算的有效期，必须大于零。
@@ -182,7 +218,7 @@ manga:
       # Director 的系统提示词资源位置。
       director-prompt-resource: classpath:agent/profiles/manga-director-system.md
       # Director 定义的语义版本；提示词或行为契约变化时递增，并参与 Blueprint 指纹。
-      director-profile-version: 2
+      director-profile-version: 3
       # Director 单次调用允许的最大模型推理轮次，达到限制后失败。
       director-max-turns: 12
       # 只读剧本解析 Agent 的系统提示词资源位置。

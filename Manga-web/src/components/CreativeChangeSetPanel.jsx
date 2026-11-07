@@ -104,14 +104,25 @@ function ProposalCard({ proposal, onDecide, onRegenerate }) {
     finally { setBusy(false) }
   }
   return <article className={`creative-proposal ${proposal.status.toLowerCase()}`}>
-    <header><strong>{proposal.kind === CHANGE_SET_KIND.SCRIPT ? (proposal.chapterId ? '章节改写提案' : '新章节提案') : '分镜草稿提案'}</strong>
-      <span>{CHANGE_SET_STATUS_LABEL[proposal.status] || proposal.status}</span></header>
+    <header><strong>{proposal.kind === CHANGE_SET_KIND.IMAGE_GENERATION ? '图片生成与费用确认' : proposal.kind === CHANGE_SET_KIND.SCRIPT ? (proposal.chapterId ? '章节改写提案' : '新章节提案') : '分镜草稿提案'}</strong>
+      <span>{proposal.kind === CHANGE_SET_KIND.IMAGE_GENERATION && proposal.status === CHANGE_SET_STATUS.APPLIED ? '已批准，请查看生成作业' : CHANGE_SET_STATUS_LABEL[proposal.status] || proposal.status}</span></header>
     {proposal.kind === CHANGE_SET_KIND.SCRIPT
       ? <div>{scriptDifferences(proposal.before, proposal.proposed).map((difference) => <details key={difference.field} open={difference.changed}>
         <summary>{difference.label} · {difference.changed ? '有变化' : '无变化'}</summary>
         <div className="creative-diff"><div><small>修改前</small><pre>{difference.previous || '（空）'}</pre></div>
           <div><small>批准后</small><pre>{difference.next || '（空）'}</pre></div></div>
       </details>)}</div>
+      : proposal.kind === CHANGE_SET_KIND.IMAGE_GENERATION ? <div className="image-generation-preview">
+        <dl><dt>目标镜头</dt><dd>#{proposal.proposed.shotId} · {proposal.before?.title}</dd>
+          <dt>供应商 / 模型</dt><dd>{proposal.proposed.provider} / {proposal.proposed.model}</dd>
+          <dt>配置</dt><dd>{proposal.proposed.configId ? `#${proposal.proposed.configId}` : '免费模拟器'}</dd>
+          {proposal.proposed.configSnapshot?.baseUrl && <><dt>生成端点</dt><dd>{proposal.proposed.configSnapshot.baseUrl}</dd></>}
+          <dt>输出</dt><dd>{proposal.proposed.width} × {proposal.proposed.height}，1 张 PNG，中等质量</dd>
+          <dt>预计费用</dt><dd>{proposal.proposed.estimatedCost} {proposal.proposed.currency}</dd></dl>
+        <p>预计费用由平台配置，实际扣费以供应商账单为准；批准后才会提交。已提交的同步图片任务可能无法远程取消。</p>
+        <details open><summary>批准的画面提示词</summary><pre>{proposal.proposed.prompt}</pre></details>
+        <p>生成结果保存为独立平台产物，不覆盖镜头现有图片。</p>
+      </div>
       : <div><p>保留已有 {proposal.before?.length || 0} 个镜头，追加 {proposal.proposed.shots.length} 个草稿。</p>
         {proposal.proposed.shots.map((shot, index) => <details key={index} open={index === 0}>
           <summary>新增 {index + 1} · {shot.title}</summary><dl>
@@ -122,8 +133,8 @@ function ProposalCard({ proposal, onDecide, onRegenerate }) {
     {pending && <><small>审批截止：{proposal.expiresAt?.replace('T', ' ')}（有效期由服务端校验）</small>
       <label>审批评论<textarea maxLength={2000} rows={2} value={comment} onChange={(event) => setComment(event.target.value)} disabled={busy} /></label>
       <div className="creative-proposal-actions"><button type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.REJECT)}>拒绝</button>
-        <button type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.APPROVE)}>{busy ? '处理中…' : '批准并保存'}</button></div></>}
-    {proposal.status === CHANGE_SET_STATUS.CONFLICTED && <p role="alert">项目或章节已经变化，本提案没有写入。请基于最新内容重新生成。</p>}
+        <button type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.APPROVE)}>{busy ? '处理中…' : proposal.kind === CHANGE_SET_KIND.IMAGE_GENERATION ? '确认费用并批准生成' : '批准并保存'}</button></div></>}
+    {proposal.status === CHANGE_SET_STATUS.CONFLICTED && <p role="alert">项目、章节或生成配置已经变化，本提案没有应用。请基于最新内容重新生成。</p>}
     {retryable && onRegenerate && <button type="button" onClick={() => onRegenerate(proposal)}>基于最新内容重新生成</button>}
     {proposal.comment && <p>审批评论：{proposal.comment}</p>}
     {proposal.decidedBy && <small>审批人 #{proposal.decidedBy} · {proposal.decidedAt?.replace('T', ' ')}</small>}

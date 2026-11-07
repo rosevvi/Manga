@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.GenerationJobMapper">
+    <select id="find" resultType="com.manga.entity.GenerationJob">
+        SELECT id, job_id, run_id, step_id, change_set_id, user_id,
+               project_id, shot_id, provider, config_id, status, provider_job_id,
+               progress, cancel_requested, error_code, error_message, owner_instance_id, owner_epoch,
+               lease_until, attempts, next_action_at, submitted_at, finished_at, reconciled_by,
+               reconciled_at, reconciliation_note, created_at, updated_at, created_by, updated_by
+        FROM manga_generation_job WHERE job_id = #{jobId}
+    </select>
+    <select id="lock" resultType="com.manga.entity.GenerationJob">
+        SELECT id, job_id, run_id, step_id, change_set_id, user_id,
+               project_id, shot_id, provider, config_id, config_snapshot_json, request_json,
+               status, provider_job_id, progress, cancel_requested, result_base64, error_code,
+               error_message, owner_instance_id, owner_epoch, lease_until, attempts, next_action_at,
+               submitted_at, finished_at, reconciled_by, reconciled_at, reconciliation_note, created_at,
+               updated_at, created_by, updated_by
+        FROM manga_generation_job WHERE job_id = #{jobId} FOR UPDATE
+    </select>
+    <select id="findDue" resultType="string">
+        SELECT job_id FROM manga_generation_job
+        WHERE status IN ('PENDING_SUBMISSION', 'SUBMITTING', 'SUBMITTED', 'RUNNING', 'MATERIALIZING')
+          AND next_action_at &lt;= #{now} AND (lease_until IS NULL OR lease_until &lt;= #{now})
+        ORDER BY next_action_at, id LIMIT #{limit}
+    </select>
+    <select id="findVisible" resultType="com.manga.entity.GenerationJob">
+        SELECT id, job_id, run_id, step_id, change_set_id, user_id,
+               project_id, shot_id, provider, config_id, status, provider_job_id,
+               progress, cancel_requested, error_code, error_message, owner_instance_id, owner_epoch,
+               lease_until, attempts, next_action_at, submitted_at, finished_at, reconciled_by,
+               reconciled_at, reconciliation_note, created_at, updated_at, created_by, updated_by
+        FROM manga_generation_job
+        WHERE user_id = #{userId} AND project_id = #{projectId}
+        <if test="runId != null">AND run_id = #{runId}</if>
+        <if test="conversationId != null">
+            AND EXISTS (SELECT 1 FROM manga_creative_run r WHERE r.run_id = manga_generation_job.run_id
+                        AND r.conversation_id = #{conversationId})
+        </if>
+        <if test="beforeId != null">AND id &lt; #{beforeId}</if>
+        ORDER BY id DESC LIMIT #{limit}
+    </select>
+    <select id="findByRun" resultType="string">
+        SELECT job_id FROM manga_generation_job WHERE run_id = #{runId}
+          AND status NOT IN ('SUCCEEDED', 'FAILED', 'CANCELLED') ORDER BY id
+    </select>
+    <select id="lockCapacity" resultType="string">
+        SELECT provider FROM manga_generation_capacity WHERE provider = #{provider} FOR UPDATE
+    </select>
+    <select id="countInFlight" resultType="int">
+        SELECT COUNT(*) FROM manga_generation_job
+        WHERE provider = #{provider}
+          AND status IN ('SUBMITTING', 'SUBMITTED', 'RUNNING', 'MATERIALIZING', 'UNKNOWN')
+        <if test="userId != null">AND user_id = #{userId}</if>
+    </select>
+    <update id="updateState">
+        UPDATE manga_generation_job SET
+        status = #{job.status},
+        provider_job_id = #{job.providerJobId},
+        progress = #{job.progress},
+        cancel_requested = #{job.cancelRequested},
+        result_base64 = #{job.resultBase64},
+        error_code = #{job.errorCode},
+        error_message = #{job.errorMessage},
+        owner_instance_id = #{job.ownerInstanceId},
+        owner_epoch = #{job.ownerEpoch},
+        lease_until = #{job.leaseUntil},
+        attempts = #{job.attempts},
+        next_action_at = #{job.nextActionAt},
+        submitted_at = #{job.submittedAt},
+        finished_at = #{job.finishedAt},
+        reconciled_by = #{job.reconciledBy},
+        reconciled_at = #{job.reconciledAt},
+        reconciliation_note = #{job.reconciliationNote},
+        updated_by = #{job.updatedBy}, updated_at = CURRENT_TIMESTAMP
+        WHERE job_id = #{job.jobId} AND owner_epoch = #{expectedEpoch}
+    </update>
+    <insert id="createSubmission">
+        INSERT INTO manga_generation_submission_outbox (job_id, status, created_by, updated_by)
+        VALUES (#{jobId}, 'PENDING', #{actor}, #{actor})
+    </insert>
+    <update id="updateSubmission">
+        UPDATE manga_generation_submission_outbox
+        SET status = #{status}, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP WHERE job_id = #{jobId}
+    </update>
+</mapper>
+

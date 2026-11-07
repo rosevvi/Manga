@@ -1,0 +1,12 @@
+/* 图片任务使用现有工作区颜色变量，长标识和提示词允许换行。 */
+.generation-jobs, .image-generation-panel { display: grid; gap: 12px; margin: 16px 0; }
+.generation-card, .image-generation-panel { border: 1px solid var(--border-color, #ddd); border-radius: 12px; padding: 16px; }
+.generation-card { display: grid; gap: 10px; overflow-wrap: anywhere; }
+.generation-card header, .generation-actions { display: flex; gap: 12px; justify-content: space-between; flex-wrap: wrap; }
+.generation-card img { display: block; max-width: 100%; max-height: 320px; object-fit: contain; margin-bottom: 8px; }
+.generation-card progress { width: 100%; }
+.generation-card small { opacity: .75; }
+.generation-reconcile, .image-generation-form { display: grid; gap: 10px; }
+.generation-reconcile textarea, .image-generation-form textarea, .image-generation-form select { width: 100%; box-sizing: border-box; }
+.image-generation-form label { display: grid; gap: 5px; }
+.image-generation-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -20,17 +20,19 @@ export const CREATIVE_TOOL_LABEL = Object.freeze({
   /** 分镜镜头列表。 */ list_storyboard_shots: '读取分镜列表',
   /** 生成待批准的章节提案。 */ propose_script_change: '提出章节变更',
   /** 生成待批准的分镜提案。 */ propose_storyboard_change: '提出分镜草稿',
+  /** 图片生成需费用确认和批准。 */ propose_image_generation: '提出图片生成',
 })
 
 /** Creative Run 的业务操作，与后端 CreativeOperationType 对齐。 */
 export const CREATIVE_OPERATION = Object.freeze({
   ASSISTANT_CHAT: 'ASSISTANT_CHAT', PARSE_SCRIPT: 'PARSE_SCRIPT',
   GENERATE_SCRIPT_CHAPTER: 'GENERATE_SCRIPT_CHAPTER', GENERATE_CHAPTER_STORYBOARD: 'GENERATE_CHAPTER_STORYBOARD',
+  /** 单镜头图片提案及作业。 */ GENERATE_SHOT_IMAGE: 'GENERATE_SHOT_IMAGE',
 })
 /** 请求使用的最高能力权限；提案权限始终不能自动批准。 */
 export const CREATIVE_PERMISSION = Object.freeze({ READ_ONLY: 'READ_ONLY', PROPOSE_CHANGES: 'PROPOSE_CHANGES' })
 /** 手动入口的资源范围。 */
-export const CREATIVE_RESOURCE = Object.freeze({ PROJECT: 'PROJECT', SCRIPT: 'SCRIPT', CHAPTER: 'CHAPTER' })
+export const CREATIVE_RESOURCE = Object.freeze({ PROJECT: 'PROJECT', SCRIPT: 'SCRIPT', CHAPTER: 'CHAPTER', STORYBOARD_SHOT: 'STORYBOARD_SHOT' })
 /** 请求触发来源。 */
 export const CREATIVE_TRIGGER = Object.freeze({ CONVERSATION: 'CONVERSATION', MANUAL: 'MANUAL' })
 

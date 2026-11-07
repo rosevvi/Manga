@@ -38,6 +38,11 @@ public class MediaStorageService {
         return strategy.storeBytes(data, subDir, extension);
     }
 
+    /** 生成作业转存使用稳定键，进程重启只重试保存同一产物。 */
+    public String storeGeneratedBytes(byte[] data, String subDir, String extension, String jobId) {
+        return resolveStrategy().storeNamedBytes(data, subDir, extension, jobId);
+    }
+
     /** 按环境变量选择媒体存储策略。 */
     private StorageStrategy resolveStrategy() {
         if (aliyunOssProperties.enabled()) {

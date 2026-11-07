@@ -16,6 +16,8 @@ import com.manga.agent.event.CreativeEventSources;
 import com.manga.agent.execution.ClaimedCreativeStep;
 import com.manga.agent.execution.CreativeDispatchSignal;
 import com.manga.agent.harness.AgentRuntimeException;
+import com.manga.agent.generation.GenerationJobService;
+import com.manga.agent.generation.GenerationConstants;
 import com.manga.agent.state.AgentStateSessionService;
 import com.manga.common.exception.BusinessException;
 import com.manga.entity.CreativeApproval;
@@ -58,6 +60,7 @@ public class ChangeSetApprovalService {
     private final CreativeRuntimeProperties runtimeProperties;
     private final CreativeIdentifierGenerator identifiers;
     private final ApplicationEventPublisher publisher;
+    private final GenerationJobService generationJobs;
 
     /** 工具结果后停止流，也用于进程重启后发现已落库草稿的步骤。 */
     @Transactional(readOnly = true)
@@ -71,6 +74,7 @@ public class ChangeSetApprovalService {
         ChangeSetKind required = switch (operation) {
             case GENERATE_SCRIPT_CHAPTER -> ChangeSetKind.SCRIPT;
             case GENERATE_CHAPTER_STORYBOARD -> ChangeSetKind.STORYBOARD;
+            case GENERATE_SHOT_IMAGE -> ChangeSetKind.IMAGE_GENERATION;
             default -> null;
         };
         if (Objects.isNull(required)) return;
@@ -172,13 +176,17 @@ public class ChangeSetApprovalService {
         if (proposal.getKind() == ChangeSetKind.SCRIPT) {
             title = codec.read(proposal.getPayloadJson(), ScriptChangeSet.class).title();
             resourceCount = 1;
-        } else {
+        } else if (proposal.getKind() == ChangeSetKind.STORYBOARD) {
             resourceCount = codec.read(proposal.getPayloadJson(), StoryboardChangeSet.class).shots().size();
+        } else {
+            resourceCount = 1;
         }
         ProposalResumeSummary summary = new ProposalResumeSummary(proposal.getChangeSetId(), proposal.getKind(),
                 proposal.getChapterId(), title, resourceCount);
         // 正文留在不可变提案中；恢复只解释审批结果，避免把完整长章节再次灌入模型上下文。
-        return ChangeSetConstants.RESUME_TEMPLATE.formatted(original, codec.write(summary), step.getApprovalResultJson());
+        String instruction = ChangeSetConstants.RESUME_TEMPLATE.formatted(original, codec.write(summary), step.getApprovalResultJson());
+        return Objects.isNull(step.getGenerationResultJson()) ? instruction
+                : instruction + GenerationConstants.RESUME.formatted(step.getGenerationResultJson());
     }
 
     /** 记录终态并创建逻辑恢复命令；在此之前发生的任何异常都会回滚业务写入。 */
@@ -213,7 +221,9 @@ public class ChangeSetApprovalService {
                             ? CreativeEventType.CHANGESET_APPLIED : CreativeEventType.CHANGESET_CONFLICTED,
                     CreativeEventSources.RUNTIME, proposal.getChangeSetId(), result);
         }
-        if (resume) resume(run, proposal, actor);
+        if (resume && status == ApprovalStatus.APPROVED && proposal.getKind() == ChangeSetKind.IMAGE_GENERATION) {
+            generationJobs.await(proposal, proposal.getResultJson(), actor);
+        } else if (resume) resume(run, proposal, actor);
         log.info("Creative approval decided runId={} stepId={} changeSetId={} status={} actorId={}",
                 run.getRunId(), proposal.getStepId(), proposal.getChangeSetId(), status, actorId);
         return result;

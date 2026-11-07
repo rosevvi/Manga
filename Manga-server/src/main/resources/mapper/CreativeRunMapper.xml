@@ -127,7 +127,7 @@
         SELECT id, run_id, operation_type, target_id, status, created_at
         FROM manga_creative_run
         WHERE user_id = #{userId} AND project_id = #{projectId} AND trigger_source = 'MANUAL'
-          AND operation_type IN ('GENERATE_SCRIPT_CHAPTER', 'GENERATE_CHAPTER_STORYBOARD')
+          AND operation_type IN ('GENERATE_SCRIPT_CHAPTER', 'GENERATE_CHAPTER_STORYBOARD', 'GENERATE_SHOT_IMAGE')
         <if test="beforeId != null">AND id &lt; #{beforeId}</if>
         ORDER BY id DESC LIMIT #{limit}
     </select>
@@ -135,7 +135,7 @@
         SELECT id, run_id, operation_type, target_id, status, created_at
         FROM manga_creative_run
         WHERE user_id = #{userId} AND project_id = #{projectId} AND trigger_source = 'MANUAL'
-          AND operation_type IN ('GENERATE_SCRIPT_CHAPTER', 'GENERATE_CHAPTER_STORYBOARD')
+          AND operation_type IN ('GENERATE_SCRIPT_CHAPTER', 'GENERATE_CHAPTER_STORYBOARD', 'GENERATE_SHOT_IMAGE')
           AND status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED')
         ORDER BY id DESC LIMIT 1
     </select>

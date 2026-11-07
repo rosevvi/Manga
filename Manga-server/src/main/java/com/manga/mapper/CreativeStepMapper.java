@@ -11,6 +11,11 @@ import java.util.List;
  * 提供 Step 查询及带 owner epoch 围栏的原子状态变更。
  */
 public interface CreativeStepMapper extends BaseMapper<CreativeStep> {
+    /** 图片审批原子进入外部作业等待，不分配新 Harness。 */
+    int awaitJob(@Param("stepId") String stepId, @Param("result") String result, @Param("actor") String actor);
+    /** 仅一次将作业等待恢复为 READY，保留原 Blueprint。 */
+    int resumeJob(@Param("stepId") String stepId, @Param("sessionId") String sessionId,
+            @Param("result") String result, @Param("maxAttempts") int maxAttempts, @Param("actor") String actor);
     /** 释放执行权并持久化审批等待，旧 owner epoch 立即失效。 */
     int pauseOwned(@Param("stepId") String stepId, @Param("owner") String owner,
             @Param("epoch") long epoch, @Param("now") LocalDateTime now, @Param("actor") String actor);

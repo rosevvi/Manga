@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -48,18 +49,26 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
     /** 上传媒体数据并返回浏览器可访问的对象地址。 */
     @Override
     public String storeBytes(byte[] data, String subDir, String extension) {
+        return storeNamedBytes(data, subDir, extension, UUID.randomUUID().toString());
+    }
+
+    /** 同一作业使用同一对象键，重试只覆盖原转存内容。 */
+    @Override
+    public String storeNamedBytes(byte[] data, String subDir, String extension, String stableName) {
+        if (!stableName.matches("[A-Za-z0-9_-]{1,128}")) throw new IllegalArgumentException(STORAGE_FILE_SAVE_FAILED);
         requireConfigured();
-        String objectKey = buildObjectKey(subDir, extension);
+        String objectKey = buildObjectKey(subDir, extension, stableName);
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentLength(data.length);
         metadata.setContentType(resolveContentType(extension));
 
-        try {
-            ByteArrayInputStream inputStream = new ByteArrayInputStream(data);
+        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(data)) {
             ossClient().putObject(properties.bucketName(), objectKey, inputStream, metadata);
             log.info("[AliyunOssStorageStrategy#storeBytes] stored bucket={} key={} size={}",
                     properties.bucketName(), objectKey, data.length);
             return resolvePublicUrl(objectKey);
+        } catch (IOException exception) {
+            throw new IllegalStateException(STORAGE_FILE_SAVE_FAILED, exception);
         } catch (OSSException exception) {
             log.warn("[AliyunOssStorageStrategy#storeBytes] OSS rejected upload errorCode={} requestId={}",
                     exception.getErrorCode(), exception.getRequestId());
@@ -106,10 +115,10 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
     }
 
     /** 生成包含统一对象前缀和业务子目录的对象键。 */
-    private String buildObjectKey(String subDir, String extension) {
+    private String buildObjectKey(String subDir, String extension, String stableName) {
         String prefix = normalizePath(properties.objectPrefix(), properties.objectPrefix());
         String directory = normalizePath(subDir, DEFAULT_UPLOAD_DIRECTORY);
-        return prefix + "/" + directory + "/" + UUID.randomUUID() + normalizeExtension(extension);
+        return prefix + "/" + directory + "/" + stableName + normalizeExtension(extension);
     }
 
     /** 清理对象路径中的不安全片段。 */

@@ -1,5 +1,5 @@
 /** 与后端不可变提案协议对应的业务类型。 */
-export const CHANGE_SET_KIND = Object.freeze({ SCRIPT: 'SCRIPT', STORYBOARD: 'STORYBOARD' })
+export const CHANGE_SET_KIND = Object.freeze({ SCRIPT: 'SCRIPT', STORYBOARD: 'STORYBOARD', IMAGE_GENERATION: 'IMAGE_GENERATION' })
 /** 与后端状态机对应的提案状态。 */
 export const CHANGE_SET_STATUS = Object.freeze({
   PENDING: 'PENDING', APPLIED: 'APPLIED', REJECTED: 'REJECTED', CONFLICTED: 'CONFLICTED', EXPIRED: 'EXPIRED', CANCELLED: 'CANCELLED',

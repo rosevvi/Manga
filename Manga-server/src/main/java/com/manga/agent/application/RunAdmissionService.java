@@ -39,6 +39,7 @@ import com.manga.repository.CreativeDispatchOutboxRepository;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.CreativeStepRepository;
 import com.manga.repository.ProjectScriptRepository;
+import com.manga.repository.StoryboardShotRepository;
 import com.manga.service.ProjectRevisionService;
 import com.manga.service.ProjectService;
 import lombok.RequiredArgsConstructor;
@@ -87,6 +88,7 @@ public class RunAdmissionService {
     private final CreativeConversationMemory conversationMemory;
     private final AgentStateSessionService stateSessions;
     private final ProjectRevisionService revisions;
+    private final StoryboardShotRepository shots;
 
     /**
      * 幂等受理会话或手动创作请求。新请求会原子创建 Run、READY 根 Step 和 Dispatch Outbox，
@@ -184,7 +186,8 @@ public class RunAdmissionService {
             return null;
         }
         if ((command.operationType() == CreativeOperationType.GENERATE_CHAPTER_STORYBOARD
-                || command.operationType() == CreativeOperationType.GENERATE_SCRIPT_CHAPTER)
+                || command.operationType() == CreativeOperationType.GENERATE_SCRIPT_CHAPTER
+                || command.operationType() == CreativeOperationType.GENERATE_SHOT_IMAGE)
                 && !command.permissionPolicy().allows(AgentPermissionPolicy.PROPOSE_CHANGES)) {
             throw new BusinessException(CreativeRuntimeResponseCode.TARGET_RESOURCE_INVALID, HttpStatus.BAD_REQUEST);
         }
@@ -207,6 +210,8 @@ public class RunAdmissionService {
                 validTarget = true;
             } else if (binding.targetType() == CreativeResourceType.PROJECT) {
                 validTarget = Objects.equals(projectId, command.target().resourceId());
+            } else if (binding.targetType() == CreativeResourceType.STORYBOARD_SHOT) {
+                validTarget = shots.findByProjectAndId(projectId, command.target().resourceId()).isPresent();
             }
         }
         if (!validTarget) {

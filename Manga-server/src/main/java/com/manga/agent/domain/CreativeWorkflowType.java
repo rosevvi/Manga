@@ -14,7 +14,9 @@ public enum CreativeWorkflowType {
     /** 针对指定章节生成分镜的工作流。 */
     CHAPTER_STORYBOARD,
     /** 生成章节提案并等待人工批准。 */
-    SCRIPT_CHAPTER;
+    SCRIPT_CHAPTER,
+    /** 图片提案、费用确认、外部作业与产物转存。 */
+    SHOT_IMAGE;
 
     /** 根据稳定业务操作选择对应的工作流类型。 */
     public static CreativeWorkflowType fromOperation(CreativeOperationType operationType) {
@@ -23,6 +25,7 @@ public enum CreativeWorkflowType {
             case PARSE_SCRIPT -> SCRIPT_PARSE;
             case GENERATE_CHAPTER_STORYBOARD -> CHAPTER_STORYBOARD;
             case GENERATE_SCRIPT_CHAPTER -> SCRIPT_CHAPTER;
+            case GENERATE_SHOT_IMAGE -> SHOT_IMAGE;
         };
     }
 }

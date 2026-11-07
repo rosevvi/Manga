@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.GenerationCallbackMapper">
+    <insert id="receive">
+        INSERT INTO manga_generation_callback_inbox (provider, event_id, provider_job_id, payload_sha256, status, next_attempt_at, created_by, updated_by)
+        VALUES (#{provider}, #{event.eventId}, #{event.providerJobId}, #{event.payloadSha256}, 'PENDING', CURRENT_TIMESTAMP, #{actor}, #{actor})
+        ON DUPLICATE KEY UPDATE event_id = event_id
+    </insert>
+    <select id="payloadHash" resultType="string">
+        SELECT payload_sha256 FROM manga_generation_callback_inbox WHERE provider = #{provider} AND event_id = #{eventId}
+    </select>
+    <select id="pending" resultType="com.manga.entity.GenerationCallbackInbox">
+        SELECT id, provider, event_id, provider_job_id, payload_sha256, status, next_attempt_at, created_at, updated_at, created_by, updated_by
+        FROM manga_generation_callback_inbox WHERE status = 'PENDING' AND next_attempt_at &lt;= #{now}
+        ORDER BY next_attempt_at, id LIMIT #{limit}
+    </select>
+    <update id="defer">
+        UPDATE manga_generation_callback_inbox SET next_attempt_at = #{nextAttemptAt}, updated_at = CURRENT_TIMESTAMP, updated_by = #{actor}
+        WHERE id = #{id} AND status = 'PENDING' AND next_attempt_at &lt;= #{now}
+    </update>
+    <update id="complete">
+        UPDATE manga_generation_callback_inbox SET status = #{status}, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND status = 'PENDING'
+    </update>
+</mapper>

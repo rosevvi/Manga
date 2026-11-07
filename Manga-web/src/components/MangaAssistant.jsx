@@ -5,6 +5,7 @@ import { getCreativeConversationHistory, listCreativeConversations } from '../ap
 import { CREATIVE_MESSAGE_ROLE, CREATIVE_MESSAGE_STATUS, CREATIVE_TOOL_LABEL, CREATIVE_TOOL_STATUS_LABEL } from '../constants/creative'
 import './manga-assistant.css'
 import CreativeChangeSetPanel from './CreativeChangeSetPanel'
+import GenerationJobsPanel from './GenerationJobsPanel'
 import { regenerationInstruction } from './changeSetPreview'
 
 /** 网络重连间隔，单位：毫秒。 */
@@ -40,6 +41,7 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
   const scopeRef = useRef(0)
   const historyVersionRef = useRef(0)
   const busy = submitting || Boolean(activeRun)
+  const conversationProjectId = projectId || conversations.find((item) => item.conversationId === conversationId)?.projectId
 
   /** 切换会话时隔离旧异步响应、消息和 SSE cursor。 */
   const selectConversation = useCallback((id) => {
@@ -280,6 +282,8 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
           {conversationId && <CreativeChangeSetPanel accessToken={accessToken} conversationId={conversationId}
             onDecided={() => refreshHistory(conversationId)}
             onRegenerate={(proposal) => setInstruction(regenerationInstruction(proposal))} />}
+          {conversationId && conversationProjectId && <GenerationJobsPanel accessToken={accessToken}
+            projectId={conversationProjectId} conversationId={conversationId} />}
         </div>
         <form onSubmit={submit}>
           <textarea value={instruction} onChange={(event) => setInstruction(event.target.value)}

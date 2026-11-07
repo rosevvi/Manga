@@ -8,6 +8,8 @@ import com.manga.agent.domain.CreativeOperationType;
 import com.manga.agent.domain.CreativeRunStatus;
 import com.manga.agent.domain.CreativeStepStatus;
 import com.manga.agent.event.RunAcceptedEventPayload;
+import com.manga.agent.generation.ImageGenerationChange;
+import com.manga.agent.generation.ImageGenerationQuoteService;
 import com.manga.common.exception.BusinessException;
 import com.manga.dto.ProjectScriptChapterResponse;
 import com.manga.entity.CreativeChangeSet;
@@ -19,6 +21,7 @@ import com.manga.repository.CreativeChangeSetRepository;
 import com.manga.repository.CreativeEventRepository;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.CreativeStepRepository;
+import com.manga.repository.StoryboardShotRepository;
 import com.manga.service.ProjectRevisionService;
 import com.manga.service.ProjectScriptService;
 import com.manga.service.StoryboardShotService;
@@ -45,6 +48,8 @@ public class ChangeSetProposalService {
     private final StoryboardShotService storyboards;
     private final ProjectScriptService scripts;
     private final ChangeSetCodec codec;
+    private final ImageGenerationQuoteService generationQuotes;
+    private final StoryboardShotRepository shots;
 
     /** 围栏校验、目标归属和 Schema 校验后保存单步骤唯一草稿；重试只返回原草稿。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -66,15 +71,23 @@ public class ChangeSetProposalService {
             ScriptChangeSet script = codec.validate(input, ScriptChangeSet.class);
             payload = script;
             chapterId = script.chapterId();
-        } else {
+        } else if (kind == ChangeSetKind.STORYBOARD) {
             StoryboardChangeSet storyboard = codec.validate(input, StoryboardChangeSet.class);
             payload = storyboard;
             chapterId = storyboard.chapterId();
+        } else {
+            ImageGenerationChange image = generationQuotes.canonicalize(codec.validate(input, ImageGenerationChange.class), run.getUserId());
+            var shot = shots.findByProjectAndId(run.getProjectId(), image.shotId())
+                    .orElseThrow(() -> new BusinessException(ChangeSetResponseCode.NOT_FOUND));
+            payload = image;
+            chapterId = shot.getChapterId();
         }
         if ((run.getOperationType() == CreativeOperationType.GENERATE_CHAPTER_STORYBOARD
                 && (kind != ChangeSetKind.STORYBOARD || !Objects.equals(chapterId, run.getTargetId())))
                 || (run.getOperationType() == CreativeOperationType.GENERATE_SCRIPT_CHAPTER
-                && (kind != ChangeSetKind.SCRIPT || Objects.nonNull(chapterId)))) {
+                && (kind != ChangeSetKind.SCRIPT || Objects.nonNull(chapterId)))
+                || (run.getOperationType() == CreativeOperationType.GENERATE_SHOT_IMAGE
+                && (kind != ChangeSetKind.IMAGE_GENERATION || !Objects.equals(((ImageGenerationChange) payload).shotId(), run.getTargetId())))) {
             throw new BusinessException(ChangeSetResponseCode.INVALID);
         }
         MangaProject project = revisions.lock(run.getProjectId(), run.getUserId());
@@ -87,8 +100,10 @@ public class ChangeSetProposalService {
             ProjectScriptChapterResponse current = Objects.isNull(chapter) ? null
                     : scripts.findChapterForUser(project.getId(), chapterId, run.getUserId());
             before = Objects.isNull(current) ? null : new ScriptChangeSet(chapterId, current.title(), current.synopsis(), current.rawContent(), current.scenes());
-        } else {
+        } else if (kind == ChangeSetKind.STORYBOARD) {
             before = storyboards.findAllForUser(project.getId(), run.getUserId(), chapterId);
+        } else {
+            before = shots.findByProjectAndId(project.getId(), ((ImageGenerationChange) payload).shotId()).orElseThrow();
         }
         String actor = CreativeActor.user(context.userId());
         CreativeChangeSet proposal = CreativeChangeSet.builder().changeSetId(UUID.randomUUID().toString())

@@ -18,7 +18,9 @@ public enum AgentOperationBinding {
     /** 手动为章节生成待审批分镜，不直接写镜头表。 */
     STORYBOARD_PROPOSAL(CreativeOperationType.GENERATE_CHAPTER_STORYBOARD, AgentProfileKey.MANGA_DIRECTOR, CreativeResourceType.CHAPTER),
     /** 手动创建章节提案；改写既有章节也可通过会话提出。 */
-    SCRIPT_PROPOSAL(CreativeOperationType.GENERATE_SCRIPT_CHAPTER, AgentProfileKey.MANGA_DIRECTOR, CreativeResourceType.PROJECT);
+    SCRIPT_PROPOSAL(CreativeOperationType.GENERATE_SCRIPT_CHAPTER, AgentProfileKey.MANGA_DIRECTOR, CreativeResourceType.PROJECT),
+    /** 手动镜头图片生成同样走提案审批与持久化作业。 */
+    IMAGE_PROPOSAL(CreativeOperationType.GENERATE_SHOT_IMAGE, AgentProfileKey.MANGA_DIRECTOR, CreativeResourceType.STORYBOARD_SHOT);
 
     /** 创建 Run 时用于选择 Agent 执行链路的业务操作。 */
     private final CreativeOperationType operationType;

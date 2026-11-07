@@ -53,6 +53,8 @@ public class CreativeStep {
     private Long baseProjectRevision;
     /** 审批持久化恢复命令；空值表示尚未处理审批。 */
     private String approvalResultJson;
+    /** 外部作业完成后的恢复结果，等待期间不保留模型执行资源。 */
+    private String generationResultJson;
     /** Agent Step 执行前固化的不含密钥 Blueprint 快照。 */
     private String blueprintSnapshotJson;
     /** Blueprint 快照的 SHA-256 指纹。 */

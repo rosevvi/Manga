@@ -45,6 +45,8 @@ public enum CreativeEventType {
     JOB_COMPLETED,
     /** 外部生成作业失败。 */
     JOB_FAILED,
+    /** 平台撤销产物采用权；不承诺供应商已退款。 */
+    JOB_CANCELLED,
     /** 新的创作产物已经入库。 */
     ARTIFACT_CREATED,
     /** Run 已收到取消请求。 */

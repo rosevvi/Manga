@@ -2,6 +2,7 @@ package com.manga.agent.changeset;
 
 import com.manga.common.exception.BusinessException;
 import com.manga.entity.CreativeChangeSet;
+import com.manga.agent.generation.GenerationJobService;
 import com.manga.service.ProjectRevisionService;
 import com.manga.service.ProjectScriptService;
 import com.manga.service.StoryboardShotService;
@@ -20,6 +21,7 @@ public class ChangeSetApplicationService {
     private final ProjectScriptService scripts;
     private final StoryboardShotService storyboards;
     private final ChangeSetCodec codec;
+    private final GenerationJobService generationJobs;
 
     /** 先比较并锁住基础版本；冲突返回结构化结果，成功写入与审批一起提交或回滚。 */
     @Transactional(propagation = Propagation.MANDATORY)
@@ -31,12 +33,13 @@ public class ChangeSetApplicationService {
                 proposal.getChapterId(), proposal.getBaseChapterRevision())) {
             return new ApprovalResult(proposal.getChangeSetId(), ApprovalStatus.CONFLICTED, comment, List.of());
         }
-        List<Long> ids = switch (proposal.getKind()) {
-            case SCRIPT -> List.of(scripts.applyApproved(proposal.getProjectId(), userId, actor,
-                    codec.read(proposal.getPayloadJson(), ScriptChangeSet.class)));
-            case STORYBOARD -> storyboards.applyApproved(proposal.getProjectId(), userId, actor,
-                    codec.read(proposal.getPayloadJson(), StoryboardChangeSet.class));
+        return switch (proposal.getKind()) {
+            case SCRIPT -> new ApprovalResult(proposal.getChangeSetId(), ApprovalStatus.APPROVED, comment,
+                    List.of(scripts.applyApproved(proposal.getProjectId(), userId, actor, codec.read(proposal.getPayloadJson(), ScriptChangeSet.class))));
+            case STORYBOARD -> new ApprovalResult(proposal.getChangeSetId(), ApprovalStatus.APPROVED, comment,
+                    storyboards.applyApproved(proposal.getProjectId(), userId, actor, codec.read(proposal.getPayloadJson(), StoryboardChangeSet.class)));
+            case IMAGE_GENERATION -> new ApprovalResult(proposal.getChangeSetId(), generationJobs.enqueue(proposal, userId, actor)
+                    ? ApprovalStatus.APPROVED : ApprovalStatus.CONFLICTED, comment, List.of());
         };
-        return new ApprovalResult(proposal.getChangeSetId(), ApprovalStatus.APPROVED, comment, ids);
     }
 }

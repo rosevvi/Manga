@@ -17,6 +17,14 @@ import java.util.Optional;
 public class CreativeStepRepository {
 
     private final CreativeStepMapper mapper;
+    /** 图片审批结果和作业等待在同一事务落库。 */
+    public boolean awaitJob(String stepId, String result, String actor) {
+        return mapper.awaitJob(stepId, result, actor) == 1;
+    }
+    /** 有界恢复，旧 generation 的写入仍受状态会话围栏约束。 */
+    public boolean resumeJob(String stepId, String sessionId, String result, int maxAttempts, String actor) {
+        return mapper.resumeJob(stepId, sessionId, result, maxAttempts, actor) == 1;
+    }
     /** 在 Run 锁内暂停，围栏拒绝已经过期或被取消的执行器。 */
     public boolean pauseOwned(String stepId, String owner, long epoch, LocalDateTime now, String actor) {
         return mapper.pauseOwned(stepId, owner, epoch, now, actor) == 1;

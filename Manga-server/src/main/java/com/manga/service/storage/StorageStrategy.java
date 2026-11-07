@@ -8,4 +8,7 @@ public interface StorageStrategy {
 
     /** 保存二进制文件并返回站内或公网可访问地址。 */
     String storeBytes(byte[] data, String subDir, String extension);
+
+    /** 使用服务端生成的稳定名称保存，恢复转存时覆盖同一对象而不生成重复文件。 */
+    String storeNamedBytes(byte[] data, String subDir, String extension, String stableName);
 }

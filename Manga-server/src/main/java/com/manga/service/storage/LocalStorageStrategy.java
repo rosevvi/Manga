@@ -8,6 +8,9 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.StandardCopyOption;
+import java.util.Objects;
 import java.util.UUID;
 
 import static com.manga.common.constant.StorageConstants.LOCAL_TYPE;
@@ -31,21 +34,37 @@ public class LocalStorageStrategy implements StorageStrategy {
     /** 将媒体二进制数据保存到本地磁盘。 */
     @Override
     public String storeBytes(byte[] data, String subDir, String extension) {
+        return storeNamedBytes(data, subDir, extension, UUID.randomUUID().toString());
+    }
+
+    /** 以经过校验的稳定名称落盘；路径必须位于配置的媒体根目录内。 */
+    @Override
+    public String storeNamedBytes(byte[] data, String subDir, String extension, String stableName) {
+        if (!stableName.matches("[A-Za-z0-9_-]{1,128}")) throw new IllegalArgumentException(STORAGE_FILE_SAVE_FAILED);
         Path baseDirectory = resolveBaseDirectory();
-        String filename = UUID.randomUUID() + normalizeExtension(extension);
+        String filename = stableName + normalizeExtension(extension);
         Path targetDirectory = baseDirectory.resolve(normalizeSubDir(subDir)).normalize().toAbsolutePath();
         Path targetPath = targetDirectory.resolve(filename).normalize();
-        if (!targetPath.startsWith(targetDirectory)) {
+        if (!targetDirectory.startsWith(baseDirectory) || !targetPath.startsWith(targetDirectory)) {
             throw new IllegalArgumentException(STORAGE_FILE_SAVE_FAILED);
         }
 
+        Path temporary = null;
         try {
             Files.createDirectories(targetDirectory);
-            Files.write(targetPath, data);
+            temporary = Files.createTempFile(targetDirectory, filename, ".part");
+            Files.write(temporary, data);
+            try { Files.move(temporary, targetPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
+            catch (AtomicMoveNotSupportedException exception) { Files.move(temporary, targetPath, StandardCopyOption.REPLACE_EXISTING); }
             log.info("[LocalStorageStrategy#storeBytes] stored path={} size={}", targetPath, data.length);
             return normalizePublicPath() + "/" + normalizeSubDir(subDir) + "/" + filename;
         } catch (IOException exception) {
             throw new IllegalStateException(STORAGE_FILE_SAVE_FAILED, exception);
+        } finally {
+            if (Objects.nonNull(temporary)) {
+                try { Files.deleteIfExists(temporary); }
+                catch (IOException exception) { log.warn("Media temporary file cleanup deferred filename={}", filename); }
+            }
         }
     }
 

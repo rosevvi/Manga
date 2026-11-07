@@ -2353,6 +2353,8 @@ ADR 与 API/事件契约
 
 ### 阶段 5：图片和视频 GenerationJob
 
+5A 的图片链路实现说明见 [阶段 5A 图片生成作业](manga-phase5-generation-jobs.md)：首个真实模型为 OpenAI `gpt-image-2`，另有 Fake 异步供应商。代码与前端已连接，真实调用和恢复场景运行验收尚待执行；5B 视频与批量任务尚未开始。
+
 #### 目标
 
 支持不占用 Harness 的长时间生成、进度监测、取消和恢复。

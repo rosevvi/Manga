@@ -19,6 +19,8 @@ export function regenerationInstruction(proposal) {
   let refresh
   if (proposal.kind === CHANGE_SET_KIND.STORYBOARD) {
     refresh = `请重新读取章节（ID：${proposal.chapterId}）及现有分镜，基于最新内容重新生成分镜草稿提案，等待我审批。`
+  } else if (proposal.kind === CHANGE_SET_KIND.IMAGE_GENERATION) {
+    refresh = `请读取镜头（ID：${proposal.proposed.shotId}）最新内容，按上次明确选择的供应商、模型和图片参数重新提出图片生成提案，等待我确认费用并审批。`
   } else {
     refresh = proposal.chapterId
       ? `请重新读取章节（ID：${proposal.chapterId}），按上次任务目标重新提出完整改写提案，等待我审批。`

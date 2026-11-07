@@ -22,6 +22,7 @@ import { PROJECT_LIMITS, STORYBOARD_SHOT_STATUS } from '../constants/project'
 import { useLanguage } from '../i18n/LanguageContext'
 import './project-module.css'
 import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
+import ImageGenerationPanel from './ImageGenerationPanel'
 
 const EMPTY_SHOT = Object.freeze({
   title: '',
@@ -215,6 +216,7 @@ function StoryboardModule({ accessToken, projects, selectedProjectId, onSelectPr
       </div>
 
       {error && <div className="workspace-alert">{error}</div>}
+      {projectId && <ImageGenerationPanel key={projectId} accessToken={accessToken} projectId={projectId} shots={shots} />}
       {loading ? (
         <div className="workspace-state">{translate('common.loading')}</div>
       ) : shots.length === 0 ? (

@@ -60,7 +60,8 @@ export default function ProjectCreativeTaskHistory({ accessToken, projectId, sel
     <select aria-label="选择项目创作任务" value={selectedRunId || ''} onChange={(event) => onSelect(event.target.value || null)}>
       <option value="">选择任务</option>
       {items.map((item) => <option key={item.runId} value={item.runId}>
-        {item.operationType === CREATIVE_OPERATION.GENERATE_SCRIPT_CHAPTER ? '章节提案' : `章节 ${item.targetId} 分镜`}
+        {item.operationType === CREATIVE_OPERATION.GENERATE_SHOT_IMAGE ? `镜头 ${item.targetId} 图片`
+          : item.operationType === CREATIVE_OPERATION.GENERATE_SCRIPT_CHAPTER ? '章节提案' : `章节 ${item.targetId} 分镜`}
         {' · '}{item.status}{' · '}{item.createdAt?.replace('T', ' ')}
       </option>)}
     </select>

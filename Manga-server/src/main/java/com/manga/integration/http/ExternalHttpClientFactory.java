@@ -16,6 +16,7 @@ import reactor.netty.http.client.HttpClient;
 import reactor.netty.transport.ProxyProvider;
 
 import java.net.Authenticator;
+import java.net.InetSocketAddress;
 import java.net.PasswordAuthentication;
 import java.net.Proxy;
 import java.net.ProxySelector;
@@ -23,6 +24,7 @@ import java.net.SocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient.Redirect;
 import java.time.Duration;
+import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -61,6 +63,16 @@ public class ExternalHttpClientFactory {
         ClientCacheKey cacheKey = ClientCacheKey.web(serviceType, normalizedBaseUrl, proxySettings);
         return serviceType.cast(webClientCache.computeIfAbsent(cacheKey,
                 key -> createWebServiceInternal(serviceType, normalizedBaseUrl, proxySettings)));
+    }
+
+    /** 图片等大响应使用有界缓冲、独立超时和禁止重定向的客户端，避免凭据转发和无限占用内存。 */
+    public WebClient createBoundedWebClient(String baseUrl, ExternalProxySettings proxySettings,
+            Duration timeout, int maxResponseBytes) {
+        return WebClient.builder().baseUrl(normalizeBaseUrl(baseUrl))
+                .clientConnector(new ReactorClientHttpConnector(createReactorClient(proxySettings)
+                        .responseTimeout(timeout).followRedirect(false).disableRetry(true)))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(maxResponseBytes))
+                .build();
     }
 
     /** 创建同步服务接口代理。 */
@@ -128,7 +140,7 @@ public class ExternalHttpClientFactory {
         Proxy.Type proxyType = proxySettings.proxyType() == ExternalProxyType.SOCKS5
                 ? Proxy.Type.SOCKS
                 : Proxy.Type.HTTP;
-        Proxy proxy = new Proxy(proxyType, new java.net.InetSocketAddress(proxySettings.host(), proxySettings.port()));
+        Proxy proxy = new Proxy(proxyType, new InetSocketAddress(proxySettings.host(), proxySettings.port()));
         return new ProxySelector() {
             /** 为目标地址返回固定代理。 */
             @Override
@@ -138,7 +150,7 @@ public class ExternalHttpClientFactory {
 
             /** 记录代理连接失败事件。 */
             @Override
-            public void connectFailed(URI uri, SocketAddress address, java.io.IOException exception) {
+            public void connectFailed(URI uri, SocketAddress address, IOException exception) {
                 // 由上层调用方统一处理连接失败。
             }
         };

@@ -1,5 +1,7 @@
 package com.manga.config;
 
+import com.manga.agent.generation.GenerationConstants;
+
 import com.manga.common.constant.SecurityConstants;
 import com.manga.common.enums.CommonResponseCode;
 import com.manga.common.security.SecurityErrorResponseWriter;
@@ -43,6 +45,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, GenerationConstants.CALLBACK_PATTERN).permitAll()
                         .requestMatchers(SecurityConstants.OPENAPI_PUBLIC_PATHS).permitAll()
                         .requestMatchers(
                                 "/api/v1/public/**",

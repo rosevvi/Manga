@@ -23,7 +23,9 @@ public enum CapabilityName {
     /** 保存章节变更草稿，业务写入必须等待审批。 */
     PROPOSE_SCRIPT_CHANGE("propose_script_change"),
     /** 保存批量分镜草稿提案，业务写入必须等待审批。 */
-    PROPOSE_STORYBOARD_CHANGE("propose_storyboard_change");
+    PROPOSE_STORYBOARD_CHANGE("propose_storyboard_change"),
+    /** 提交镜头图片提案，真实计费提交必须等待用户批准。 */
+    PROPOSE_IMAGE_GENERATION("propose_image_generation");
 
     /** AgentScope 工具和快照使用的稳定名称。 */
     private final String code;
