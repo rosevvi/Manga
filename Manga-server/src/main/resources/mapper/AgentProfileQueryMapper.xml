@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.AgentProfileQueryMapper">
+    <select id="lock" resultType="com.manga.entity.AgentProfileRecord">
+        SELECT id, profile_key, built_in, enabled, active_version, last_version, revision,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_agent_profile WHERE profile_key = #{key} FOR UPDATE
+    </select>
+    <select id="find" resultType="com.manga.entity.AgentProfileRecord">
+        SELECT id, profile_key, built_in, enabled, active_version, last_version, revision,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_agent_profile WHERE profile_key = #{key}
+    </select>
+    <select id="profiles" resultType="com.manga.entity.AgentProfileRecord">
+        SELECT id, profile_key, built_in, enabled, active_version, last_version, revision,
+               created_at, updated_at, created_by, updated_by
+        FROM manga_agent_profile ORDER BY id LIMIT #{limit}
+    </select>
+    <select id="version" resultType="com.manga.entity.AgentProfileVersion">
+        SELECT id, profile_key, version_no, status, definition_json, definition_fingerprint,
+               published_at, published_by, created_at, updated_at, created_by, updated_by
+        FROM manga_agent_profile_version WHERE profile_key = #{key} AND version_no = #{version}
+    </select>
+    <select id="versions" resultType="com.manga.entity.AgentProfileVersion">
+        SELECT id, profile_key, version_no, status, definition_fingerprint,
+               published_at, published_by, created_at, updated_at, created_by, updated_by
+        FROM manga_agent_profile_version WHERE profile_key = #{key} ORDER BY version_no DESC LIMIT #{limit}
+    </select>
+    <select id="lockVersion" resultType="com.manga.entity.AgentProfileVersion">
+        SELECT id, profile_key, version_no, status, definition_json, definition_fingerprint,
+               published_at, published_by, created_at, updated_at, created_by, updated_by
+        FROM manga_agent_profile_version WHERE profile_key = #{key} AND version_no = #{version} FOR UPDATE
+    </select>
+    <select id="activeVersions" resultType="com.manga.entity.AgentProfileVersion">
+        SELECT v.id, v.profile_key, v.version_no, v.status, v.definition_json, v.definition_fingerprint,
+               v.published_at, v.published_by, v.created_at, v.updated_at, v.created_by, v.updated_by
+        FROM manga_agent_profile p JOIN manga_agent_profile_version v
+            ON v.profile_key = p.profile_key AND v.version_no = p.active_version
+        WHERE p.enabled = TRUE AND v.status = 'PUBLISHED' ORDER BY p.id LIMIT #{limit}
+    </select>
+    <select id="audits" resultType="com.manga.entity.AgentProfileAudit">
+        SELECT id, profile_key, version_no, action, previous_active_version, active_version,
+               profile_revision, definition_fingerprint, comment, created_at, updated_at, created_by, updated_by
+        FROM manga_agent_profile_audit WHERE profile_key = #{key}
+        <if test="beforeId != null">AND id &lt; #{beforeId}</if>
+        ORDER BY id DESC LIMIT #{limit}
+    </select>
+    <select id="countProfiles" resultType="int">
+        SELECT COUNT(*) FROM manga_agent_profile
+    </select>
+    <insert id="seed">
+        INSERT INTO manga_agent_profile (profile_key, built_in, enabled, last_version, revision, created_by, updated_by)
+        VALUES (#{key}, TRUE, TRUE, 0, 0, #{actor}, #{actor})
+        ON DUPLICATE KEY UPDATE profile_key = profile_key
+    </insert>
+</mapper>

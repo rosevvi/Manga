@@ -2430,6 +2430,8 @@ ADR 与 API/事件契约
 
 ### 阶段 7：管理员动态 Agent
 
+实现说明与请求链路见 [阶段 7：管理员专业 Agent 与版本发布](manga-phase7-versioned-agent-profiles.md)。角色族保持有限枚举，专业身份和版本来自数据库；配置变更只影响后续选择，已有 Step 使用冻结快照恢复。
+
 #### 目标
 
 允许管理员创建、版本化和启停 Agent Profile，不允许执行任意代码。

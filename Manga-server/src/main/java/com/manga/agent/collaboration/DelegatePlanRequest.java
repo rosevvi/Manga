@@ -1,6 +1,7 @@
 package com.manga.agent.collaboration;
 
 import com.manga.agent.profile.AgentProfileKey;
+import com.manga.agent.profile.AgentProfileContracts;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -17,8 +18,13 @@ public record DelegatePlanRequest(
     /** 单个只读 Worker 的业务任务。 */
     public record Node(
             /** 批内稳定标识，用于声明依赖。 */ @NotBlank @Pattern(regexp = "[a-z][a-z0-9_]{0,47}") String key,
-            /** 平台白名单内的 Worker Profile。 */ @NotNull AgentProfileKey profile,
+            /** 已启用发布的 Worker 配置身份。 */ @NotBlank @Pattern(regexp = AgentProfileContracts.KEY_PATTERN) String profile,
             /** 本节点要完成的具体目标。 */ @NotBlank @Size(max = 12000) String instruction,
             /** 同一计划内的前置节点标识。 */ @NotNull @Size(max = 16) List<@NotBlank String> dependsOn
-    ) { }
+    ) {
+        /** 内置调用可继续使用枚举，动态标识来自已发布目录。 */
+        public Node(String key, AgentProfileKey profile, String instruction, List<String> dependsOn) {
+            this(key, profile.code(), instruction, dependsOn);
+        }
+    }
 }

@@ -23,6 +23,7 @@ export const CREATIVE_TOOL_LABEL = Object.freeze({
   /** 图片生成需费用确认和批准。 */ propose_image_generation: '提出图片生成',
   /** 提交持久化多 Agent 子图。 */ delegate_creative_plan: '安排协作计划',
   /** 从已完成的 Worker 读取有界结果。 */ read_delegated_result: '读取协作结果',
+  /** 读取当前启用的发布配置目录。 */ list_agent_profiles: '选择专业 Agent',
 })
 
 /** Creative Run 的业务操作，与后端 CreativeOperationType 对齐。 */

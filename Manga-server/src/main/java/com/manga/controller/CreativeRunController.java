@@ -1,6 +1,7 @@
 package com.manga.controller;
 
 import com.manga.agent.api.CreateCreativeRunRequest;
+import com.manga.agent.profile.AgentProfileSelection;
 import com.manga.agent.api.CreativeApiConstants;
 import com.manga.agent.api.CreativeEventCursor;
 import com.manga.agent.api.CreativeManualRunPage;
@@ -128,7 +129,9 @@ public class CreativeRunController {
                 request.projectId(),
                 Objects.isNull(request.target()) ? null : request.target().toDomain(),
                 request.permissionPolicy(),
-                request.instruction()
+                request.instruction(),
+                Objects.isNull(request.agentProfileId()) && Objects.isNull(request.modelConfigId()) ? null
+                        : new AgentProfileSelection(request.agentProfileId(), null, request.modelConfigId(), false)
         );
     }
 

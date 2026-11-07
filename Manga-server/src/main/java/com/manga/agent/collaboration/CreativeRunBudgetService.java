@@ -46,6 +46,22 @@ public class CreativeRunBudgetService {
         return budget;
     }
 
+    /** 受理事务内将平台预算收窄到根 Profile 的冻结上限，不影响已有运行。 */
+    @Transactional
+    public void constrain(String runId, AgentBlueprint blueprint) {
+        if (Objects.isNull(blueprint.executionPolicy())) return;
+        runs.lockByRunId(runId);
+        var budget = initialize(runId);
+        var limits = blueprint.executionPolicy().budget();
+        budget.setMaxSteps(Math.min(budget.getMaxSteps(), limits.maxSteps()));
+        budget.setMaxDepth(Math.min(budget.getMaxDepth(), limits.maxDepth()));
+        budget.setMaxParallel(Math.min(budget.getMaxParallel(), limits.maxParallel()));
+        budget.setMaxRepairRounds(Math.min(budget.getMaxRepairRounds(), limits.maxRepairRounds()));
+        budget.setMaxInvocations(Math.min(budget.getMaxInvocations(), limits.maxInvocations()));
+        budget.setMaxReservedTurns(Math.min(budget.getMaxReservedTurns(), limits.maxReservedTurns()));
+        graph.update(budget);
+    }
+
     /** 一个 owner epoch 只预留一次；额度按最大轮数保守计算，失败不退款。 */
     @Transactional
     public void reserve(ClaimedCreativeStep claim, AgentBlueprint blueprint) {
@@ -55,6 +71,12 @@ public class CreativeRunBudgetService {
         if (Objects.equals(step.getReservedEpoch(), claim.ownerEpoch())) return;
         CreativeRunBudget budget = initialize(claim.runId());
         int turns = blueprint.maxTurns() + 1;
+        if (Objects.nonNull(step.getParentStepId()) && Objects.nonNull(blueprint.executionPolicy())) {
+            var limits = blueprint.executionPolicy().budget();
+            if (step.getAttemptNo() > limits.maxInvocations() || (long) step.getAttemptNo() * turns > limits.maxReservedTurns()) {
+                throw new AgentRuntimeException(CreativeErrorCode.BUDGET_EXCEEDED, CollaborationMessages.BUDGET_EXCEEDED);
+            }
+        }
         if (budget.getUsedInvocations() >= budget.getMaxInvocations()
                 || (long) budget.getReservedTurns() + turns > budget.getMaxReservedTurns()) {
             throw new AgentRuntimeException(CreativeErrorCode.BUDGET_EXCEEDED, CollaborationMessages.BUDGET_EXCEEDED);

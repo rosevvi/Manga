@@ -29,7 +29,8 @@ public enum CapabilityName {
     PROPOSE_IMAGE_GENERATION("propose_image_generation"),
     /** 持久化委派计划并暂停 Director。 */ DELEGATE_CREATIVE_PLAN("delegate_creative_plan"),
     /** Worker 提交经过 schema 校验的不可变结果。 */ SUBMIT_CREATIVE_STEP_RESULT("submit_creative_step_result"),
-    /** 读取授权范围内已完成的协作结果。 */ READ_DELEGATED_RESULT("read_delegated_result");
+    /** 读取授权范围内已完成的协作结果。 */ READ_DELEGATED_RESULT("read_delegated_result"),
+    /** 发现管理员已发布的专业 Worker 配置。 */ LIST_AGENT_PROFILES("list_agent_profiles");
 
     /** AgentScope 工具和快照使用的稳定名称。 */
     private final String code;

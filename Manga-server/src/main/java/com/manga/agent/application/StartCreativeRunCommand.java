@@ -1,6 +1,7 @@
 package com.manga.agent.application;
 
 import com.manga.agent.domain.AgentPermissionPolicy;
+import com.manga.agent.profile.AgentProfileSelection;
 import com.manga.agent.domain.CreativeOperationType;
 import com.manga.agent.domain.CreativeResourceReference;
 import com.manga.agent.domain.CreativeRuntimeMessages;
@@ -31,8 +32,16 @@ public record StartCreativeRunCommand(
         /** 本次 Run 允许 Agent 使用的最高业务权限。 */
         AgentPermissionPolicy permissionPolicy,
         /** 用户本次提交的自然语言指令或操作补充说明。 */
-        String instruction
+        String instruction,
+        /** 可选专业 Agent 选择；管理员精确版本测试由服务端构造。 */ AgentProfileSelection agentSelection
 ) {
+
+    /** 默认按业务操作绑定内置 Agent。 */
+    public StartCreativeRunCommand(long userId, String requestId, CreativeRunTriggerSource triggerSource,
+            CreativeOperationType operationType, String conversationId, Long projectId,
+            CreativeResourceReference target, AgentPermissionPolicy permissionPolicy, String instruction) {
+        this(userId, requestId, triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, null);
+    }
 
     public StartCreativeRunCommand {
         if (userId <= 0) {

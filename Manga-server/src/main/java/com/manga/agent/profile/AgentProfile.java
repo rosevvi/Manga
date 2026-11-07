@@ -9,7 +9,7 @@ import java.util.Set;
  * 描述不携带用户、项目或 Run 数据的长期 Agent 定义。
  */
 public record AgentProfile(
-        /** Profile 的稳定机器标识。 */
+        /** 固定执行角色族，专业配置身份由 executionPolicy 提供。 */
         AgentProfileKey key,
         /** Profile 语义版本。 */
         long version,
@@ -24,8 +24,15 @@ public record AgentProfile(
         /** Profile 允许的最高业务权限。 */
         AgentPermissionPolicy permissionPolicy,
         /** 单次执行允许的最大推理轮次。 */
-        int maxTurns
+        int maxTurns,
+        /** 已发布身份、模型与预算快照；内置初始化定义可为空。 */ AgentExecutionPolicy executionPolicy
 ) {
+
+    /** 内置初始化定义使用平台默认模型策略与预算。 */
+    public AgentProfile(AgentProfileKey key, long version, String displayName, String description,
+            String systemPrompt, Set<CapabilityName> allowedCapabilities, AgentPermissionPolicy permissionPolicy, int maxTurns) {
+        this(key, version, displayName, description, systemPrompt, allowedCapabilities, permissionPolicy, maxTurns, null);
+    }
 
     /** 固化白名单，避免调用方修改 Profile。 */
     public AgentProfile {

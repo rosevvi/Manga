@@ -6,8 +6,17 @@ import com.manga.agent.config.CreativeAgentProperties;
 import com.manga.agent.domain.AgentPermissionPolicy;
 import com.manga.agent.domain.CreativeRuntimeMessages;
 import com.manga.agent.model.ModelConfigurationFingerprint;
+import com.manga.agent.model.AgentModelProviderRegistry;
 import com.manga.agent.profile.AgentProfile;
 import com.manga.agent.profile.AgentProfileSource;
+import com.manga.agent.profile.AgentExecutionPolicy;
+import com.manga.agent.profile.AgentBudgetLimits;
+import com.manga.agent.profile.AgentModelSelection;
+import com.manga.agent.profile.AgentProfileContracts;
+import com.manga.agent.profile.AgentProfileResponseCode;
+import com.manga.agent.profile.AgentProfilePolicySupport;
+import com.manga.agent.capability.CapabilityName;
+import com.manga.common.exception.BusinessException;
 import com.manga.entity.AiProviderConfig;
 import com.manga.repository.AiProviderConfigRepository;
 import org.springframework.stereotype.Component;
@@ -27,6 +36,7 @@ public class AgentBlueprintCompiler {
     private final CreativeAgentProperties properties;
     private final ModelConfigurationFingerprint modelFingerprint;
     private final AgentBlueprintCodec blueprintCodec;
+    private final AgentModelProviderRegistry modelProviders;
 
     public AgentBlueprintCompiler(
             AgentProfileSource profileSource,
@@ -34,50 +44,56 @@ public class AgentBlueprintCompiler {
             AiProviderConfigRepository modelConfigRepository,
             CreativeAgentProperties properties,
             ModelConfigurationFingerprint modelFingerprint,
-            AgentBlueprintCodec blueprintCodec) {
+            AgentBlueprintCodec blueprintCodec,
+            AgentModelProviderRegistry modelProviders) {
         this.profileSource = profileSource;
         this.capabilityRegistry = capabilityRegistry;
         this.modelConfigRepository = modelConfigRepository;
         this.properties = properties;
         this.modelFingerprint = modelFingerprint;
         this.blueprintCodec = blueprintCodec;
+        this.modelProviders = modelProviders;
     }
 
     /** 编译并序列化 Blueprint；密钥只参与内存中的摘要计算，不进入快照。 */
     public CompiledAgentBlueprint compile(AgentBlueprintCompileRequest request) {
-        AgentProfile profile = profileSource.require(request.profileKey());
+        AgentProfile profile = Objects.isNull(request.profileId()) ? profileSource.require(request.profileKey())
+                : profileSource.require(request.profileId());
+        return compileResolved(profile, request, false, profile.maxTurns());
+    }
+
+    /** 管理员测试精确版本；只读工具子集和预算固定进快照，不调用模型。 */
+    public CompiledAgentBlueprint compileSandbox(AgentProfile profile, AgentBlueprintCompileRequest request, int maxTurns) {
+        return compileResolved(profile, request, true, Math.min(profile.maxTurns(), maxTurns));
+    }
+
+    /** 将选定版本和实际模型决策冻结成完整规格。 */
+    private CompiledAgentBlueprint compileResolved(AgentProfile profile, AgentBlueprintCompileRequest request, boolean sandbox, int turns) {
         requirePermission(profile, request.permissionPolicy());
-        AiProviderConfig config = requireModelConfig(request);
-        ModelSnapshot model = modelSnapshot(config);
-        List<CapabilityManifest> capabilities = capabilityRegistry
-                .descriptors(profile.allowedCapabilities())
-                .stream()
+        AgentExecutionPolicy policy = profile.executionPolicy();
+        if (!sandbox && !AgentProfilePolicySupport.rootSelectable(profile)) throw new BusinessException(AgentProfileResponseCode.UNAVAILABLE);
+        if (Objects.nonNull(policy) && policy.model().selection() == AgentModelSelection.USER_DEFAULT
+                && Objects.nonNull(request.modelConfigId())) throw new BusinessException(AgentProfileResponseCode.INVALID);
+        ModelSnapshot model = modelSnapshot(requireModelConfig(request));
+        if (!modelProviders.supports(model.providerType())) throw new BusinessException(AgentProfileResponseCode.MODEL_UNAVAILABLE);
+        if (Objects.nonNull(policy)) AgentProfilePolicySupport.requireModel(policy.model(), model);
+        if (sandbox) {
+            if (Objects.isNull(policy) || request.permissionPolicy() != AgentPermissionPolicy.READ_ONLY) {
+                throw new BusinessException(AgentProfileResponseCode.INVALID);
+            }
+            policy = new AgentExecutionPolicy(policy.profileId(), policy.displayName(), policy.model(),
+                    new AgentBudgetLimits(1, 1, 1, 0, 1, turns + 1), true);
+        }
+        List<CapabilityManifest> capabilities = capabilityRegistry.descriptors(profile.allowedCapabilities()).stream()
                 .filter(capability -> request.permissionPolicy().allows(capability.requiredPermission()))
-                .map(this::manifest)
-                .toList();
-        AgentBlueprintFingerprintMaterial fingerprintMaterial = new AgentBlueprintFingerprintMaterial(
-                profile.key(),
-                profile.version(),
-                model,
-                profile.systemPrompt(),
-                request.stableVariables(),
-                capabilities,
-                request.permissionPolicy(),
-                profile.maxTurns()
-        );
-        String fingerprint = blueprintCodec.fingerprint(fingerprintMaterial);
-        AgentBlueprint blueprint = new AgentBlueprint(
-                new AgentKernelKey(fingerprint),
-                profile.key(),
-                profile.version(),
-                model,
-                profile.systemPrompt(),
-                request.stableVariables(),
-                capabilities,
-                request.permissionPolicy(),
-                profile.maxTurns(),
-                fingerprint
-        );
+                .filter(capability -> !sandbox || CapabilityName.phaseTwoReadOnlyCapabilities().contains(capability.name()))
+                .map(this::manifest).toList();
+        String prompt = profile.systemPrompt() + (sandbox ? AgentProfileContracts.SANDBOX_PROMPT : "");
+        var material = new AgentBlueprintFingerprintMaterial(profile.key(), profile.version(), model, prompt,
+                request.stableVariables(), capabilities, request.permissionPolicy(), turns, policy);
+        String fingerprint = blueprintCodec.fingerprint(material);
+        var blueprint = new AgentBlueprint(new AgentKernelKey(fingerprint), profile.key(), profile.version(), model, prompt,
+                request.stableVariables(), capabilities, request.permissionPolicy(), turns, fingerprint, policy);
         return new CompiledAgentBlueprint(blueprint, blueprintCodec.serialize(blueprint));
     }
 
@@ -87,10 +103,10 @@ public class AgentBlueprintCompiler {
                 ? modelConfigRepository.findDefaultOwnedBy(request.userId()).orElse(null)
                 : modelConfigRepository.findOwnedById(request.modelConfigId(), request.userId()).orElse(null);
         if (Objects.isNull(config) || !Boolean.TRUE.equals(config.getEnabled())) {
-            throw new IllegalStateException(CreativeRuntimeMessages.AGENT_MODEL_CONFIG_UNAVAILABLE);
+            throw new BusinessException(AgentProfileResponseCode.MODEL_UNAVAILABLE);
         }
         if (Objects.isNull(config.getDefaultModel()) || config.getDefaultModel().isBlank()) {
-            throw new IllegalStateException(CreativeRuntimeMessages.AGENT_MODEL_NAME_REQUIRED);
+            throw new BusinessException(AgentProfileResponseCode.MODEL_UNAVAILABLE);
         }
         return config;
     }
@@ -107,6 +123,7 @@ public class AgentBlueprintCompiler {
         );
     }
 
+    /** 工具描述符进入冻结白名单和指纹。 */
     private CapabilityManifest manifest(CapabilityDescriptor descriptor) {
         return new CapabilityManifest(
                 descriptor.name(),

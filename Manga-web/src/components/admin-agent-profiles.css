@@ -1,0 +1,22 @@
+.agent-admin { padding: 24px; max-width: 1400px; margin: auto; color: #253044; }
+.agent-admin header, .agent-admin-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.agent-admin-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 24px; margin-top: 20px; }
+.agent-admin nav { display: flex; flex-direction: column; gap: 8px; }
+.agent-admin nav button { text-align: left; overflow-wrap: anywhere; }
+.agent-admin nav button.selected { border-color: #7356d5; background: #f0ecff; }
+.agent-admin small { display: block; color: #687386; }
+.agent-admin button { padding: 8px 12px; margin: 4px; background: white; border: 1px solid #d8dce5; border-radius: 7px; cursor: pointer; }
+.agent-admin button:disabled { opacity: .5; cursor: default; }
+.agent-admin label { display: grid; gap: 6px; margin: 10px 0; font-size: 13px; }
+.agent-admin input:not([type=checkbox]), .agent-admin textarea, .agent-admin select { width: 100%; padding: 8px; border: 1px solid #d8dce5; border-radius: 6px; color: inherit; background: white; box-sizing: border-box; }
+.agent-admin textarea { resize: vertical; }
+.agent-admin fieldset, .agent-admin main > section { min-width: 0; margin: 16px 0; padding: 16px; border: 1px solid #d8dce5; border-radius: 10px; background: #fff; }
+.agent-admin-fields, .agent-diff { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.agent-capabilities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.agent-capabilities label { display: flex; align-items: flex-start; gap: 8px; margin: 4px; overflow-wrap: anywhere; }
+.agent-diff pre { min-width: 0; max-height: 280px; padding: 12px; background: #f5f6fa; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.agent-admin code, .agent-admin p { overflow-wrap: anywhere; white-space: pre-wrap; }
+.agent-admin-error { color: #b43141; }
+.agent-admin table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.agent-admin td, .agent-admin th { text-align: left; padding: 8px; border-bottom: 1px solid #edf0f5; overflow-wrap: anywhere; }
+@media (max-width: 900px) { .agent-admin-layout, .agent-admin-fields, .agent-capabilities, .agent-diff { grid-template-columns: 1fr; } .agent-admin { padding: 12px; } }

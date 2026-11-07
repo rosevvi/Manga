@@ -8,6 +8,8 @@ import CreativeChangeSetPanel from './CreativeChangeSetPanel'
 import GenerationJobsPanel from './GenerationJobsPanel'
 import CreativeRunGraph from './CreativeRunGraph'
 import { regenerationInstruction } from './changeSetPreview'
+import { listAgentCatalog } from '../api/agentProfileApi'
+import { CREATIVE_PERMISSION } from '../constants/creative'
 
 /** 网络重连间隔，单位：毫秒。 */
 const RECONNECT_DELAY_MS = 1500
@@ -37,12 +39,23 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [agentCatalog, setAgentCatalog] = useState([])
+  const [selectedAgent, setSelectedAgent] = useState('')
   const selectedRef = useRef(null)
   const activeRef = useRef(null)
   const scopeRef = useRef(0)
   const historyVersionRef = useRef(0)
   const busy = submitting || Boolean(activeRun)
   const conversationProjectId = projectId || conversations.find((item) => item.conversationId === conversationId)?.projectId
+
+  /** 打开会话时重新读取发布目录，管理员启停和发布不依赖前端本地缓存。 */
+  useEffect(() => {
+    if (!open || !accessToken) return undefined
+    let stopped = false
+    listAgentCatalog(accessToken).then((items) => { if (!stopped) setAgentCatalog(items.filter((item) => item.rootSelectable)) })
+      .catch((failure) => { if (!stopped) setError(failure.message) })
+    return () => { stopped = true }
+  }, [accessToken, open])
 
   /** 切换会话时隔离旧异步响应、消息和 SSE cursor。 */
   const selectConversation = useCallback((id) => {
@@ -192,6 +205,9 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
         requestId: nextRequestId(), instruction: prompt,
         projectId: projectId || conversations.find((conversation) => conversation.conversationId === conversationId)?.projectId,
         conversationId,
+        agentProfileId: selectedAgent || null,
+        permissionPolicy: selectedAgent ? agentCatalog.find((item) => item.profileId === selectedAgent)?.permissionPolicy
+          : conversationProjectId ? CREATIVE_PERMISSION.PROPOSE_CHANGES : CREATIVE_PERMISSION.READ_ONLY,
       })
       if (scope !== scopeRef.current) return
       setInstruction('')
@@ -259,6 +275,9 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
       </button>
       {open && <section className="assistant-panel">
         <header><div><strong>AI 漫剧助手</strong><span>{activeRun?.status || '就绪'}</span></div></header>
+        <div className="assistant-conversations"><select aria-label="选择专业 Agent" disabled={busy || loading} value={selectedAgent} onChange={(event) => setSelectedAgent(event.target.value)}>
+          <option value="">平台创作导演</option>{agentCatalog.map((agent) => <option key={agent.profileId} value={agent.profileId}>{agent.displayName} · v{agent.version}</option>)}
+        </select></div>
         <div className="assistant-conversations">
           <select aria-label="选择历史会话" value={conversationId || ''} disabled={submitting}
             onChange={(event) => selectConversation(event.target.value || null)}>

@@ -35,6 +35,8 @@ import UserAccountMenu from './UserAccountMenu'
 import ProjectModule from './ProjectModule'
 import StoryboardModule from './StoryboardModule'
 import AiProviderSettings from './AiProviderSettings'
+import AdminAgentProfiles from './AdminAgentProfiles'
+import { AGENT_ADMIN_ROLE, AGENT_PROFILE_NAV } from '../constants/agentProfile'
 import ProjectWorkspace from './ProjectWorkspace'
 import MangaAssistant from './MangaAssistant'
 import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
@@ -50,6 +52,7 @@ const SIDEBAR_NAV_ITEMS = [
   { id: 'storyboards', labelKey: 'dashboard.nav.storyboards', icon: LayoutPanelTop },
   { id: 'ai-tools', labelKey: 'dashboard.nav.aiTools', icon: WandSparkles },
   { id: 'ai-settings', labelKey: 'dashboard.nav.aiSettings', icon: Settings2 },
+  { id: AGENT_PROFILE_NAV, labelKey: 'dashboard.nav.agentProfiles', icon: Sparkles, adminOnly: true },
   { id: 'creations', labelKey: 'dashboard.nav.creations', icon: GalleryVerticalEnd },
   { id: 'favorites', labelKey: 'dashboard.nav.favorites', icon: Heart },
   { id: 'trash', labelKey: 'dashboard.nav.trash', icon: Trash2 },
@@ -149,6 +152,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   const displayName = authSession?.user?.displayName || DEFAULT_USER_NAME
   const accessToken = authSession?.accessToken
   const isGuest = Boolean(authSession?.user?.guest)
+  const isAdmin = Boolean(authSession?.user?.roles?.includes(AGENT_ADMIN_ROLE))
 
   /** 刷新当前用户项目，游客保持只读控制台体验。 */
   const loadProjects = useCallback(async () => {
@@ -248,7 +252,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
         </button>
 
         <nav className="dashboard-nav" aria-label={translate('dashboard.navigation')}>
-          {SIDEBAR_NAV_ITEMS.map(({ id, labelKey, icon: Icon }) => (
+          {SIDEBAR_NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map(({ id, labelKey, icon: Icon }) => (
             <button
               className={activeNav === id ? 'dashboard-nav-item active' : 'dashboard-nav-item'}
               key={id}
@@ -336,6 +340,8 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
           />
         ) : activeNav === 'ai-settings' ? (
           <AiProviderSettings accessToken={accessToken} isGuest={isGuest} />
+        ) : activeNav === AGENT_PROFILE_NAV && isAdmin ? (
+          <AdminAgentProfiles accessToken={accessToken} projects={projects} />
         ) : (
           <>
         <section className="dashboard-welcome" aria-labelledby="dashboard-title">

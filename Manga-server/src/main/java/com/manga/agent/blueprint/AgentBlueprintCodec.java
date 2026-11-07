@@ -62,7 +62,7 @@ public class AgentBlueprintCodec {
                 blueprint.stableVariables(),
                 blueprint.capabilities(),
                 blueprint.permissionPolicy(),
-                blueprint.maxTurns());
+                blueprint.maxTurns(), blueprint.executionPolicy());
     }
 
     /** 执行规范化 JSON 序列化。 */

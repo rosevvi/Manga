@@ -9,6 +9,8 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Pattern;
+import com.manga.agent.profile.AgentProfileContracts;
 import jakarta.validation.constraints.Size;
 import org.springframework.util.StringUtils;
 
@@ -33,8 +35,16 @@ public record CreateCreativeRunRequest(
         /** 本次 Run 允许 Agent 使用的最高业务权限。 */
         @NotNull AgentPermissionPolicy permissionPolicy,
         /** 用户自然语言指令或手动操作的补充说明。 */
-        @NotBlank @Size(max = 12000) String instruction
+        @NotBlank @Size(max = 12000) String instruction,
+        /** 可选已发布根专业 Agent，仅支持会话入口。 */ @Pattern(regexp = AgentProfileContracts.KEY_PATTERN) String agentProfileId,
+        /** 可选用户自己的模型配置。 */ @Positive Long modelConfigId
 ) {
+
+    /** 默认使用业务操作绑定的内置 Agent。 */
+    public CreateCreativeRunRequest(String requestId, CreativeRunTriggerSource triggerSource, CreativeOperationType operationType,
+            String conversationId, Long projectId, CreativeTargetRequest target, AgentPermissionPolicy permissionPolicy, String instruction) {
+        this(requestId, triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, null, null);
+    }
 
     /** 校验会话入口与手动入口不能混用的字段组合。 */
     @AssertTrue(message = CreativeRuntimeMessages.REQUEST_SCOPE_INVALID)
@@ -45,7 +55,8 @@ public record CreateCreativeRunRequest(
         if (triggerSource == CreativeRunTriggerSource.CONVERSATION) {
             return operationType == CreativeOperationType.ASSISTANT_CHAT && Objects.isNull(target);
         }
-        return operationType != CreativeOperationType.ASSISTANT_CHAT
+        return Objects.isNull(agentProfileId) && Objects.isNull(modelConfigId)
+                && operationType != CreativeOperationType.ASSISTANT_CHAT
                 && !StringUtils.hasText(conversationId)
                 && Objects.nonNull(projectId)
                 && Objects.nonNull(target);

@@ -13,10 +13,17 @@ import java.util.Objects;
 public final class CreativePlanValidator {
     /** 拒绝重复节点、未知依赖、环、非 Worker 角色和未受评审覆盖的分支。 */
     public static void validate(DelegatePlanRequest request, int maxBatch) {
+        Map<String, AgentProfileKey> roles = new HashMap<>();
+        request.nodes().forEach(node -> roles.put(node.profile(), AgentProfileKey.fromCode(node.profile())));
+        validate(request, maxBatch, roles);
+    }
+
+    /** 动态配置的角色来自已冻结的 Blueprint，不能由模型在参数中自报。 */
+    public static void validate(DelegatePlanRequest request, int maxBatch, Map<String, AgentProfileKey> roles) {
         if (request.nodes().size() > maxBatch) invalid();
         Map<String, DelegatePlanRequest.Node> indexed = new HashMap<>();
         for (var node : request.nodes()) {
-            if (node.profile() == AgentProfileKey.MANGA_DIRECTOR || CollaborationToolContract.JOIN_NODE_KEY.equals(node.key())
+            if (Objects.isNull(roles.get(node.profile())) || roles.get(node.profile()) == AgentProfileKey.MANGA_DIRECTOR || CollaborationToolContract.JOIN_NODE_KEY.equals(node.key())
                     || Objects.nonNull(indexed.put(node.key(), node))
                     || new HashSet<>(node.dependsOn()).size() != node.dependsOn().size()) invalid();
         }
@@ -24,7 +31,7 @@ public final class CreativePlanValidator {
             if (!indexed.keySet().containsAll(node.dependsOn())) invalid();
             ancestors(node.key(), indexed, new HashSet<>());
         }
-        var reviewers = request.nodes().stream().filter(node -> node.profile() == AgentProfileKey.CONTINUITY_REVIEWER).toList();
+        var reviewers = request.nodes().stream().filter(node -> roles.get(node.profile()) == AgentProfileKey.CONTINUITY_REVIEWER).toList();
         if (reviewers.size() != 1 || ancestors(reviewers.getFirst().key(), indexed, new HashSet<>()).size() != indexed.size() - 1) invalid();
     }
 

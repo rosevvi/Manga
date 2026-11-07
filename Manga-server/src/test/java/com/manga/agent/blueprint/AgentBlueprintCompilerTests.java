@@ -12,6 +12,8 @@ import com.manga.agent.profile.AgentProfile;
 import com.manga.agent.profile.AgentProfileKey;
 import com.manga.agent.profile.AgentProfileSource;
 import com.manga.agent.model.ModelConfigurationFingerprint;
+import com.manga.agent.model.AgentModelProviderRegistry;
+import com.manga.agent.model.OpenAiCompatibleChatModelProvider;
 import com.manga.common.enums.AiProviderType;
 import com.manga.common.enums.AiProxyType;
 import com.manga.entity.AiProviderConfig;
@@ -141,7 +143,8 @@ class AgentBlueprintCompilerTests {
                 repository,
                 properties,
                 new ModelConfigurationFingerprint(objectMapper),
-                new AgentBlueprintCodec(objectMapper)
+                new AgentBlueprintCodec(objectMapper),
+                new AgentModelProviderRegistry(List.of(new OpenAiCompatibleChatModelProvider()))
         );
     }
 

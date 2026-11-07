@@ -23,8 +23,10 @@ export function createConversationRun(accessToken, request) {
       conversationId: request.conversationId || null,
       projectId: request.projectId || null,
       target: null,
-      permissionPolicy: request.projectId ? CREATIVE_PERMISSION.PROPOSE_CHANGES : CREATIVE_PERMISSION.READ_ONLY,
+      permissionPolicy: request.permissionPolicy || (request.projectId ? CREATIVE_PERMISSION.PROPOSE_CHANGES : CREATIVE_PERMISSION.READ_ONLY),
       instruction: request.instruction,
+      agentProfileId: request.agentProfileId || null,
+      modelConfigId: request.modelConfigId || null,
     }),
   })
 }

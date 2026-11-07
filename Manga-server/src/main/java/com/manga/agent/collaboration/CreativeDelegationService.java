@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
 
 /** 工具事务只提交冻结计划；不在模型回调栈内调度或等待其他 Agent。 */
 @Service
@@ -43,11 +45,12 @@ public class CreativeDelegationService {
         CollaborationGuard.requireRun(run, parent, context);
         var blueprint = blueprints.deserialize(parent.getBlueprintSnapshotJson());
         if (Objects.nonNull(parent.getParentStepId()) || blueprint.profileKey() != AgentProfileKey.MANGA_DIRECTOR
+                || (Objects.nonNull(blueprint.executionPolicy()) && blueprint.executionPolicy().sandbox())
                 || Objects.isNull(run.getProjectId()) || Objects.nonNull(parent.getApprovalResultJson())
                 || proposals.findByStep(parent.getStepId()).isPresent()
                 || !StringUtils.hasText(command.toolCallId()) || command.toolCallId().length() > 128) invalid();
         DelegatePlanRequest request = codec.validate(command.input(), DelegatePlanRequest.class);
-        CreativePlanValidator.validate(request, properties.maxBatchSize());
+
         String fingerprint = CapabilityContractSupport.sha256(codec.write(request));
         var plans = graph.plans(run.getRunId());
         var existing = plans.stream().filter(plan -> plan.getParentStepId().equals(parent.getStepId()))
@@ -67,8 +70,11 @@ public class CreativeDelegationService {
                 || round > budget.getMaxRepairRounds() + 1) {
             throw new AgentRuntimeException(CreativeErrorCode.BUDGET_EXCEEDED, CollaborationMessages.BUDGET_EXCEEDED);
         }
-        FrozenDelegation frozen = new FrozenDelegation(request, request.nodes().stream()
-                .map(node -> workers.freeze(node.profile(), blueprint)).toList());
+        var snapshots = request.nodes().stream().map(node -> workers.freeze(node.profile(), blueprint)).toList();
+        Map<String, AgentProfileKey> roles = new HashMap<>();
+        for (int index = 0; index < snapshots.size(); index++) roles.put(request.nodes().get(index).profile(), snapshots.get(index).profileKey());
+        CreativePlanValidator.validate(request, properties.maxBatchSize(), roles);
+        FrozenDelegation frozen = new FrozenDelegation(request, snapshots);
         String actor = CreativeActor.user(context.userId());
         CreativeDelegation plan = new CreativeDelegation();
         plan.setPlanId(UUID.randomUUID().toString());

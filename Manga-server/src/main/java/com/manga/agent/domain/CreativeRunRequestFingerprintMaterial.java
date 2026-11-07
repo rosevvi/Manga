@@ -1,5 +1,8 @@
 package com.manga.agent.domain;
 
+import com.manga.agent.profile.AgentProfileSelection;
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 /**
  * 定义幂等请求指纹参与规范化序列化的稳定字段。
  */
@@ -17,6 +20,13 @@ public record CreativeRunRequestFingerprintMaterial(
         /** 请求允许的最高权限策略。 */
         AgentPermissionPolicy permissionPolicy,
         /** 用户提交的原始创作指令。 */
-        String instruction
+        String instruction,
+        /** 专业配置、精确测试版本和模型选择参与幂等校验。 */
+        @JsonInclude(JsonInclude.Include.NON_NULL) AgentProfileSelection agentSelection
 ) {
+    /** 默认业务操作没有显式选择，保持原请求指纹材料。 */
+    public CreativeRunRequestFingerprintMaterial(CreativeRunTriggerSource triggerSource, CreativeOperationType operationType,
+            String conversationId, Long projectId, CreativeResourceReference target, AgentPermissionPolicy permissionPolicy, String instruction) {
+        this(triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, null);
+    }
 }

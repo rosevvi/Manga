@@ -19,8 +19,8 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class MangaHarnessFactory {
 
-    /** AgentScope 中只用于诊断的稳定 Director 描述。 */
-    private static final String DIRECTOR_DESCRIPTION = "Manga creative director with reviewed proposals";
+    /** AgentScope 中用于诊断的通用执行描述，不携带用户内容。 */
+    private static final String AGENT_DESCRIPTION = "Manga creative agent with frozen capabilities";
 
     private final AgentBlueprintPreflight blueprintPreflight;
     private final AgentModelFactory modelFactory;
@@ -56,8 +56,8 @@ public class MangaHarnessFactory {
             Toolkit toolkit) {
         return HarnessAgent.builder()
                 .agentId(blueprint.kernelKey().value())
-                .name(blueprint.profileKey().code())
-                .description(DIRECTOR_DESCRIPTION)
+                .name(blueprint.profileId())
+                .description(AGENT_DESCRIPTION)
                 .sysPrompt(blueprint.systemPrompt())
                 .model(model.model())
                 .toolkit(toolkit)

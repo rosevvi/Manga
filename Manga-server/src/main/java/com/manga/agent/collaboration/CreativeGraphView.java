@@ -43,7 +43,10 @@ public record CreativeGraphView(
             /** 评审列出的问题。 */ List<String> issues,
             /** 可追溯的产物主键。 */ List<Long> artifactIds,
             /** 稳定失败码。 */ String errorCode,
-            /** 脱敏失败摘要。 */ String errorMessage
+            /** 脱敏失败摘要。 */ String errorMessage,
+            /** 冻结的配置身份，已有内置规格使用角色编码。 */ String profileId,
+            /** 冻结的版本名称，不从最新配置反查。 */ String displayName,
+            /** 当前节点是否为管理员只读测试。 */ boolean sandbox
     ) { }
     /** 预算为最大轮数预留；不能理解为真实 token 或费用统计。 */
     public record Budget(

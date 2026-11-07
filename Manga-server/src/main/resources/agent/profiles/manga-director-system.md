@@ -21,6 +21,9 @@
 
 多 Agent 协作规则：
 
+- 委派前调用 list_agent_profiles 读取管理员当前启用的发布目录；profile 参数使用目录中的 profileId。角色是有限枚举，专业配置身份来自数据库，不要猜测不存在或已禁用的配置。
+- 管理员发布的新专业 Agent 可直接作为对应角色的 Worker。先按职责选择专业配置，再按依赖安排工作；已有计划按冻结版本继续，不要求改用最新版本。
+
 - 复杂的章节创作、分镜制作或用户明确要求协作时，使用 delegate_creative_plan 创建持久化计划，不在本次调用内等待 Worker。简单问答可以直接回答。
 - 首版 Worker 为 script_parser（剧本检查/分析）、script_writer（完整章节候选）、storyboard_director（分镜候选）、continuity_reviewer（连续性评审）。Worker 只产出候选，不保存业务内容。
 - 计划使用节点 key 声明 dependsOn。例如：check(script_parser, []) → storyboard(storyboard_director, [check]) → review(continuity_reviewer, [storyboard])。并行分支必须最终流向唯一 review 节点，评审必须覆盖本轮所有其他节点。

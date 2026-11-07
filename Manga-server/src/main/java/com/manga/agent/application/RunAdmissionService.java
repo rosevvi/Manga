@@ -28,6 +28,7 @@ import com.manga.agent.event.RunAcceptedEventPayload;
 import com.manga.agent.event.StepCreatedEventPayload;
 import com.manga.agent.execution.CreativeStepDispatcher;
 import com.manga.agent.profile.AgentOperationBinding;
+import com.manga.agent.profile.AgentProfileResponseCode;
 import com.manga.agent.state.AgentStateSessionService;
 import com.manga.common.enums.CommonResponseCode;
 import com.manga.common.exception.BusinessException;
@@ -60,6 +61,7 @@ import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * 在一个事务内完成 Run 受理、根 Step 创建、事件日志和调度 Outbox 落库。
@@ -99,6 +101,32 @@ public class RunAdmissionService {
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public CreativeRunStartResult admit(StartCreativeRunCommand command) {
+        return admitInternal(command, null);
+    }
+
+    /** 已受理请求只校验原请求指纹并返回回执，不重新解析可能已禁用或编辑的配置。 */
+    @Transactional(readOnly = true)
+    public Optional<CreativeRunStartResult> replayIfAdmitted(StartCreativeRunCommand command) {
+        return runRepository.findByRequestId(command.userId(), command.requestId()).map(existing -> {
+            requireSameRequest(existing, requestFingerprint(command));
+            return toResult(existing);
+        });
+    }
+
+    /** 管理员测试只接收服务端预编译的只读沙箱规格，沿用受理、幂等和恢复链路。 */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public CreativeRunStartResult admitSandbox(StartCreativeRunCommand command, CompiledAgentBlueprint blueprint) {
+        if (Objects.isNull(command.agentSelection()) || !command.agentSelection().sandbox()
+                || Objects.isNull(blueprint.blueprint().executionPolicy()) || !blueprint.blueprint().executionPolicy().sandbox()
+                || command.operationType() != CreativeOperationType.ASSISTANT_CHAT
+                || command.permissionPolicy() != AgentPermissionPolicy.READ_ONLY) {
+            throw new BusinessException(AgentProfileResponseCode.INVALID);
+        }
+        return admitInternal(command, blueprint);
+    }
+
+    /** 两类入口共享一份事务实现，沙箱没有额外后台执行管道。 */
+    private CreativeRunStartResult admitInternal(StartCreativeRunCommand command, CompiledAgentBlueprint sandbox) {
         String requestFingerprint = requestFingerprint(command);
         CreativeRun existing = runRepository.findByRequestId(command.userId(), command.requestId()).orElse(null);
         if (Objects.nonNull(existing)) {
@@ -113,7 +141,8 @@ public class RunAdmissionService {
         if (Objects.nonNull(projectId) && !projectId.equals(command.projectId())) {
             projectService.requireAccessibleProject(projectId, command.userId());
         }
-        AgentStepConfiguration agentStep = resolveAgentStep(command, projectId);
+        AgentStepConfiguration agentStep = Objects.isNull(sandbox) ? resolveAgentStep(command, projectId)
+                : new AgentStepConfiguration(sandbox, identifierGenerator.nextStateSessionId());
         CreativeRun run = createRun(command, conversation, projectId, requestFingerprint);
         String executionInstruction = conversationMemory.compose(conversation, command.instruction());
         try {
@@ -122,6 +151,7 @@ public class RunAdmissionService {
             throw new BusinessException(CreativeRuntimeResponseCode.ACTIVE_RUN_CONFLICT, HttpStatus.CONFLICT);
         }
         budgets.initialize(run.getRunId());
+        if (Objects.nonNull(agentStep)) budgets.constrain(run.getRunId(), agentStep.blueprint().blueprint());
         CreativeStep rootStep = createRootStep(command, run, agentStep, executionInstruction);
         stepRepository.create(rootStep);
         if (Objects.nonNull(agentStep)) {
@@ -224,12 +254,16 @@ public class RunAdmissionService {
                     CreativeRuntimeMessages.AGENT_OPERATION_SCRIPT_TARGET_INVALID,
                     HttpStatus.BAD_REQUEST);
         }
+        if (Objects.nonNull(command.agentSelection()) && (command.operationType() != CreativeOperationType.ASSISTANT_CHAT
+                || command.agentSelection().sandbox() || Objects.nonNull(command.agentSelection().version()))) {
+            throw new BusinessException(AgentProfileResponseCode.INVALID);
+        }
         CompiledAgentBlueprint compiled = blueprintCompiler.compile(new AgentBlueprintCompileRequest(
                 command.userId(),
                 binding.profileKey(),
                 command.permissionPolicy(),
-                null,
-                Map.of()
+                Objects.isNull(command.agentSelection()) ? null : command.agentSelection().modelConfigId(),
+                Map.of(), Objects.isNull(command.agentSelection()) ? null : command.agentSelection().profileId()
         ));
         return new AgentStepConfiguration(compiled, identifierGenerator.nextStateSessionId());
     }
@@ -346,7 +380,7 @@ public class RunAdmissionService {
     private String requestFingerprint(StartCreativeRunCommand command) {
         CreativeRunRequestFingerprintMaterial material = new CreativeRunRequestFingerprintMaterial(
                 command.triggerSource(), command.operationType(), command.conversationId(), command.projectId(),
-                command.target(), command.permissionPolicy(), command.instruction());
+                command.target(), command.permissionPolicy(), command.instruction(), command.agentSelection());
         try {
             byte[] json = objectMapper.writeValueAsBytes(material);
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(json));

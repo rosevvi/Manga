@@ -10,6 +10,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * 按 AI 服务协议路由唯一的 AgentScope 模型适配器。
@@ -32,6 +33,12 @@ public class AgentModelProviderRegistry {
         }
         providers = Map.copyOf(indexed);
     }
+
+    /** 发布配置时只检查适配器是否存在，不创建客户端或调用外部模型。 */
+    public boolean supports(AiProviderType type) { return providers.containsKey(type); }
+
+    /** 管理界面仅展示已有对话模型适配器，避免配置尚未接入的供应商。 */
+    public Set<AiProviderType> supportedTypes() { return Set.copyOf(providers.keySet()); }
 
     /** 使用与配置协议匹配的唯一适配器创建模型。 */
     public OwnedChatModel create(

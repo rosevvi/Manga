@@ -7,7 +7,7 @@ import com.manga.agent.domain.CreativeRuntimeMessages;
 import java.util.Arrays;
 
 /**
- * 定义平台内置 Agent Profile 的稳定机器标识。
+ * 定义固定执行角色族及同名内置 Profile；管理员专业配置身份保存在 AgentExecutionPolicy。
  */
 public enum AgentProfileKey {
 

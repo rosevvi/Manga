@@ -38,17 +38,19 @@ export default function CreativeRunGraph({ accessToken, runId }) {
     catch (failure) { if (scope.current === expected) setError(failure.message) }
     finally { if (scope.current === expected) setStopping(false) }
   }
-  if (!runId || (!graph?.plans.length && !error)) return null
+  const namedRoot = graph?.nodes.some((node) => node.sandbox || (node.profileId && node.profileId !== node.profile))
+  if (!runId || (!graph?.plans.length && !namedRoot && !error)) return null
   const workers = graph?.nodes.filter((node) => node.parentStepId && node.profile) || []
-  const complete = workers.filter((node) => node.status === 'COMPLETED').length
+  const progressNodes = graph?.plans.length ? workers : graph?.nodes.filter((node) => node.profile) || []
+  const complete = progressNodes.filter((node) => node.status === 'COMPLETED').length
   const labels = new Map(graph?.nodes.map((node) => [node.stepId, node.nodeKey || AGENT_PROFILE_LABEL[node.profile] || '汇合节点']))
   return <section className="creative-run-graph" aria-label="AI 协作计划">
-    <h4>AI 协作 · 已完成 {complete}/{workers.length} 个步骤</h4>
+    <h4>{graph?.plans.length ? 'AI 协作' : 'Agent 执行'} · 已完成 {complete}/{progressNodes.length} 个步骤</h4>
     {error && <p role="alert">{error}</p>}
     {graph?.plans.map((plan) => <p className="creative-plan-title" key={plan.planId}>{plan.title} · 第 {plan.round} 轮 · {CREATIVE_PLAN_STATUS_LABEL[plan.status] || plan.status}</p>)}
     <ol>
       {graph?.nodes.map((node) => <li key={node.stepId} className={`creative-step creative-step-${node.status.toLowerCase()}`}>
-        <div><strong>{AGENT_PROFILE_LABEL[node.profile] || '全部成功汇合'}</strong>
+        <div><strong>{node.displayName || AGENT_PROFILE_LABEL[node.profile] || '全部成功汇合'}</strong>
           <span>{CREATIVE_STEP_STATUS_LABEL[node.status] || node.status}</span></div>
         {node.nodeKey && <small>{node.nodeKey} · 第 {node.depth} 层</small>}
         {node.dependsOn.length > 0 && <small>前置：{node.dependsOn.map((id) => labels.get(id) || id).join('、')}</small>}
@@ -58,7 +60,7 @@ export default function CreativeRunGraph({ accessToken, runId }) {
         {node.issues?.length > 0 && <ul>{node.issues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>}
         {node.artifactIds?.length > 0 && <small>产物：{node.artifactIds.join('、')}</small>}
         {node.errorMessage && <p role="alert">{node.errorMessage}</p>}
-        <details><summary>步骤信息</summary><small>{node.stepId} · 代次 {node.ownerEpoch} · 尝试 {node.attemptNo}</small></details>
+        <details><summary>步骤信息</summary><small>{node.stepId} · {node.profileId} · v{node.profileVersion} · 代次 {node.ownerEpoch} · 尝试 {node.attemptNo}{node.sandbox ? ' · 只读测试' : ''}</small></details>
         {!CREATIVE_STEP_TERMINAL.has(node.status) && !CREATIVE_TERMINAL_STATUSES.has(graph.status) &&
           <button type="button" disabled={stopping || node.status === 'CANCEL_REQUESTED'} onClick={() => stop(node.stepId)}>停止此步骤及整个任务</button>}
       </li>)}

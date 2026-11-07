@@ -234,7 +234,7 @@ manga:
       # Director 的系统提示词资源位置。
       director-prompt-resource: classpath:agent/profiles/manga-director-system.md
       # Director 定义的语义版本；提示词或行为契约变化时递增，并参与 Blueprint 指纹。
-      director-profile-version: 4
+      director-profile-version: 5
       # Director 单次调用允许的最大模型推理轮次，达到限制后失败。
       director-max-turns: 12
       # 只读剧本解析 Agent 的系统提示词资源位置。
@@ -255,6 +255,14 @@ manga:
         kernel-acquire-timeout: ${MANGA_CREATIVE_AGENT_KERNEL_ACQUIRE_TIMEOUT:5s}
         # 应用关闭时等待活跃 KernelHandle 和 HarnessLease 释放的最长时间。
         shutdown-drain-timeout: ${MANGA_CREATIVE_AGENT_SHUTDOWN_DRAIN_TIMEOUT:30s}
+    # 管理员专业 Agent 配置、版本与只读测试边界。
+    profile-management:
+      # 平台配置身份总数上限，包含内置定义。
+      max-profiles: 100
+      # 每个身份保留的最大版本数，不自动删除发布历史。
+      max-versions: 100
+      # 管理员真实只读测试的推理轮数上限，预览不调用模型。
+      test-max-turns: 4
     # 模型步骤的专用有界线程池；饱和时拒绝并由 Outbox 补投，不占用请求线程运行模型。
     dispatch-pool:
       # 常驻执行线程数。

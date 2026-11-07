@@ -56,7 +56,10 @@ public class CreativeGraphQueryService {
                     edges.stream().filter(edge -> edge.getDownstreamStepId().equals(step.getStepId())).map(edge -> edge.getUpstreamStepId()).toList(),
                     step.getOwnerEpoch(), step.getAttemptNo(), Objects.isNull(result) ? null : result.content(),
                     Objects.isNull(result) ? null : result.verdict(), Objects.isNull(result) ? List.of() : result.issues(),
-                    Objects.isNull(result) ? List.of() : result.artifactIds(), step.getErrorCode(), step.getErrorMessage());
+                    Objects.isNull(result) ? List.of() : result.artifactIds(), step.getErrorCode(), step.getErrorMessage(),
+                    Objects.isNull(blueprint) ? null : blueprint.profileId(),
+                    Objects.isNull(blueprint) || Objects.isNull(blueprint.executionPolicy()) ? null : blueprint.executionPolicy().displayName(),
+                    Objects.nonNull(blueprint) && Objects.nonNull(blueprint.executionPolicy()) && blueprint.executionPolicy().sandbox());
         }).toList();
         var plans = graph.plans(runId).stream().map(plan -> new CreativeGraphView.Plan(plan.getPlanId(), plan.getParentStepId(),
                 plan.getTitle(), plan.getRoundNo(), plan.getStatus(), JoinPolicy.ALL_SUCCESS, StepFailurePolicy.FAIL_RUN)).toList();
