@@ -3,6 +3,8 @@ package com.manga.service;
 import com.manga.common.constant.StorageConstants;
 import com.manga.config.properties.AliyunOssProperties;
 import com.manga.service.storage.StorageStrategy;
+import com.manga.service.storage.GeneratedMediaReference;
+import java.util.Objects;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,9 +40,17 @@ public class MediaStorageService {
         return strategy.storeBytes(data, subDir, extension);
     }
 
-    /** 生成作业转存使用稳定键，进程重启只重试保存同一产物。 */
-    public String storeGeneratedBytes(byte[] data, String subDir, String extension, String jobId) {
-        return resolveStrategy().storeNamedBytes(data, subDir, extension, jobId);
+    /** 先生成位置并登记，再允许执行物理写入。 */
+    public GeneratedMediaReference prepareGenerated(String jobId, long epoch) { return resolveStrategy().generatedReference(jobId, epoch); }
+    /** 写入已登记位置，禁止客户端上传任意删除或写入地址。 */
+    public void storeGeneratedBytes(byte[] data, GeneratedMediaReference reference) { requireStrategy(reference).writeGenerated(data, reference); }
+    /** 回收只操作引用指定的策略，不跟随当前默认存储切换。 */
+    public void deleteGenerated(GeneratedMediaReference reference) { requireStrategy(reference).deleteGenerated(reference); }
+    /** 解析登记的存储策略，未知策略交由退避处理。 */
+    private StorageStrategy requireStrategy(GeneratedMediaReference reference) {
+        StorageStrategy strategy = strategyMap.get(reference.storageType());
+        if (Objects.isNull(strategy)) throw new IllegalStateException(StorageConstants.STORAGE_STRATEGY_UNAVAILABLE);
+        return strategy;
     }
 
     /** 按环境变量选择媒体存储策略。 */

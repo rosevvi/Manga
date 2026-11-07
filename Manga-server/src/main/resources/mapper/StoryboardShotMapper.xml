@@ -19,6 +19,7 @@
         <result property="dialogue" column="dialogue"/>
         <result property="soundEffect" column="sound_effect"/>
         <result property="imageUrl" column="image_url"/>
+        <result property="imageArtifactId" column="image_artifact_id"/>
         <result property="notes" column="notes"/>
         <result property="status" column="status" javaType="com.manga.common.enums.StoryboardShotStatus"/>
         <result property="createdAt" column="created_at"/>
@@ -29,7 +30,7 @@
 
     <select id="findAllByProjectId" resultMap="storyboardShotResultMap">
         SELECT id, project_id, chapter_id, sort_order, shot_number, title, scene_name, shot_type,
-               camera_movement, duration_seconds, content, dialogue, sound_effect, image_url, notes,
+               camera_movement, duration_seconds, content, dialogue, sound_effect, image_url, image_artifact_id, notes,
                status, created_at, updated_at, created_by, updated_by
         FROM manga_storyboard_shot
         WHERE project_id = #{projectId}
@@ -38,7 +39,9 @@
     </select>
 
     <select id="findByProjectAndId" resultMap="storyboardShotResultMap">
-        SELECT *
+        SELECT id, project_id, chapter_id, sort_order, shot_number, title, scene_name, shot_type,
+               camera_movement, duration_seconds, content, dialogue, sound_effect, image_url, image_artifact_id, notes,
+               status, created_at, updated_at, created_by, updated_by
         FROM manga_storyboard_shot
         WHERE project_id = #{projectId}
           AND id = #{shotId}
@@ -61,12 +64,19 @@
             content = #{shot.content},
             dialogue = #{shot.dialogue},
             sound_effect = #{shot.soundEffect},
+            image_artifact_id = CASE WHEN image_url = #{shot.imageUrl}
+                OR (image_url IS NULL AND #{shot.imageUrl} IS NULL) THEN image_artifact_id ELSE NULL END,
             image_url = #{shot.imageUrl},
             notes = #{shot.notes},
             status = #{shot.status},
             updated_by = #{shot.updatedBy}
         WHERE id = #{shot.id}
           AND project_id = #{projectId}
+    </update>
+    <update id="adoptImage">
+        UPDATE manga_storyboard_shot SET image_url = #{url}, image_artifact_id = #{artifactId},
+            updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE project_id = #{projectId} AND id = #{shotId}
     </update>
 
     <update id="updateOrder">

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.GenerationMediaObjectMapper">
+    <select id="lock" resultType="com.manga.entity.GenerationMediaObject">
+        SELECT id, job_id, owner_epoch, storage_type, storage_namespace,
+               object_name, url, status, claim_owner, claim_until,
+               next_attempt_at, attempts, created_at, updated_at, created_by,
+               updated_by
+        FROM manga_generation_media_object WHERE id = #{id} FOR UPDATE
+    </select>
+    <select id="due" resultType="long">
+        SELECT id FROM manga_generation_media_object
+        WHERE status IN ('PENDING', 'RETIRING', 'DELETED') AND next_attempt_at &lt;= #{now}
+          AND (claim_until IS NULL OR claim_until &lt;= #{now})
+        ORDER BY next_attempt_at, id LIMIT #{limit}
+    </select>
+    <update id="publish">
+        UPDATE manga_generation_media_object SET status = 'PUBLISHED', updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND status = 'PENDING' AND claim_owner IS NULL
+    </update>
+    <update id="claim">
+        UPDATE manga_generation_media_object SET status = 'RETIRING', claim_owner = #{token}, claim_until = #{until},
+            attempts = attempts + 1, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND status IN ('PENDING', 'RETIRING', 'DELETED')
+    </update>
+    <update id="defer">
+        UPDATE manga_generation_media_object SET next_attempt_at = #{next}, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND status != 'PUBLISHED'
+    </update>
+    <update id="finish">
+        UPDATE manga_generation_media_object SET status = CASE WHEN #{deleted} THEN 'DELETED' ELSE 'RETIRING' END,
+            claim_owner = NULL, claim_until = NULL, next_attempt_at = #{next}, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND status = 'RETIRING' AND claim_owner = #{token}
+    </update>
+    <select id="references" resultType="int">
+        SELECT COUNT(*) FROM manga_creative_artifact WHERE media_object_id = #{id}
+    </select>
+</mapper>
+

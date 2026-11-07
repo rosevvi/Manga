@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { acknowledgeUnknownJob, cancelGenerationJob, generationMediaUrl, listGenerationJobs } from '../api/generationApi'
+import { acknowledgeUnknownJob, cancelGenerationJob, generationMediaUrl, listGenerationJobs, previewArtifactAdoption, adoptGeneratedArtifact } from '../api/generationApi'
+import { notifyCreativeProjectChanged } from './creativeProjectEvents'
+import { REVISION_CONFLICT_CODE } from '../constants/changeSet'
 import { GENERATION_PAGE_SIZE, GENERATION_POLL_MS, GENERATION_STATUS_LABEL, GENERATION_TERMINAL } from '../constants/generation'
 import './generation.css'
 
@@ -47,12 +49,37 @@ function GenerationCard({ job, accessToken, onChanged }) {
   const [error, setError] = useState('')
   const [checked, setChecked] = useState(false)
   const [note, setNote] = useState('')
+  const [adoption, setAdoption] = useState(null)
+  const [adoptionConflict, setAdoptionConflict] = useState(false)
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const elapsed = Math.max(0, Math.floor(((job.finishedAt ? new Date(job.finishedAt).getTime() : Date.now()) - new Date(job.submittedAt || job.createdAt).getTime()) / 1000))
   const act = async (operation) => {
     setBusy(true); setError('')
     try { await operation(); onChanged() }
     catch (failure) { setError(failure.message) }
     finally { setBusy(false) }
+  }
+  /** 先读取当前事实，再由用户明确确认替换，不在查看产物时自动写业务数据。 */
+  const previewAdoption = async () => {
+    setBusy(true); setError('')
+    try {
+      const preview = await previewArtifactAdoption(accessToken, job.jobId)
+      if (mounted.current) { setAdoption(preview); setAdoptionConflict(false) }
+    } catch (failure) { if (mounted.current) setError(failure.message) }
+    finally { if (mounted.current) setBusy(false) }
+  }
+  /** 冲突后必须重新预览再确认；网络失败可用同一版本重放，不能静默覆盖最新编辑。 */
+  const confirmAdoption = async () => {
+    if (!adoption || adoptionConflict || busy) return
+    setBusy(true); setError('')
+    try {
+      await adoptGeneratedArtifact(accessToken, job.jobId, adoption.target.projectRevision)
+      notifyCreativeProjectChanged(job.projectId)
+      if (mounted.current) { setAdoption(null); onChanged() }
+    } catch (failure) {
+      if (mounted.current) { setError(failure.message); if (failure.code === REVISION_CONFLICT_CODE) setAdoptionConflict(true) }
+    } finally { if (mounted.current) setBusy(false) }
   }
   return <article className="generation-card">
     <header><strong>镜头 #{job.shotId} · {job.provider}</strong><span>{GENERATION_STATUS_LABEL[job.status] || job.status}</span></header>
@@ -62,6 +89,19 @@ function GenerationCard({ job, accessToken, onChanged }) {
     {job.errorMessage && <p role="status">{job.errorMessage}</p>}
     {job.reconciliationNote && <p>核对说明：{job.reconciliationNote}</p>}
     {job.artifactUrl && <a href={generationMediaUrl(job.artifactUrl)} target="_blank" rel="noreferrer"><img src={generationMediaUrl(job.artifactUrl)} alt={`镜头 ${job.shotId} 的生成产物`} /><span>查看平台产物 #{job.artifactId}</span></a>}
+    {job.artifactUrl && <button type="button" disabled={busy} onClick={previewAdoption}>用作镜头图片</button>}
+    {job.adoptedAt && <small>最近采用：{job.adoptedAt.replace('T', ' ')} · 用户 #{job.adoptedBy}</small>}
+    {adoption && <section className="generation-adoption" aria-label="确认采用图片">
+      <strong>替换镜头「{adoption.target.title}」的图片</strong>
+      <div className="generation-adoption-images"><div><small>当前图片</small>
+        {adoption.target.imageUrl ? <img src={generationMediaUrl(adoption.target.imageUrl)} alt="镜头当前图片" /> : <p>暂无图片</p>}</div>
+        <div><small>拟采用图片</small><img src={generationMediaUrl(adoption.artifactUrl)} alt="拟采用的生成图片" /></div></div>
+      <p>只替换该镜头图片，不修改正文、对白或备注。预览后若项目发生变化，需要重新确认。</p>
+      {adoptionConflict && <p role="alert">项目已被修改，尚未采用。请重新预览最新图片。</p>}
+      <div className="generation-actions"><button type="button" disabled={busy} onClick={() => { setAdoption(null); setAdoptionConflict(false) }}>取消</button>
+        {adoptionConflict ? <button type="button" disabled={busy} onClick={previewAdoption}>重新预览</button>
+          : <button type="button" disabled={busy} onClick={confirmAdoption}>确认采用</button>}</div>
+    </section>}
     {!GENERATION_TERMINAL.has(job.status) && !job.cancelRequested && <button type="button" disabled={busy} onClick={() => act(() => cancelGenerationJob(accessToken, job.jobId))}>取消结果采用</button>}
     {job.status === 'UNKNOWN' && <div className="generation-reconcile">
       <p>系统不会自动重新提交。请在供应商核对执行结果及账单，再结束平台等待。</p>

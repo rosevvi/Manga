@@ -21,6 +21,12 @@ public final class StorageConstants {
     public static final String STORAGE_STRATEGY_UNAVAILABLE = "没有可用的媒体存储策略";
     /** 媒体文件保存失败提示。 */
     public static final String STORAGE_FILE_SAVE_FAILED = "媒体文件保存失败";
+    /** 生成媒体专用目录，只回收登记在此目录的对象。 */
+    public static final String GENERATED_DIRECTORY = "generated";
+    /** 当前平台生成产物格式。 */
+    public static final String GENERATED_FORMAT = "png";
+    /** 存储引用越界或物理配置已经变化。 */
+    public static final String GENERATED_REFERENCE_INVALID = "生成对象引用无效或存储位置已变化";
     /** 阿里云 OSS 配置不完整提示。 */
     public static final String ALIYUN_OSS_CONFIGURATION_INCOMPLETE =
             "阿里云 OSS 配置不完整，请填写 Endpoint、Bucket、AccessKey ID 和 AccessKey Secret";

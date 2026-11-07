@@ -183,11 +183,27 @@ manga:
       http-timeout: 5m
       # 单张 medium 质量预计费用，单位 USD；需运维核价。空配置禁用真实生成。
       # 这不是 OpenAI 的扣费硬上限，实际账单以供应商为准。
-      image-prices: {}
+      image-prices:
+        # 用户核定的单张预计费用，单位 USD；不是供应商扣费硬上限。
+        gpt-image-2: 1
       # 平台异步中继 HMAC 密钥，至少 32 字符；空时关闭，当前仅供 Fake 验证。
       callback-secret: ${MANGA_GENERATION_CALLBACK_SECRET:}
       # 签名回调允许的时间偏移，单位分钟；防止长期重放。
       callback-clock-skew: 5m
+      # 未发布生成对象的回收；只处理数据库登记记录，不扫描任意目录。
+      cleanup:
+        # 到期对象扫描周期，调度器只提交有界后台任务。
+        scan-interval: 10m
+        # 每批最多处理数量，范围 1 到 100。
+        batch-size: 20
+        # 写入前登记后至少等待此时长再回收，同时复核有效 Job lease。
+        grace: 24h
+        # 单次回收执行权，跨实例互斥，过期可以再次领取。
+        lease: 5m
+        # 存储不可用或仍有活动写入时的复查间隔。
+        retry-delay: 1h
+        # 已删除墓碑仍周期复查，清除极晚到旧 worker 的重新写入。
+        tombstone-interval: 24h
       # 配置示例：image-prices: { gpt-image-2: 0.10 }；示例数字不是官方报价。
     # AI 提案审批：等待期间释放 Harness 和 Kernel，业务写入只在批准事务发生。
     approval:

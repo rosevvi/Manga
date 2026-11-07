@@ -4,6 +4,16 @@ import { AUTH_CONFIG } from '../constants/auth'
 export function generationMediaUrl(url) { return url ? new URL(url, new URL(AUTH_CONFIG.apiBaseUrl, window.location.origin)).href : '' }
 /** 作业 API 的客户端根路径。 */
 const ENDPOINT = '/generation-jobs'
+/** 每次采用前读取最新图片与项目版本，不沿用生成时的旧 revision。 */
+export function previewArtifactAdoption(accessToken, jobId) {
+  return authorizedRequest(accessToken, `${ENDPOINT}/${encodeURIComponent(jobId)}/adoption-preview`)
+}
+/** 确认只提交预览 revision，图片地址由服务器决定。 */
+export function adoptGeneratedArtifact(accessToken, jobId, expectedProjectRevision) {
+  return authorizedRequest(accessToken, `${ENDPOINT}/${encodeURIComponent(jobId)}/adopt`, {
+    method: 'POST', body: JSON.stringify({ expectedProjectRevision }),
+  })
+}
 /** 图片选项不读取或返回配置密钥。 */
 export function listImageGenerationOptions(accessToken) { return authorizedRequest(accessToken, `${ENDPOINT}/options`) }
 /** 从服务端恢复当前页，支持限定 Run，不依赖本地临时进度。 */

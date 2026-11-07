@@ -66,5 +66,11 @@ public class GenerationJobRepository {
     }
     /** 首次发布转存产物，唯一键防止重复。 */
     public void createArtifact(CreativeArtifact value) { artifacts.insert(value); }
+    /** 原子采用事务只修改审计字段，重复请求不推进项目版本。 */
+    public void recordAdoption(CreativeArtifact value, long requestRevision, long appliedRevision, LocalDateTime at, long userId, String actor) {
+        if (artifacts.recordAdoption(value.getId(), requestRevision, appliedRevision, at, userId, actor) != 1) {
+            throw new IllegalStateException(GenerationError.STATE.message());
+        }
+    }
 }
 

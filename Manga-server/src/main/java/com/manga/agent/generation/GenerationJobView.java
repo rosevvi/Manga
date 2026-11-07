@@ -23,5 +23,7 @@ public record GenerationJobView(
         /** 供应商提交开始时间。 */ LocalDateTime submittedAt,
         /** 平台终态时间。 */ LocalDateTime finishedAt,
         /** 最近一次状态更新时间，便于发现监测停滞。 */ LocalDateTime updatedAt,
-        /** 人工核对说明。 */ String reconciliationNote
+        /** 人工核对说明。 */ String reconciliationNote,
+        /** 最近显式采用时间，不代表此后未被人工修改。 */ LocalDateTime adoptedAt,
+        /** 最近采用的认证用户。 */ Long adoptedBy
 ) { }

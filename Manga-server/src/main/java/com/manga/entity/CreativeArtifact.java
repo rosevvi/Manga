@@ -39,6 +39,16 @@ public class CreativeArtifact {
     private Long byteSize;
     /** 内容摘要。 */
     private String sha256;
+    /** 发布的物理对象登记记录，回收程序不得删除该引用。 */
+    private Long mediaObjectId;
+    /** 最近一次采用请求预览的项目版本，重复请求只返回原结果。 */
+    private Long adoptionRequestRevision;
+    /** 最近采用后的项目版本。 */
+    private Long adoptedProjectRevision;
+    /** 最近采用时间。 */
+    private LocalDateTime adoptedAt;
+    /** 最近采用的认证用户。 */
+    private Long adoptedBy;
     /** 创建时间。 */
     private LocalDateTime createdAt;
     /** 更新时间。 */

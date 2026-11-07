@@ -20,6 +20,9 @@ public interface StoryboardShotMapper extends BaseMapper<StoryboardShot> {
 
     /** 更新项目内的分镜镜头。 */
     int updateInProject(@Param("shot") StoryboardShot shot, @Param("projectId") long projectId);
+    /** 采用产物时只替换图片及其来源，不覆盖正文、对白或人工备注。 */
+    int adoptImage(@Param("projectId") long projectId, @Param("shotId") long shotId,
+            @Param("artifactId") long artifactId, @Param("url") String url, @Param("actor") String actor);
 
     /** 批量更新分镜镜头顺序。 */
     int updateOrder(

@@ -1,7 +1,7 @@
 package com.manga.agent.changeset;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.manga.dto.ProjectScriptSaveRequest;
+import com.manga.dto.ProjectScriptSaveRequest.Scene;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
@@ -21,7 +21,7 @@ public record ScriptChangeSet(
         /** 章节简介。 */ @Size(max = 2000) String synopsis,
         /** 完整章节正文，不接受局部字符串替换指令。 */ @NotBlank @Size(max = 200000) String rawContent,
         /** 完整场景和对白列表；空列表表示没有结构化场景。 */
-        @NotNull @Size(max = 200) List<@NotNull @Valid ProjectScriptSaveRequest.Scene> scenes
+        @NotNull @Size(max = 200) List<@NotNull @Valid Scene> scenes
 ) {
     /** 提交时校验最终场景编号及对白元素，避免审批时才遇到结构约束错误。 */
     @AssertTrue
@@ -30,7 +30,7 @@ public record ScriptChangeSet(
         if (Objects.isNull(scenes)) return false;
         Set<Integer> numbers = new HashSet<>();
         for (int index = 0; index < scenes.size(); index++) {
-            ProjectScriptSaveRequest.Scene scene = scenes.get(index);
+            Scene scene = scenes.get(index);
             if (Objects.isNull(scene)) return false;
             int number = Objects.requireNonNullElse(scene.sceneNumber(), index + 1);
             if (number <= 0 || !numbers.add(number)) return false;

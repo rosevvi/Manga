@@ -6,6 +6,7 @@ import com.aliyun.oss.OSSClientBuilder;
 import com.aliyun.oss.OSSException;
 import com.aliyun.oss.model.ObjectMetadata;
 import com.manga.config.properties.AliyunOssProperties;
+import com.manga.common.constant.StorageConstants;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -119,6 +120,32 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
         String prefix = normalizePath(properties.objectPrefix(), properties.objectPrefix());
         String directory = normalizePath(subDir, DEFAULT_UPLOAD_DIRECTORY);
         return prefix + "/" + directory + "/" + stableName + normalizeExtension(extension);
+    }
+
+    /** 冻结 Bucket、前缀和 Endpoint 对应的对象位置，不保存密钥。 */
+    @Override
+    public GeneratedMediaReference generatedReference(String jobId, long epoch) {
+        requireConfigured();
+        String name = GeneratedMediaNames.of(jobId, epoch);
+        return new GeneratedMediaReference(getType(), generatedNamespace(), name,
+                resolvePublicUrl(buildObjectKey(StorageConstants.GENERATED_DIRECTORY, StorageConstants.GENERATED_FORMAT, name)));
+    }
+    /** 写入前再次确认物理位置，禁止静默切换 Bucket。 */
+    @Override
+    public void writeGenerated(byte[] data, GeneratedMediaReference reference) {
+        requireConfigured(); GeneratedMediaNames.require(reference, getType(), generatedNamespace());
+        storeNamedBytes(data, StorageConstants.GENERATED_DIRECTORY, StorageConstants.GENERATED_FORMAT, reference.name());
+    }
+    /** 幂等删除已登记对象，不使用用户提交的 URL 作为对象键。 */
+    @Override
+    public void deleteGenerated(GeneratedMediaReference reference) {
+        requireConfigured(); GeneratedMediaNames.require(reference, getType(), generatedNamespace());
+        ossClient().deleteObject(properties.bucketName(), buildObjectKey(StorageConstants.GENERATED_DIRECTORY, StorageConstants.GENERATED_FORMAT, reference.name()));
+    }
+    /** 命名空间不包含 AccessKey，配置改变后旧回收请求会安全失败。 */
+    private String generatedNamespace() {
+        return GeneratedMediaNames.namespace(normalizeEndpoint(properties.endpoint()) + "/" + properties.bucketName()
+                + "/" + normalizePath(properties.objectPrefix(), properties.objectPrefix()));
     }
 
     /** 清理对象路径中的不安全片段。 */

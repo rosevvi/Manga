@@ -48,6 +48,8 @@ public class StoryboardShot {
     private String soundEffect;
     /** 分镜参考图片地址。 */
     private String imageUrl;
+    /** 当前采用的生成产物，手动改换图片时解除关联。 */
+    private Long imageArtifactId;
     /** 分镜制作备注。 */
     private String notes;
     /** 分镜镜头状态。 */

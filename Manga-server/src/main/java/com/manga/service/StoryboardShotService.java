@@ -10,6 +10,8 @@ import com.manga.dto.StoryboardShotCreateRequest;
 import com.manga.dto.StoryboardShotOrderRequest;
 import com.manga.dto.StoryboardShotResponse;
 import com.manga.dto.StoryboardShotUpdateRequest;
+import com.manga.dto.StoryboardImageSnapshot;
+import com.manga.agent.changeset.ChangeSetResponseCode;
 import com.manga.entity.StoryboardShot;
 import com.manga.repository.StoryboardShotRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,28 @@ public class StoryboardShotService {
     private final ProjectService projectService;
     private final ProjectWorkflowService workflowService;
     private final ProjectRevisionService revisionService;
+    /** 预览采用时读取同一项目版本下的当前图片，客户端不能自行指定原图。 */
+    @Transactional
+    public StoryboardImageSnapshot imageSnapshot(long projectId, long shotId, long userId) {
+        var project = revisionService.lock(projectId, userId);
+        StoryboardShot shot = requireShot(projectId, shotId);
+        return new StoryboardImageSnapshot(shotId, shot.getTitle(), project.getRevision(), shot.getImageUrl());
+    }
+    /** 只在预览版本仍有效时采用；与产物审计事务一起提交或回滚。 */
+    @Transactional
+    public long adoptGeneratedImage(long projectId, long shotId, long userId, long expectedRevision,
+            long artifactId, String url, String actor) {
+        var project = revisionService.lock(projectId, userId);
+        if (!Objects.equals(project.getRevision(), expectedRevision)) throw new BusinessException(ChangeSetResponseCode.REVISION_CONFLICT, HttpStatus.CONFLICT);
+        StoryboardShot shot = requireShot(projectId, shotId);
+        revisionService.edit(projectId, userId, shot.getChapterId(), actor);
+        if (!storyboardShotRepository.adoptImage(projectId, shotId, artifactId, url, actor)) {
+            throw new BusinessException(ProjectResponseCode.STORYBOARD_SHOT_NOT_FOUND, HttpStatus.NOT_FOUND);
+        }
+        workflowService.advanceTo(projectId, ProjectWorkflowStage.ASSETS, actor);
+        log.info("Generated image adopted projectId={} shotId={} artifactId={} userId={}", projectId, shotId, artifactId, userId);
+        return project.getRevision() + 1;
+    }
 
     /** 查询项目分镜镜头列表。 */
     public List<StoryboardShotResponse> findAll(long projectId, Long chapterId) {

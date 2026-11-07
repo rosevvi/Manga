@@ -14,3 +14,6 @@ uploads/
 target/
 node_modules/
 dist/
+
+# 本地可丢弃的编译和隔离验收文件。
+.tmp/

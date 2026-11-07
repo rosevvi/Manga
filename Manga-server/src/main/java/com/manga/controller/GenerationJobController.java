@@ -6,6 +6,9 @@ import com.manga.agent.generation.GenerationJobService;
 import com.manga.agent.generation.GenerationJobView;
 import com.manga.agent.generation.ImageGenerationOption;
 import com.manga.agent.generation.ImageGenerationQuoteService;
+import com.manga.agent.generation.ArtifactApplicationService;
+import com.manga.agent.generation.ArtifactAdoptionPreview;
+import com.manga.agent.generation.ArtifactAdoptionResult;
 import com.manga.common.api.ApiResponse;
 import com.manga.common.constant.OpenApiConstants;
 import com.manga.common.security.SecurityUtils;
@@ -41,6 +44,26 @@ public class GenerationJobController {
     private final GenerationJobQueryService query;
     private final GenerationJobService lifecycle;
     private final ImageGenerationQuoteService quotes;
+    private final ArtifactApplicationService artifacts;
+    /** 采用前先展示目标当前图片，并取得新的乐观版本。 */
+    @GetMapping("/{jobId}/adoption-preview")
+    @Operation(summary = "预览采用生成图片", description = "返回当前镜头图片、生成产物及项目 revision；不会修改镜头。")
+    public ApiResponse<ArtifactAdoptionPreview> adoptionPreview(@PathVariable @Size(max = 36) String jobId) {
+        long userId = SecurityUtils.requireCurrentUserId(); ArtifactAdoptionPreview result = artifacts.preview(jobId, userId);
+        log.debug("Artifact adoption preview userId={} jobId={} artifactId={}", userId, jobId, result.artifactId());
+        return ApiResponse.success(result);
+    }
+    /** 只接收预览版本，产物地址、目标镜头和采用人都由服务端确定。 */
+    @PostMapping("/{jobId}/adopt")
+    @Operation(summary = "采用产物为镜头图片", description = "校验预览 revision，只更新镜头图片与来源；并发编辑返回冲突，重复请求幂等。")
+    public ApiResponse<ArtifactAdoptionResult> adopt(@PathVariable @Size(max = 36) String jobId, @Valid @RequestBody AdoptionRequest request) {
+        long userId = SecurityUtils.requireCurrentUserId();
+        ArtifactAdoptionResult result = artifacts.adopt(jobId, userId, request.expectedProjectRevision());
+        log.info("Artifact adopted userId={} jobId={} artifactId={} revision={}", userId, jobId, result.artifactId(), result.projectRevision());
+        return ApiResponse.success(result);
+    }
+    /** 采用确认只声明用户预览过的版本，不允许提交任意媒体地址。 */
+    public record AdoptionRequest(/** 预览响应中的项目版本。 */ @Positive long expectedProjectRevision) { }
     /** 图片选项只返回最小摘要，不复用含密钥的配置管理响应。 */
     @GetMapping("/options")
     @Operation(summary = "查询可选图片模型配置", description = "返回当前用户配置、固定模型和预计费用；费用为空表示尚未核价、不能生成。")

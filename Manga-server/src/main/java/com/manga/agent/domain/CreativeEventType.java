@@ -49,6 +49,8 @@ public enum CreativeEventType {
     JOB_CANCELLED,
     /** 新的创作产物已经入库。 */
     ARTIFACT_CREATED,
+    /** 用户显式采用产物到镜头，包含认证采用人与项目版本。 */
+    ARTIFACT_ADOPTED,
     /** Run 已收到取消请求。 */
     RUN_CANCEL_REQUESTED,
     /** Run 已完成取消。 */

@@ -1,4 +1,5 @@
 package com.manga.agent.generation;
+import com.manga.common.constant.StorageConstants;
 /** 图片作业路由与调度协议。 */
 public final class GenerationConstants {
     /** 生成作业 API。 */ public static final String API = "/api/v1/generation-jobs";
@@ -12,11 +13,11 @@ public final class GenerationConstants {
     /** 运维配置预计费用的计价币种。 */ public static final String CURRENCY = "USD";
     /** 指定的首个真实图片模型。 */ public static final String OPENAI_MODEL = "gpt-image-2";
     /** 固定质量，保证审批预览和实际请求一致。 */ public static final String QUALITY = "medium";
-    /** 平台只接收 PNG，避免下载外部任意 URL。 */ public static final String FORMAT = "png";
+    /** 平台只接收 PNG，避免下载外部任意 URL。 */ public static final String FORMAT = StorageConstants.GENERATED_FORMAT;
     /** OpenAI 图片生成相对路径。 */ public static final String IMAGE_PATH = "/images/generations";
     /** 图片 API 的请求追踪头；不是幂等承诺。 */ public static final String CLIENT_REQUEST_ID = "X-Client-Request-Id";
     /** 作业列表单页上限。 */ public static final int PAGE_SIZE = 25;
-    /** 平台生成媒体子目录。 */ public static final String MEDIA_DIRECTORY = "generated";
+    /** 无引用对象回收的调度配置。 */ public static final String CLEANUP_INTERVAL = "${manga.creative.generation.cleanup.scan-interval:10m}";
     /** 原冻结规格恢复只注入业务引用。 */ public static final String RESUME = "\n<generation_result>%s</generation_result>\n以上为服务端生成结果。请说明作业状态和产物，不要再次提交生成；取消和失败均不可宣称媒体已保存。";
     private GenerationConstants() { }
 }

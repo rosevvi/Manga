@@ -44,6 +44,10 @@ public class StoryboardShotRepository {
     public void update(StoryboardShot shot, long projectId) {
         storyboardShotMapper.updateInProject(shot, projectId);
     }
+    /** 调用者在项目版本锁内只更新图片关联。 */
+    public boolean adoptImage(long projectId, long shotId, long artifactId, String url, String actor) {
+        return storyboardShotMapper.adoptImage(projectId, shotId, artifactId, url, actor) == 1;
+    }
 
     /** 删除分镜镜头。 */
     public void delete(long shotId) {

@@ -1,6 +1,7 @@
 package com.manga.service.storage;
 
 import com.manga.config.properties.MediaUploadProperties;
+import com.manga.common.constant.StorageConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -10,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.LinkOption;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -52,8 +55,11 @@ public class LocalStorageStrategy implements StorageStrategy {
         Path temporary = null;
         try {
             Files.createDirectories(targetDirectory);
-            temporary = Files.createTempFile(targetDirectory, filename, ".part");
-            Files.write(temporary, data);
+            boolean generated = StorageConstants.GENERATED_DIRECTORY.equals(subDir);
+            if (generated && Files.isSymbolicLink(targetDirectory)) throw new IllegalArgumentException(StorageConstants.GENERATED_REFERENCE_INVALID);
+            // 生成对象的临时文件也有可推导名称，进程崩溃后能够按登记记录回收。
+            temporary = generated ? targetDirectory.resolve(filename + ".part") : Files.createTempFile(targetDirectory, filename, ".part");
+            Files.write(temporary, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
             try { Files.move(temporary, targetPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
             catch (AtomicMoveNotSupportedException exception) { Files.move(temporary, targetPath, StandardCopyOption.REPLACE_EXISTING); }
             log.info("[LocalStorageStrategy#storeBytes] stored path={} size={}", targetPath, data.length);
@@ -71,6 +77,34 @@ public class LocalStorageStrategy implements StorageStrategy {
     /** 解析本地存储根目录。 */
     private Path resolveBaseDirectory() {
         return uploadProperties.directory().normalize().toAbsolutePath();
+    }
+
+    /** 位置只由当前配置根目录、固定生成目录和服务端代次名称构造。 */
+    @Override
+    public GeneratedMediaReference generatedReference(String jobId, long epoch) {
+        String name = GeneratedMediaNames.of(jobId, epoch);
+        return new GeneratedMediaReference(getType(), generatedNamespace(), name,
+                normalizePublicPath() + "/" + StorageConstants.GENERATED_DIRECTORY + "/" + name + "." + StorageConstants.GENERATED_FORMAT);
+    }
+    /** 同代次只覆盖同一文件，发布前仍需数据库确认当前执行权。 */
+    @Override
+    public void writeGenerated(byte[] data, GeneratedMediaReference reference) {
+        GeneratedMediaNames.require(reference, getType(), generatedNamespace());
+        storeNamedBytes(data, StorageConstants.GENERATED_DIRECTORY, StorageConstants.GENERATED_FORMAT, reference.name());
+    }
+    /** 只删除固定生成目录内登记的普通文件，不递归删除目录。 */
+    @Override
+    public void deleteGenerated(GeneratedMediaReference reference) {
+        GeneratedMediaNames.require(reference, getType(), generatedNamespace());
+        Path directory = resolveBaseDirectory().resolve(StorageConstants.GENERATED_DIRECTORY).normalize();
+        Path target = directory.resolve(reference.name() + "." + StorageConstants.GENERATED_FORMAT).normalize();
+        if (!target.getParent().equals(directory) || Files.isSymbolicLink(directory)) throw new IllegalArgumentException(StorageConstants.GENERATED_REFERENCE_INVALID);
+        try { Files.deleteIfExists(target); Files.deleteIfExists(target.resolveSibling(target.getFileName() + ".part")); }
+        catch (IOException exception) { throw new IllegalStateException(STORAGE_FILE_SAVE_FAILED, exception); }
+    }
+    /** 固定目录 URI 的末尾斜杠，避免目录创建前后 Path.toUri() 变化导致重启后无法回收。 */
+    private String generatedNamespace() {
+        return GeneratedMediaNames.namespace(resolveBaseDirectory().toUri().toString().replaceAll("/+$", ""));
     }
 
     /** 规范媒体公开访问路径。 */

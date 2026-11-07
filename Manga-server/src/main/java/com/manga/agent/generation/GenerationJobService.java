@@ -22,6 +22,9 @@ import com.manga.entity.CreativeDispatchOutbox;
 import com.manga.entity.CreativeRun;
 import com.manga.entity.CreativeStep;
 import com.manga.entity.GenerationJob;
+import com.manga.entity.GenerationMediaObject;
+import com.manga.repository.GenerationMediaObjectRepository;
+import com.manga.service.storage.GeneratedMediaReference;
 import com.manga.repository.CreativeDispatchOutboxRepository;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.CreativeStepRepository;
@@ -35,6 +38,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -57,6 +61,8 @@ public class GenerationJobService {
     private final ImageGenerationQuoteService quotes;
     private final ChangeSetCodec codec;
     private final ApplicationEventPublisher publisher;
+    private final GenerationMediaObjectRepository media;
+    private final GenerationCleanupProperties cleanupProperties;
 
     /** 批准事务内创建单次提交意图；价格或端点变化要求重新生成预览。 */
     @Transactional(propagation = Propagation.MANDATORY)
@@ -151,21 +157,38 @@ public class GenerationJobService {
 
     /** 已转存文件在此原子发布成唯一 Artifact，取消或失去租约时禁止发布。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    public void materialized(GenerationJob claim, String url, long bytes, String digest) {
+    public void materialized(GenerationJob claim, long mediaObjectId, long bytes, String digest) {
         CreativeRun run = runs.lockByRunId(claim.getRunId());
         GenerationJob job = jobs.lock(claim.getJobId());
         if (!owned(job, claim)) return;
+        GenerationMediaObject object = media.lock(mediaObjectId);
+        if (Objects.isNull(object) || !Objects.equals(object.getJobId(), job.getJobId())
+                || !Objects.equals(object.getOwnerEpoch(), claim.getOwnerEpoch()) || object.getStatus() != GenerationMediaStatus.PENDING) {
+            throw new GenerationException(GenerationError.STATE);
+        }
         if (Boolean.TRUE.equals(job.getCancelRequested()) || run.getStatus().isTerminal()
                 || run.getStatus() == CreativeRunStatus.CANCEL_REQUESTED) terminal(job, GenerationJobStatus.CANCELLED, null);
         else {
             jobs.createArtifact(CreativeArtifact.builder().jobId(job.getJobId()).runId(job.getRunId()).stepId(job.getStepId())
                     .changeSetId(job.getChangeSetId()).userId(job.getUserId()).projectId(job.getProjectId()).shotId(job.getShotId())
-                    .url(url).mediaType("image/png").byteSize(bytes).sha256(digest).createdBy(actor()).updatedBy(actor()).build());
+                    .url(object.getUrl()).mediaObjectId(mediaObjectId).mediaType("image/png").byteSize(bytes).sha256(digest).createdBy(actor()).updatedBy(actor()).build());
+            media.publish(mediaObjectId, actor());
             terminal(job, GenerationJobStatus.SUCCEEDED, null);
         }
         jobs.save(job, claim.getOwnerEpoch());
         if (job.getStatus() == GenerationJobStatus.SUCCEEDED) emit(job, CreativeEventType.ARTIFACT_CREATED);
         finish(job);
+    }
+
+    /** 文件 IO 前登记确定的物理位置；失去执行权时不得产生新的写入对象。 */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public GenerationMediaObject prepareMedia(GenerationJob claim, GeneratedMediaReference reference) {
+        runs.lockByRunId(claim.getRunId()); GenerationJob job = jobs.lock(claim.getJobId());
+        if (!owned(job, claim) || job.getStatus() != GenerationJobStatus.MATERIALIZING) throw new GenerationException(GenerationError.STATE);
+        return media.create(GenerationMediaObject.builder().jobId(job.getJobId()).ownerEpoch(job.getOwnerEpoch())
+                .storageType(reference.storageType()).storageNamespace(reference.namespace()).objectName(reference.name()).url(reference.url())
+                .status(GenerationMediaStatus.PENDING).attempts(0).nextAttemptAt(LocalDateTime.now().plus(cleanupProperties.grace()))
+                .createdBy(actor()).updatedBy(actor()).build());
     }
 
     /** 提交失败按确定性分类；查询/转存故障只退避当前阶段，不回到付费提交。 */
@@ -183,7 +206,7 @@ public class GenerationJobService {
         } else {
             job.setErrorCode(error.code()); job.setErrorMessage(error.message()); release(job);
             long multiplier = 1L << Math.min(job.getAttempts(), 10);
-            job.setNextActionAt(LocalDateTime.now().plusMillis(Math.min(properties.maxBackoff().toMillis(), properties.pollInterval().toMillis() * multiplier)));
+            job.setNextActionAt(LocalDateTime.now().plus(Duration.ofMillis(Math.min(properties.maxBackoff().toMillis(), properties.pollInterval().toMillis() * multiplier))));
         }
         jobs.save(job, claim.getOwnerEpoch());
         if (job.getStatus().isTerminal()) finish(job); else emit(job, CreativeEventType.JOB_PROGRESS);
