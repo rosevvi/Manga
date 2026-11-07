@@ -2,6 +2,8 @@ package com.manga.dto;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
@@ -19,7 +21,9 @@ public record ProjectScriptSaveRequest(
         /** 当前章节来源类型。 */
         @Size(max = 32) String sourceType,
         /** 场景列表。 */
-        @Valid List<Scene> scenes
+        @Valid List<Scene> scenes,
+        /** 打开编辑器时读取的章节业务版本，缺失或过期时禁止覆盖。 */
+        @NotNull @Positive Long expectedRevision
 ) {
 
     /** 描述剧本场景。 */

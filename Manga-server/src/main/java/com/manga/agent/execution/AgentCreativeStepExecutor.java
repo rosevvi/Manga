@@ -68,7 +68,7 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
         return CreativeStepType.AGENT_INVOCATION;
     }
 
-    /** 执行模型与只读工具循环，持续续租并使用 owner epoch 围栏提交结果。 */
+    /** 执行模型和提案工具；等待审批时释放资源，手动任务必须产出所需提案。 */
     @Override
     public void execute(ClaimedCreativeStep step) {
         AgentBlueprint blueprint = restoreBlueprint(step);
@@ -93,6 +93,7 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
             lifecycleService.acknowledgeCancellation(step);
             return;
         }
+        approvals.requireGenerationResult(step, input.operationType());
         lifecycleService.complete(step, write(new AgentStepResult(content.toString())));
     }
 

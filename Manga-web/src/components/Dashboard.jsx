@@ -37,6 +37,7 @@ import StoryboardModule from './StoryboardModule'
 import AiProviderSettings from './AiProviderSettings'
 import ProjectWorkspace from './ProjectWorkspace'
 import MangaAssistant from './MangaAssistant'
+import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
 import { getActiveTasks, getProjects } from '../api/projectApi'
 import { useLanguage } from '../i18n/LanguageContext'
 
@@ -171,6 +172,12 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
     loadProjects()
   }, [loadProjects])
 
+  /** 审批改变章节或镜头数量时同步更新项目列表。 */
+  useEffect(() => {
+    window.addEventListener(CREATIVE_PROJECT_CHANGED, loadProjects)
+    return () => window.removeEventListener(CREATIVE_PROJECT_CHANGED, loadProjects)
+  }, [loadProjects])
+
   useEffect(() => {
     if (!accessToken || isGuest) return undefined
     let cancelled = false
@@ -300,6 +307,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
       <main className="dashboard-main">
         {activeNav === 'project' ? (
           <ProjectWorkspace
+            key={`${authSession?.user?.id}.${selectedProjectId}`}
             accessToken={accessToken}
             projectId={selectedProjectId}
             initialStage={projectStage}

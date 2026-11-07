@@ -6,6 +6,10 @@ export const CHANGE_SET_STATUS = Object.freeze({
 })
 /** 用户可主动提交的审批决定。 */
 export const APPROVAL_DECISION = Object.freeze({ APPROVE: 'APPROVE', REJECT: 'REJECT' })
+/** 批准成功对应真实业务写入，其他结果均不能发布业务变更通知。 */
+export const APPROVAL_STATUS = Object.freeze({ APPROVED: 'APPROVED' })
+/** 人工保存时使用的版本冲突编码。 */
+export const REVISION_CONFLICT_CODE = 'REVISION_CONFLICT'
 /** 提案生命周期展示文案。 */
 export const CHANGE_SET_STATUS_LABEL = Object.freeze({
   PENDING: '等待审批', APPLIED: '已批准并保存', REJECTED: '已拒绝', CONFLICTED: '版本冲突', EXPIRED: '已过期', CANCELLED: '已取消',

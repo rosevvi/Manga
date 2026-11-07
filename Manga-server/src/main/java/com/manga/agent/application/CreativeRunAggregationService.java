@@ -3,8 +3,11 @@ package com.manga.agent.application;
 import com.manga.agent.domain.CreativeErrorCode;
 import com.manga.agent.domain.CreativeEventType;
 import com.manga.agent.domain.CreativeRunStatus;
+import com.manga.agent.domain.CreativeRuntimeMessages;
+import com.manga.agent.domain.CreativeStepStatus;
 import com.manga.agent.domain.SystemActor;
 import com.manga.entity.CreativeRun;
+import com.manga.entity.CreativeStep;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.CreativeStepRepository;
 import lombok.RequiredArgsConstructor;
@@ -44,8 +47,10 @@ public class CreativeRunAggregationService {
         } else if (stepRepository.countFailed(runId) > 0) {
             terminalStatus = CreativeRunStatus.FAILED;
             terminalEvent = CreativeEventType.RUN_FAILED;
-            run.setErrorCode(CreativeErrorCode.CAPABILITY_EXECUTION_FAILED.code());
-            run.setErrorMessage("Creative step execution failed");
+            CreativeStep failed = stepRepository.findByRunId(runId).stream()
+                    .filter(step -> step.getStatus() == CreativeStepStatus.FAILED).findFirst().orElse(null);
+            run.setErrorCode(Objects.isNull(failed) ? CreativeErrorCode.CAPABILITY_EXECUTION_FAILED.code() : failed.getErrorCode());
+            run.setErrorMessage(Objects.isNull(failed) ? CreativeRuntimeMessages.AGENT_STEP_EXECUTION_FAILED : failed.getErrorMessage());
         } else {
             terminalStatus = CreativeRunStatus.COMPLETED;
             terminalEvent = CreativeEventType.RUN_COMPLETED;

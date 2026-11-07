@@ -12,7 +12,10 @@ export async function authorizedRequest(accessToken, path, options = {}) {
   })
   const payload = await response.json().catch(() => null)
   if (!response.ok || !payload?.success) {
-    throw new Error(payload?.message ?? 'Unable to connect to Manga server')
+    const failure = new Error(payload?.message ?? 'Unable to connect to Manga server')
+    failure.code = payload?.code
+    failure.status = response.status
+    throw failure
   }
   return payload.data
 }

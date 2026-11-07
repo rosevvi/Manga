@@ -5,6 +5,9 @@ import { createManualRun, getCreativeRun, streamCreativeRunEvents } from '../api
 import { useLanguage } from '../i18n/LanguageContext'
 import './project-workspace.css'
 import ManualCreativeTaskPanel from './ManualCreativeTaskPanel'
+import ProjectCreativeTaskHistory from './ProjectCreativeTaskHistory'
+import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
+import { REVISION_CONFLICT_CODE } from '../constants/changeSet'
 import { CREATIVE_OPERATION, CREATIVE_PERMISSION, CREATIVE_RESOURCE } from '../constants/creative'
 
 const STAGES = [
@@ -14,8 +17,6 @@ const STAGES = [
 
 const TERMINAL_RUN_STATUSES = new Set(['COMPLETED', 'FAILED', 'CANCELLED'])
 const SCRIPT_ANALYSIS_STORAGE_PREFIX = 'manga.script.analysis.'
-/** 项目手动提案只缓存 Run 标识，正文与审批状态从服务端恢复。 */
-const CREATIVE_REVIEW_STORAGE_PREFIX = 'manga.creative.review.'
 
 /** 创建浏览器兼容的手动 Run 幂等标识。 */
 function nextRequestId() { return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}` }
@@ -23,12 +24,6 @@ function nextRequestId() { return globalThis.crypto?.randomUUID?.() ?? `${Date.n
 /** 安全恢复当前项目最近一次剧本解析游标。 */
 function restoreScriptAnalysis(projectId) {
   try { return JSON.parse(sessionStorage.getItem(`${SCRIPT_ANALYSIS_STORAGE_PREFIX}${projectId}`) || 'null') }
-  catch { return null }
-}
-
-/** 存储不可用时仍可在当前页面使用审批能力。 */
-function restoreReviewRun(projectId) {
-  try { return sessionStorage.getItem(`${CREATIVE_REVIEW_STORAGE_PREFIX}${projectId}`) }
   catch { return null }
 }
 
@@ -52,25 +47,40 @@ function ProjectWorkspace({ accessToken, projectId, initialStage = 'OVERVIEW', i
   const analysisAbortRef = useRef(null)
   const analysisReconnectRef = useRef(null)
   const [scriptAnalysis, setScriptAnalysis] = useState(analysisRef.current)
-  const [reviewRunId, setReviewRunId] = useState(() => restoreReviewRun(projectId))
+  const [reviewRunId, setReviewRunId] = useState(null)
   const [reviewRunStatus, setReviewRunStatus] = useState(null)
+  const [hasServerActiveRun, setHasServerActiveRun] = useState(false)
+  const [runListVersion, setRunListVersion] = useState(0)
+  const [chapterConflict, setChapterConflict] = useState(false)
+  const editor = useRef(null)
+  const chapterReadVersion = useRef(0)
+  const workspaceReadVersion = useRef(0)
+  editor.current = { chapter: selectedChapter, title: chapterTitle, text: chapterText }
   const [generationInstruction, setGenerationInstruction] = useState('')
-  const hasActiveReview = Boolean(reviewRunId) && !TERMINAL_RUN_STATUSES.has(reviewRunStatus)
+  const hasActiveReview = hasServerActiveRun || (Boolean(reviewRunId) && !TERMINAL_RUN_STATUSES.has(reviewRunStatus))
 
   /** 切换项目时恢复该项目的手动任务，避免串用审批卡片。 */
-  useEffect(() => { setReviewRunId(restoreReviewRun(projectId)); setReviewRunStatus(null); setGenerationInstruction('') }, [projectId])
+  useEffect(() => {
+    setReviewRunId(null); setReviewRunStatus(null); setHasServerActiveRun(false); setGenerationInstruction('')
+  }, [projectId, accessToken])
 
-  /** 仅持久化稳定标识，刷新后重新查询提案及审批事实。 */
+  /** 新任务立即展示，任务清单随后从服务端重新读取。 */
   const rememberReviewRun = (id) => {
     setReviewRunId(id)
     setReviewRunStatus(null)
-    try { sessionStorage.setItem(`${CREATIVE_REVIEW_STORAGE_PREFIX}${projectId}`, id) }
-    catch { /* 无存储环境下保留当前页状态。 */ }
+    setRunListVersion((value) => value + 1)
   }
 
-  const loadWorkspace = async () => {
-    setLoading(true); setError('')
-    try { const [nextWorkspace, nextTasks] = await Promise.all([getProjectWorkspace(accessToken, projectId), getProjectTasks(accessToken, projectId)]); setWorkspace(nextWorkspace); setTasks(nextTasks) } catch (e) { setError(e.message) } finally { setLoading(false) }
+  const loadWorkspace = async (showLoading = true) => {
+    const version = ++workspaceReadVersion.current
+    if (showLoading) setLoading(true)
+    setError('')
+    try {
+      const [nextWorkspace, nextTasks] = await Promise.all([getProjectWorkspace(accessToken, projectId), getProjectTasks(accessToken, projectId)])
+      if (version !== workspaceReadVersion.current) return
+      setWorkspace(nextWorkspace); setTasks(nextTasks)
+    } catch (failure) { if (version === workspaceReadVersion.current) setError(failure.message) }
+    finally { if (version === workspaceReadVersion.current) setLoading(false) }
   }
   useEffect(() => { loadWorkspace() }, [accessToken, projectId])
   useEffect(() => {
@@ -80,11 +90,58 @@ function ProjectWorkspace({ accessToken, projectId, initialStage = 'OVERVIEW', i
   }, [workspace?.tasks, accessToken, projectId])
   useEffect(() => {
     if (!initialChapterId) return
+    let stopped = false
+    chapterReadVersion.current += 1
     setActiveStage('SCRIPT_CHAPTER')
     getProjectChapter(accessToken, projectId, initialChapterId).then((chapter) => {
+      if (stopped) return
       setSelectedChapter(chapter); setChapterTitle(chapter.title || ''); setChapterText(chapter.rawContent || '')
-    }).catch((e) => setError(e.message))
+      setChapterConflict(false)
+    }).catch((e) => { if (!stopped) setError(e.message) })
+    return () => { stopped = true; chapterReadVersion.current += 1 }
   }, [accessToken, projectId, initialChapterId])
+
+  /** 审批后刷新章节；保留未保存编辑及其旧版本，用户显式重载后才替换草稿。 */
+  const refreshChapter = async (force = false) => {
+    const id = editor.current?.chapter?.id
+    if (!id) return
+    const version = ++chapterReadVersion.current
+    const latest = await getProjectChapter(accessToken, projectId, id)
+    if (version !== chapterReadVersion.current || editor.current?.chapter?.id !== id) return
+    const current = editor.current
+    const dirty = current.title !== current.chapter.title || current.text !== current.chapter.rawContent
+    if (!force && dirty && latest.revision !== current.chapter.revision) { setChapterConflict(true); return }
+    if (!force && dirty) return
+    setSelectedChapter(latest); setChapterTitle(latest.title || ''); setChapterText(latest.rawContent || ''); setChapterConflict(false)
+  }
+
+  /** 保存编辑器读取时的版本；遇到冲突保留用户输入，不自动覆盖新内容。 */
+  const saveChapterChanges = async () => {
+    if (!selectedChapter || importing) return
+    setImporting(true); setError('')
+    try {
+      const saved = await saveProjectChapter(accessToken, projectId, selectedChapter.id, {
+        title: chapterTitle, synopsis: selectedChapter.synopsis, rawContent: chapterText,
+        sourceType: selectedChapter.sourceType, scenes: selectedChapter.scenes || [], expectedRevision: selectedChapter.revision,
+      })
+      setSelectedChapter(saved); setChapterConflict(false)
+      await loadWorkspace(false)
+    } catch (failure) {
+      if (failure.code === REVISION_CONFLICT_CODE) setChapterConflict(true)
+      setError(failure.message)
+    } finally { setImporting(false) }
+  }
+
+  /** 会话审批和手动审批共用业务刷新信号。 */
+  useEffect(() => {
+    const refresh = (event) => {
+      if (String(event.detail.projectId) !== String(projectId)) return
+      loadWorkspace(false)
+      refreshChapter().catch((failure) => setError(failure.message))
+    }
+    window.addEventListener(CREATIVE_PROJECT_CHANGED, refresh)
+    return () => window.removeEventListener(CREATIVE_PROJECT_CHANGED, refresh)
+  }, [accessToken, projectId])
 
   /** 同时保存 UI 状态和断线重连所需的 Run cursor。 */
   const persistScriptAnalysis = useCallback((patch) => {
@@ -233,6 +290,11 @@ function ProjectWorkspace({ accessToken, projectId, initialStage = 'OVERVIEW', i
     <header className="project-workspace-header"><div className="project-workspace-cover">{project.coverUrl ? <img src={project.coverUrl} alt="" /> : <Clapperboard size={30} />}</div><div className="project-workspace-heading"><span className="workspace-eyebrow">{translate('projects.workspaceEyebrow')}</span><h1>{project.name}</h1><p>{project.description || translate('projects.descriptionUnset')}</p></div></header>
     <nav className="workflow-stepper">{STAGES.map(([value, label, Icon], index) => <button key={value} type="button" className={value === activeStage ? 'workflow-step active' : index < stageIndex ? 'workflow-step completed' : 'workflow-step'} onClick={() => navigateStage(value)}><span className="workflow-step-icon">{index < stageIndex ? <CheckCircle2 size={15} /> : <Icon size={15} />}</span>{translate(label)}{index < STAGES.length - 1 && <ChevronRight size={13} />}</button>)}</nav>
     {error && <div className="workspace-alert">{error}</div>}
+    {chapterConflict && <div className="workspace-alert" role="alert">章节已被更新，已保留你的未保存编辑。
+      <button type="button" onClick={() => refreshChapter(true).catch((failure) => setError(failure.message))}>重新加载最新章节（放弃当前编辑）</button>
+    </div>}
+    <ProjectCreativeTaskHistory accessToken={accessToken} projectId={projectId} selectedRunId={reviewRunId}
+      reloadKey={runListVersion} onSelect={(id) => { setReviewRunId(id); setReviewRunStatus(null) }} onActiveChanged={setHasServerActiveRun} />
     {activeStage === 'SCRIPT' && <section className="script-import-panel">
       <h3>AI 生成新章节</h3>
       <textarea className="script-raw-input" rows={3} maxLength={12000} value={generationInstruction}
@@ -241,10 +303,10 @@ function ProjectWorkspace({ accessToken, projectId, initialStage = 'OVERVIEW', i
       {hasActiveReview && <small>当前手动任务尚未结束，请先处理下方审批或停止任务。</small>}
     </section>}
     {reviewRunId && <ManualCreativeTaskPanel key={`${projectId}.${reviewRunId}`} accessToken={accessToken}
-      projectId={projectId} runId={reviewRunId} onRunChanged={rememberReviewRun} onApplied={loadWorkspace} onStatusChanged={setReviewRunStatus} />}
+      projectId={projectId} runId={reviewRunId} onRunChanged={rememberReviewRun} onStatusChanged={setReviewRunStatus} />}
     {activeStage === 'OVERVIEW' && <Overview workspace={workspace} onScript={() => navigateStage('SCRIPT')} onStoryboard={() => onOpenStoryboard(project)} translate={translate} />}
     {activeStage === 'SCRIPT' && <ScriptList chapters={chapters} tasks={tasks} importing={importing} importFull={importFull} importOne={importOne} chapterTitle={chapterTitle} setChapterTitle={setChapterTitle} chapterText={chapterText} setChapterText={setChapterText} onChapter={(chapter) => onNavigateChapter?.(chapter.id)} onParseScript={parseScript} scriptAnalysis={scriptAnalysis} hasScript={Boolean(workspace.script?.id)} translate={translate} />}
-    {activeStage === 'SCRIPT_CHAPTER' && selectedChapter && <ChapterEditor chapter={selectedChapter} title={chapterTitle} setTitle={setChapterTitle} text={chapterText} setText={setChapterText} saving={importing} generating={hasActiveReview} onGenerateStoryboard={generateChapterStoryboard} onSave={async () => { setImporting(true); try { await saveProjectChapter(accessToken, projectId, selectedChapter.id, { title: chapterTitle, synopsis: selectedChapter.synopsis, rawContent: chapterText, sourceType: selectedChapter.sourceType, scenes: selectedChapter.scenes || [] }); await loadWorkspace() } catch (e) { setError(e.message) } finally { setImporting(false) } }} onDelete={async () => { await deleteProjectChapter(accessToken, projectId, selectedChapter.id); onNavigateStage?.('SCRIPT') }} translate={translate} />}
+    {activeStage === 'SCRIPT_CHAPTER' && selectedChapter && <ChapterEditor chapter={selectedChapter} title={chapterTitle} setTitle={setChapterTitle} text={chapterText} setText={setChapterText} saving={importing} generating={hasActiveReview} onGenerateStoryboard={generateChapterStoryboard} onSave={saveChapterChanges} onDelete={async () => { await deleteProjectChapter(accessToken, projectId, selectedChapter.id); onNavigateStage?.('SCRIPT') }} translate={translate} />}
     {activeStage === 'STORYBOARD' && <Placeholder icon={Film} title={translate('workflow.storyboard')} text={translate('workflow.storyboardReady')} action={() => onOpenStoryboard(project)} label={translate('storyboards.create')} />}
     {activeStage === 'ASSETS' && <Placeholder icon={ImageIcon} title={translate('workflow.assets')} text={translate('workflow.assetsPlanned')} />}
     {activeStage === 'GENERATION' && <Placeholder icon={WandSparkles} title={translate('workflow.generation')} text={translate('workflow.generationPlanned')} />}

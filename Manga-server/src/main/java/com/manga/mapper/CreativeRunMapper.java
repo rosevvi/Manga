@@ -10,6 +10,11 @@ import java.util.List;
  * 提供 Creative Run 的所有权、幂等和加锁查询。
  */
 public interface CreativeRunMapper extends BaseMapper<CreativeRun> {
+    /** 用户项目内的章节和分镜手动任务分页。 */
+    List<CreativeRun> findManual(@Param("userId") long userId, @Param("projectId") long projectId,
+            @Param("beforeId") Long beforeId, @Param("limit") int limit);
+    /** 查询最新未结束的手动生成任务，不受历史游标限制。 */
+    CreativeRun findActiveManual(@Param("userId") long userId, @Param("projectId") long projectId);
     /** 查询尚有事件未投影的 Run，支持限定会话。 */
     List<String> findUnprojected(@Param("conversationId") String conversationId, @Param("limit") int limit);
     /** 查询会话的当前活动 Run。 */

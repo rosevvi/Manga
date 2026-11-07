@@ -3,9 +3,11 @@ package com.manga.controller;
 import com.manga.agent.api.CreateCreativeRunRequest;
 import com.manga.agent.api.CreativeApiConstants;
 import com.manga.agent.api.CreativeEventCursor;
+import com.manga.agent.api.CreativeManualRunPage;
 import com.manga.agent.api.CreativeRunResponse;
 import com.manga.agent.application.CancelCreativeRunCommand;
 import com.manga.agent.application.CreativeEventStreamService;
+import com.manga.agent.application.CreativeManualRunQueryService;
 import com.manga.agent.application.CreativeRunQueryService;
 import com.manga.agent.application.CreativeRunStartResult;
 import com.manga.agent.application.CreativeRuntime;
@@ -18,12 +20,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,16 +44,28 @@ import java.util.Objects;
  * 提供会话和页面手动入口共用的 Creative Run HTTP/SSE 契约。
  */
 @RestController
+@Validated
 @RequestMapping(CreativeApiConstants.CREATIVE_RUNS_PATH)
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Creative Run", description = "启动、取消、查询创作 Run，并按游标订阅版本化事件")
 @SecurityRequirement(name = OpenApiConstants.BEARER_AUTH_SCHEME)
 public class CreativeRunController {
-
+    private final CreativeManualRunQueryService manualRunQueryService;
     private final CreativeRuntime creativeRuntime;
     private final CreativeRunQueryService runQueryService;
     private final CreativeEventStreamService eventStreamService;
+
+    /** 从服务端找回当前用户项目内的手动生成任务和未决审批。 */
+    @GetMapping
+    @Operation(summary = "查询项目手动创作任务", description = "返回任务历史分页及最新活动任务，支持清除缓存和跨设备恢复。")
+    public ApiResponse<CreativeManualRunPage> listManual(@RequestParam @Positive long projectId,
+            @RequestParam(required = false) @Positive Long beforeId) {
+        long userId = SecurityUtils.requireCurrentUserId();
+        CreativeManualRunPage page = manualRunQueryService.list(userId, projectId, beforeId);
+        log.debug("Manual creative runs userId={} projectId={} count={}", userId, projectId, page.items().size());
+        return ApiResponse.success(page);
+    }
 
     /** 创建会话或手动触发的 Creative Run，并返回已持久化状态快照。 */
     @Operation(summary = "创建 Creative Run", description = "支持助手会话和页面手动操作，requestId 用于启动幂等。")

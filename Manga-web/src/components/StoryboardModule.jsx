@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDown,
   ArrowLeft,
@@ -21,6 +21,7 @@ import {
 import { PROJECT_LIMITS, STORYBOARD_SHOT_STATUS } from '../constants/project'
 import { useLanguage } from '../i18n/LanguageContext'
 import './project-module.css'
+import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
 
 const EMPTY_SHOT = Object.freeze({
   title: '',
@@ -46,6 +47,7 @@ function StoryboardModule({ accessToken, projects, selectedProjectId, onSelectPr
   const [form, setForm] = useState(EMPTY_SHOT)
   const [saving, setSaving] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
+  const shotReadVersion = useRef(0)
 
   const projectId = selectedProjectId ?? projects[0]?.id ?? null
   const selectedProject = useMemo(
@@ -54,6 +56,7 @@ function StoryboardModule({ accessToken, projects, selectedProjectId, onSelectPr
   )
 
   const loadShots = async () => {
+    const version = ++shotReadVersion.current
     if (!projectId) {
       setShots([])
       return
@@ -61,16 +64,25 @@ function StoryboardModule({ accessToken, projects, selectedProjectId, onSelectPr
     setLoading(true)
     setError('')
     try {
-      setShots(await getStoryboardShots(accessToken, projectId))
+      const latest = await getStoryboardShots(accessToken, projectId)
+      if (version === shotReadVersion.current) setShots(latest)
     } catch (requestError) {
-      setError(requestError.message)
+      if (version === shotReadVersion.current) setError(requestError.message)
     } finally {
-      setLoading(false)
+      if (version === shotReadVersion.current) setLoading(false)
     }
   }
 
   useEffect(() => {
     loadShots()
+    return () => { shotReadVersion.current += 1 }
+  }, [projectId, accessToken])
+
+  /** 聊天审批新增镜头后刷新当前列表。 */
+  useEffect(() => {
+    const refresh = (event) => { if (String(event.detail.projectId) === String(projectId)) loadShots() }
+    window.addEventListener(CREATIVE_PROJECT_CHANGED, refresh)
+    return () => window.removeEventListener(CREATIVE_PROJECT_CHANGED, refresh)
   }, [projectId, accessToken])
 
   const openCreate = () => {

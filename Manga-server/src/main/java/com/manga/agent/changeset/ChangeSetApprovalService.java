@@ -5,7 +5,9 @@ import com.manga.agent.application.CreativeIdentifierGenerator;
 import com.manga.agent.config.CreativeRuntimeProperties;
 import com.manga.agent.domain.CreativeActor;
 import com.manga.agent.domain.CreativeDispatchOutboxStatus;
+import com.manga.agent.domain.CreativeErrorCode;
 import com.manga.agent.domain.CreativeEventType;
+import com.manga.agent.domain.CreativeOperationType;
 import com.manga.agent.domain.CreativeRunStatus;
 import com.manga.agent.domain.CreativeStepStateMachine;
 import com.manga.agent.domain.CreativeStepStatus;
@@ -13,6 +15,7 @@ import com.manga.agent.domain.SystemActor;
 import com.manga.agent.event.CreativeEventSources;
 import com.manga.agent.execution.ClaimedCreativeStep;
 import com.manga.agent.execution.CreativeDispatchSignal;
+import com.manga.agent.harness.AgentRuntimeException;
 import com.manga.agent.state.AgentStateSessionService;
 import com.manga.common.exception.BusinessException;
 import com.manga.entity.CreativeApproval;
@@ -60,6 +63,24 @@ public class ChangeSetApprovalService {
     @Transactional(readOnly = true)
     public boolean hasDraft(String stepId) {
         return proposals.findByStep(stepId).filter(value -> value.getStatus() == ChangeSetStatus.DRAFT).isPresent();
+    }
+
+    /** 手动生成只有在正确类型的提案已经审批并形成恢复结果后才能结束；普通聊天允许纯文本。 */
+    @Transactional(readOnly = true)
+    public void requireGenerationResult(ClaimedCreativeStep claim, CreativeOperationType operation) {
+        ChangeSetKind required = switch (operation) {
+            case GENERATE_SCRIPT_CHAPTER -> ChangeSetKind.SCRIPT;
+            case GENERATE_CHAPTER_STORYBOARD -> ChangeSetKind.STORYBOARD;
+            default -> null;
+        };
+        if (Objects.isNull(required)) return;
+        boolean valid = proposals.findByStep(claim.stepId())
+                .filter(proposal -> proposal.getKind() == required && Objects.nonNull(proposal.getResultJson()))
+                .filter(proposal -> proposal.getStatus() == ChangeSetStatus.APPLIED
+                        || proposal.getStatus() == ChangeSetStatus.REJECTED
+                        || proposal.getStatus() == ChangeSetStatus.CONFLICTED
+                        || proposal.getStatus() == ChangeSetStatus.EXPIRED).isPresent();
+        if (!valid) throw new AgentRuntimeException(CreativeErrorCode.PROPOSAL_REQUIRED, ChangeSetConstants.PROPOSAL_REQUIRED);
     }
 
     /** 执行资源关闭后调用；原子释放 owner、撤销旧状态许可并开放审批，不保留 Reactor 调用栈。 */

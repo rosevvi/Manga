@@ -5,6 +5,13 @@ import { CREATIVE_OPERATION, CREATIVE_PERMISSION, CREATIVE_TRIGGER } from '../co
 /** Creative Run 的稳定后端路径。 */
 export const CREATIVE_RUN_ENDPOINT = '/creative-runs'
 
+/** 从服务端找回项目手动任务，活动任务独立于历史分页返回。 */
+export function listProjectCreativeRuns(accessToken, projectId, beforeId) {
+  const query = new URLSearchParams({ projectId: String(projectId) })
+  if (beforeId) query.set('beforeId', String(beforeId))
+  return authorizedRequest(accessToken, `${CREATIVE_RUN_ENDPOINT}?${query}`)
+}
+
 /** 创建会话型 Creative Run。 */
 export function createConversationRun(accessToken, request) {
   return authorizedRequest(accessToken, CREATIVE_RUN_ENDPOINT, {

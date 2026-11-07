@@ -3,6 +3,7 @@ package com.manga.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.changeset.ChangeSetConstants;
+import com.manga.agent.changeset.ChangeSetResponseCode;
 import com.manga.agent.changeset.ScriptChangeSet;
 import com.manga.common.enums.ProjectWorkflowStage;
 import com.manga.common.enums.ScriptChapterParseStatus;
@@ -105,6 +106,9 @@ public class ProjectScriptService {
         ProjectScript script = requireScript(projectId, true);
         ProjectScriptChapter chapter = chapterRepository.findByIdAndScript(chapterId, script.getId())
                 .orElseThrow(() -> new BusinessException(PROJECT_NOT_FOUND, HttpStatus.NOT_FOUND));
+        if (Objects.isNull(request.expectedRevision()) || !Objects.equals(chapter.getRevision(), request.expectedRevision())) {
+            throw new BusinessException(ChangeSetResponseCode.REVISION_CONFLICT, HttpStatus.CONFLICT);
+        }
         chapter.setTitle(request.title().trim());
         chapter.setSynopsis(normalize(request.synopsis()));
         chapter.setRawContent(request.rawContent().trim());
@@ -213,6 +217,8 @@ public class ProjectScriptService {
 
     /** 一次读取章节的场景和全部对白，避免审批预览按场景产生 N+1 查询。 */
     private ProjectScriptChapterResponse toChapterResponse(ProjectScriptChapter chapter, int number) {
+        // 更新 SQL 会推进 revision，响应必须返回提交后的版本，创建时也读取数据库默认版本。
+        chapter = chapterRepository.findByIdAndScript(chapter.getId(), chapter.getScriptId()).orElseThrow();
         List<ProjectScriptScene> scenes = sceneMapper.findByChapterId(chapter.getId());
         Map<Long, List<ProjectScriptDialogue>> dialoguesByScene = dialogueMapper.findByChapterId(chapter.getId())
                 .stream().collect(Collectors.groupingBy(ProjectScriptDialogue::getSceneId));
@@ -222,7 +228,7 @@ public class ProjectScriptService {
                         .map(d -> new ProjectScriptSaveRequest.Dialogue(d.getSpeaker(), d.getText(), d.getDialogueType())).toList())).toList();
         return new ProjectScriptChapterResponse(chapter.getId(), chapter.getScriptId(), number, chapter.getTitle(), chapter.getSynopsis(),
                 chapter.getRawContent(), chapter.getSourceType(), chapter.getParseStatus(), chapter.getStructureVersion(), result,
-                chapter.getLastError(), chapter.getSortOrder(), chapter.getUpdatedAt());
+                chapter.getLastError(), chapter.getSortOrder(), chapter.getUpdatedAt(), chapter.getRevision());
     }
 
     private int chapterNumber(long scriptId, long chapterId) {

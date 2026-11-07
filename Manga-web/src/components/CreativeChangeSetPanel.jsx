@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { decideCreativeChangeSet, getCreativeChangeSet, listCreativeChangeSets } from '../api/creativeChangeSetApi'
-import { APPROVAL_DECISION, APPROVAL_POLL_MS, CHANGE_SET_KIND, CHANGE_SET_STATUS, CHANGE_SET_STATUS_LABEL } from '../constants/changeSet'
+import { APPROVAL_DECISION, APPROVAL_STATUS, APPROVAL_POLL_MS, CHANGE_SET_KIND, CHANGE_SET_STATUS, CHANGE_SET_STATUS_LABEL } from '../constants/changeSet'
 import { scriptDifferences } from './changeSetPreview'
 import './creative-change-set.css'
+import { notifyCreativeProjectChanged } from './creativeProjectEvents'
 
 /** 会话和手动任务共用审批面板；差异、评论和最终状态都由服务端恢复。 */
 export default function CreativeChangeSetPanel({ accessToken, conversationId, runId, onDecided, onRegenerate }) {
@@ -13,6 +14,7 @@ export default function CreativeChangeSetPanel({ accessToken, conversationId, ru
   const scope = useRef(0)
   const version = useRef(0)
   const earlierLoaded = useRef(false)
+  const knownStatuses = useRef(new Map())
 
   /** 避免切换登录身份或会话后应用旧请求响应。 */
   const refresh = useCallback(async () => {
@@ -20,6 +22,13 @@ export default function CreativeChangeSetPanel({ accessToken, conversationId, ru
     const requestVersion = ++version.current
     const page = await listCreativeChangeSets(accessToken, { conversationId, runId })
     if (expectedScope !== scope.current || requestVersion !== version.current) return
+    for (const proposal of page) {
+      const previous = knownStatuses.current.get(proposal.changeSetId)
+      if (previous && previous !== CHANGE_SET_STATUS.APPLIED && proposal.status === CHANGE_SET_STATUS.APPLIED) {
+        notifyCreativeProjectChanged(proposal.projectId)
+      }
+      knownStatuses.current.set(proposal.changeSetId, proposal.status)
+    }
     setProposals((current) => {
       const oldest = page.at(-1)?.id
       const previous = oldest ? current.filter((proposal) => proposal.id < oldest) : []
@@ -33,6 +42,7 @@ export default function CreativeChangeSetPanel({ accessToken, conversationId, ru
   useEffect(() => {
     const currentScope = ++scope.current
     earlierLoaded.current = false
+    knownStatuses.current = new Map()
     setProposals([]); setHasMore(false); setError('')
     if (!accessToken || (!conversationId && !runId)) return undefined
     const update = () => refresh().catch((failure) => {
@@ -61,8 +71,10 @@ export default function CreativeChangeSetPanel({ accessToken, conversationId, ru
   /** 决策后先读取持久化状态，再通知页面刷新实际业务数据。 */
   const decide = async (proposal, decision, comment) => {
     const expected = scope.current
-    await decideCreativeChangeSet(accessToken, proposal.changeSetId, decision, comment)
+    const result = await decideCreativeChangeSet(accessToken, proposal.changeSetId, decision, comment)
+    if (result.status === APPROVAL_STATUS.APPROVED) notifyCreativeProjectChanged(proposal.projectId)
     if (scope.current !== expected) return
+    if (result.status === APPROVAL_STATUS.APPROVED) knownStatuses.current.set(proposal.changeSetId, CHANGE_SET_STATUS.APPLIED)
     const latest = await getCreativeChangeSet(accessToken, proposal.changeSetId)
     if (scope.current !== expected) return
     setProposals((current) => current.map((value) => value.changeSetId === latest.changeSetId ? latest : value))

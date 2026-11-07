@@ -2,6 +2,8 @@ package com.manga.agent.changeset;
 
 /** 提案协议、审批补偿和恢复指令的共享契约。 */
 public final class ChangeSetConstants {
+    /** 手动生成不能以纯文本回复冒充已生成提案。 */
+    public static final String PROPOSAL_REQUIRED = "生成任务未产出有效提案，请重新生成；业务数据尚未写入。";
     /** 首版提案 Schema。 */
     public static final int SCHEMA_VERSION = 1;
     /** 恢复阶段单独给予租约故障重试次数。 */

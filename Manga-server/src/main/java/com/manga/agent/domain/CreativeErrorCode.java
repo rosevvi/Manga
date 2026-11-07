@@ -27,6 +27,8 @@ public enum CreativeErrorCode {
     KERNEL_CAPACITY_EXHAUSTED,
     /** 模型调用失败。 */
     MODEL_INVOCATION_FAILED,
+    /** 手动生成结束时未产出所需业务提案。 */
+    PROPOSAL_REQUIRED,
     /** 工具或能力执行失败。 */
     CAPABILITY_EXECUTION_FAILED,
     /** 执行器租约丢失。 */
