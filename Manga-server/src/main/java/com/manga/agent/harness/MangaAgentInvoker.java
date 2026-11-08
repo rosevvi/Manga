@@ -10,6 +10,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import java.time.Instant;
+import com.manga.agent.domain.CreativeErrorCode;
+import com.manga.agent.domain.CreativeRuntimeMessages;
 
 import java.util.Objects;
 import java.util.function.Predicate;
@@ -55,6 +59,7 @@ public class MangaAgentInvoker {
     public Flux<AgentEvent> invokeUntil(AgentBlueprint blueprint, AgentRuntimeContext context,
             String instruction, Predicate<AgentEvent> stopAfter) {
         return Flux.defer(() -> {
+            if (!context.deadline().isAfter(Instant.now())) return Flux.error(deadlineExceeded());
             InvocationResources resources = new InvocationResources();
             try {
                 resources.gateLease = sessionSerialGate.acquire(context.stateSessionId());
@@ -68,6 +73,7 @@ public class MangaAgentInvoker {
                 return Flux.using(() -> resources,
                         active -> active.harnessLease.stream(instruction)
                                 .takeUntilOther(active.heartbeat.lossSignal())
+                                .takeUntilOther(deadlineSignal(context))
                                 .takeUntil(stopAfter),
                         InvocationResources::close, true);
             } catch (RuntimeException | Error exception) {
@@ -75,6 +81,19 @@ public class MangaAgentInvoker {
                 return Flux.error(exception);
             }
         });
+    }
+
+    /** 精确截止时间由 Manga 调度器触发，不等待下一次续租轮询。 */
+    private Mono<Void> deadlineSignal(AgentRuntimeContext context) {
+        return Mono.create(sink -> {
+            var future = taskScheduler.schedule(() -> sink.error(deadlineExceeded()), context.deadline());
+            sink.onDispose(() -> { if (Objects.nonNull(future)) future.cancel(false); });
+        });
+    }
+
+    /** 截止后拒绝继续推理并通过 eager cleanup 释放全部租约。 */
+    private AgentRuntimeException deadlineExceeded() {
+        return new AgentRuntimeException(CreativeErrorCode.DEADLINE_EXCEEDED, CreativeRuntimeMessages.AGENT_STEP_DEADLINE_EXCEEDED);
     }
 
     /** 保存一次调用已获取的资源，并提供严格逆序幂等释放。 */

@@ -4,6 +4,7 @@ import com.manga.agent.application.CreativeEventService;
 import com.manga.agent.application.CreativeIdentifierGenerator;
 import com.manga.agent.application.CreativeRunAggregationService;
 import com.manga.agent.blueprint.AgentBlueprintCodec;
+import com.manga.agent.blueprint.CapabilityManifest;
 import com.manga.agent.changeset.ChangeSetCodec;
 import com.manga.agent.changeset.CreativeRunStopped;
 import com.manga.agent.domain.CreativeDispatchOutboxStatus;
@@ -85,6 +86,11 @@ public class CreativeGraphService {
             steps.create(child);
             nodes.put(node.key(), child);
             created(child);
+            if (Objects.nonNull(node.dynamicAgent())) {
+                events.append(run.getRunId(), child.getStepId(), CreativeEventType.DYNAMIC_AGENT_CREATED,
+                        CreativeEventSources.RUNTIME, plan.getPlanId(), new DynamicCreation(child.getStepId(), node.dynamicAgent(),
+                                node.instruction(), blueprint.fingerprint(), blueprint.capabilities(), blueprint.maxTurns()));
+            }
         }
         CreativeStep join = newStep(parent, plan, CollaborationToolContract.JOIN_NODE_KEY, CreativeStepType.JOIN);
         join.setInputJson(codec.write(Map.of()));
@@ -284,6 +290,16 @@ public class CreativeGraphService {
                 CollaborationToolContract.RETRY_ATTEMPTS, SystemActor.CREATIVE_RUNTIME.code());
         if (changed != 1) throw new IllegalStateException(CollaborationMessages.CHECKPOINT_CONFLICT);
     }
+
+    /** 临时规格审计事件，完整 Blueprint 另存于计划和 Step。 */
+    public record DynamicCreation(
+            /** 独立执行步骤。 */ String stepId,
+            /** 创建原因及原始纯数据配置。 */ DynamicAgentRequest request,
+            /** 此次业务输入。 */ String instruction,
+            /** 实际执行规格指纹。 */ String blueprintFingerprint,
+            /** 父权限求交后的有效能力。 */ List<CapabilityManifest> capabilities,
+            /** 实际轮数上限。 */ int maxTurns
+    ) { }
 
     /** 父步骤恢复命令，仅包含当前轮次的结果引用和摘要。 */
     public record Continuation(

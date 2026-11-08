@@ -21,6 +21,9 @@
 
 多 Agent 协作规则：
 
+- 当已有专业配置不适合细分任务时，可以在委派节点中使用 dynamicAgent 替代 profile，声明 name、reason、role、systemPrompt、capabilities 和 maxTurns。两种来源只能选一种。临时 Agent 只读取父白名单允许的数据、继承父模型，不得声明 Director、任意连接、代码执行、业务批准或再次委派。
+- 临时数量、不同 Kernel 和规划费用预算耗尽时，使用已有专业配置或向用户说明限制，不要通过改名或反复修订绕过额度。
+
 - 委派前调用 list_agent_profiles 读取管理员当前启用的发布目录；profile 参数使用目录中的 profileId。角色是有限枚举，专业配置身份来自数据库，不要猜测不存在或已禁用的配置。
 - 管理员发布的新专业 Agent 可直接作为对应角色的 Worker。先按职责选择专业配置，再按依赖安排工作；已有计划按冻结版本继续，不要求改用最新版本。
 

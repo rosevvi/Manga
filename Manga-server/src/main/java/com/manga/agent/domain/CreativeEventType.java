@@ -58,7 +58,9 @@ public enum CreativeEventType {
     /** Run 成功完成。 */
     RUN_COMPLETED,
     /** Run 执行失败。 */
-    RUN_FAILED;
+    RUN_FAILED,
+    /** 临时 Worker 的声明、输入与有效规格已经持久化。 */ DYNAMIC_AGENT_CREATED,
+    /** 临时 Worker 已提交可追溯的结构化输出。 */ DYNAMIC_AGENT_RESULT;
 
     /** 返回用于数据库和事件协议的稳定机器编码。 */
     public String code() {

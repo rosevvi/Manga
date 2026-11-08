@@ -255,6 +255,22 @@ manga:
         kernel-acquire-timeout: ${MANGA_CREATIVE_AGENT_KERNEL_ACQUIRE_TIMEOUT:5s}
         # 应用关闭时等待活跃 KernelHandle 和 HarnessLease 释放的最长时间。
         shutdown-drain-timeout: ${MANGA_CREATIVE_AGENT_SHUTDOWN_DRAIN_TIMEOUT:30s}
+    # 运行时临时 Worker 的规划边界；实际 token 结算属于用量账本。
+    dynamic-agent:
+      # 含修订的临时节点总数。
+      max-agents: 6
+      # 单 Run 不同临时执行规格的上限，全局仍受 Kernel 池约束。
+      max-kernels: 4
+      # 累计最大推理轮数预留，故障不退款。
+      max-reserved-turns: 64
+      # 临时 Worker 每次最大推理轮数。
+      max-turns: 8
+      # 累计临时提示词字符数。
+      max-prompt-characters: 18000
+      # 规划费用额度，单位 USD，并非供应商实际扣费保证。
+      max-estimated-usd: 1
+      # 运维提供每轮规划估值，单位 USD；留空时禁止新建临时 Agent。
+      estimated-usd-per-turn: ${MANGA_DYNAMIC_AGENT_ESTIMATED_USD_PER_TURN:}
     # 管理员专业 Agent 配置、版本与只读测试边界。
     profile-management:
       # 平台配置身份总数上限，包含内置定义。

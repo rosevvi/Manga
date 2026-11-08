@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
+import java.math.BigDecimal;
+import com.manga.agent.changeset.ChangeSetCodec;
 
 /** 在 Run 锁内冻结和消耗预算；重试和进程重启均不能重置已经预留的额度。 */
 @Service
@@ -23,11 +25,13 @@ public class CreativeRunBudgetService {
     private final CreativeRunRepository runs;
     private final CreativeStepRepository steps;
     private final CollaborationProperties properties;
+    private final DynamicAgentProperties dynamicProperties;
+    private final ChangeSetCodec codec;
 
     /** 受理事务内创建预算；已有运行首次使用时只初始化一次。 */
     @Transactional
     public CreativeRunBudget initialize(String runId) {
-        runs.lockByRunId(runId);
+        var run = runs.lockByRunId(runId);
         CreativeRunBudget existing = graph.budget(runId);
         if (Objects.nonNull(existing)) return existing;
         CreativeRunBudget budget = new CreativeRunBudget();
@@ -43,6 +47,8 @@ public class CreativeRunBudgetService {
         budget.setCreatedBy(SystemActor.CREATIVE_RUNTIME.code());
         budget.setUpdatedBy(SystemActor.CREATIVE_RUNTIME.code());
         graph.create(budget);
+        run.setBudgetJson(codec.write(DynamicAgentRunBudget.freeze(dynamicProperties)));
+        runs.update(run);
         return budget;
     }
 
@@ -65,12 +71,20 @@ public class CreativeRunBudgetService {
     /** 一个 owner epoch 只预留一次；额度按最大轮数保守计算，失败不退款。 */
     @Transactional
     public void reserve(ClaimedCreativeStep claim, AgentBlueprint blueprint) {
-        runs.lockByRunId(claim.runId());
+        var run = runs.lockByRunId(claim.runId());
         CreativeStep step = steps.findByStepId(claim.stepId()).orElseThrow();
         CollaborationGuard.requireOwner(step, claim.ownerInstanceId(), claim.ownerEpoch(), claim.stateSessionId());
         if (Objects.equals(step.getReservedEpoch(), claim.ownerEpoch())) return;
         CreativeRunBudget budget = initialize(claim.runId());
         int turns = blueprint.maxTurns() + 1;
+        if (blueprint.profileId().startsWith(DynamicAgentBlueprintFactory.ID_PREFIX)) {
+            var dynamic = codec.read(run.getBudgetJson(), DynamicAgentRunBudget.class);
+            if (Objects.isNull(dynamic.estimatedUsdPerTurn()) || (long) dynamic.reservedTurns() + turns > dynamic.maxReservedTurns()
+                    || dynamic.estimatedUsdPerTurn().multiply(BigDecimal.valueOf((long) dynamic.reservedTurns() + turns)).compareTo(dynamic.maxEstimatedUsd()) > 0) {
+                throw new AgentRuntimeException(CreativeErrorCode.BUDGET_EXCEEDED, DynamicAgentMessages.EXHAUSTED);
+            }
+            run.setBudgetJson(codec.write(dynamic.reserve(turns))); runs.update(run);
+        }
         if (Objects.nonNull(step.getParentStepId()) && Objects.nonNull(blueprint.executionPolicy())) {
             var limits = blueprint.executionPolicy().budget();
             if (step.getAttemptNo() > limits.maxInvocations() || (long) step.getAttemptNo() * turns > limits.maxReservedTurns()) {

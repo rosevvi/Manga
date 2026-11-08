@@ -53,6 +53,7 @@ export default function CreativeRunGraph({ accessToken, runId }) {
         <div><strong>{node.displayName || AGENT_PROFILE_LABEL[node.profile] || '全部成功汇合'}</strong>
           <span>{CREATIVE_STEP_STATUS_LABEL[node.status] || node.status}</span></div>
         {node.nodeKey && <small>{node.nodeKey} · 第 {node.depth} 层</small>}
+        {node.profileId?.startsWith('runtime-') && <small>运行时临时专业 Agent · 只读 · 禁止继续委派</small>}
         {node.dependsOn.length > 0 && <small>前置：{node.dependsOn.map((id) => labels.get(id) || id).join('、')}</small>}
         {node.waitingReason && <p>{node.waitingReason}</p>}
         {node.resultSummary && <p>{node.resultSummary}</p>}

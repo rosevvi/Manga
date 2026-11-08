@@ -26,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
+import com.manga.agent.blueprint.AgentBlueprintCodec;
+import com.manga.agent.collaboration.DynamicAgentBlueprintFactory;
 
 /**
  * 使用 owner epoch 围栏提交执行中事件和 Step 终态。
@@ -41,6 +43,7 @@ public class CreativeStepLifecycleService {
     private final CreativeExecutionProperties properties;
     private final AgentStateSessionService sessions;
     private final ApplicationEventPublisher publisher;
+    private final AgentBlueprintCodec blueprints;
 
     /** 判断当前执行器是否仍持有有效运行权；取消或租约过期时返回 false。 */
     @Transactional(readOnly = true)
@@ -122,10 +125,21 @@ public class CreativeStepLifecycleService {
                 CreativeEventSources.RUNTIME, null,
                 new StepCompletedEventPayload(claimed.stepId(), claimed.ownerEpoch()));
         sessions.retireSession(claimed.stateSessionId());
+        if (Objects.nonNull(claimed.blueprintSnapshotJson()) && blueprints.deserialize(claimed.blueprintSnapshotJson()).profileId()
+                .startsWith(DynamicAgentBlueprintFactory.ID_PREFIX)) {
+            eventService.append(claimed.runId(), claimed.stepId(), CreativeEventType.DYNAMIC_AGENT_RESULT,
+                    CreativeEventSources.RUNTIME, null, new DynamicResult(claimed.stepId(), outputJson));
+        }
         publisher.publishEvent(new CreativeStepSettled(claimed.runId()));
         aggregationService.aggregate(claimed.runId());
         return true;
     }
+
+    /** 结构化结果的事件审计，不改变消息投影。 */
+    public record DynamicResult(
+            /** 来源步骤。 */ String stepId,
+            /** 经 Worker schema 校验后的不可变结果 JSON。 */ String resultJson
+    ) { }
 
     /** 使用围栏原子失败 Step，并触发 Run 聚合。 */
     @Transactional

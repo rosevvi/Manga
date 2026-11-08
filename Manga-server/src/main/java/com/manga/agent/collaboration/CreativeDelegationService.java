@@ -22,6 +22,10 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.math.BigDecimal;
 
 /** 工具事务只提交冻结计划；不在模型回调栈内调度或等待其他 Agent。 */
 @Service
@@ -36,6 +40,7 @@ public class CreativeDelegationService {
     private final WorkerBlueprintFactory workers;
     private final CreativeRunBudgetService budgets;
     private final CollaborationProperties properties;
+    private final DynamicAgentBlueprintFactory dynamicAgents;
 
     /** 按工具调用、执行代次和父步骤轮数去重，提交后由执行器关闭 Harness 并物化。 */
     @Transactional
@@ -70,9 +75,12 @@ public class CreativeDelegationService {
                 || round > budget.getMaxRepairRounds() + 1) {
             throw new AgentRuntimeException(CreativeErrorCode.BUDGET_EXCEEDED, CollaborationMessages.BUDGET_EXCEEDED);
         }
-        var snapshots = request.nodes().stream().map(node -> workers.freeze(node.profile(), blueprint)).toList();
+        var dynamicBudget = Objects.isNull(run.getBudgetJson()) ? null : codec.read(run.getBudgetJson(), DynamicAgentRunBudget.class);
+        var snapshots = request.nodes().stream().map(node -> Objects.isNull(node.dynamicAgent()) ? workers.freeze(node.profile(), blueprint)
+                : dynamicAgents.freeze(node.dynamicAgent(), blueprint, dynamicBudget)).toList();
+        checkDynamicBudget(plans, new FrozenDelegation(request, snapshots), dynamicBudget);
         Map<String, AgentProfileKey> roles = new HashMap<>();
-        for (int index = 0; index < snapshots.size(); index++) roles.put(request.nodes().get(index).profile(), snapshots.get(index).profileKey());
+        for (int index = 0; index < snapshots.size(); index++) roles.put(request.nodes().get(index).key(), snapshots.get(index).profileKey());
         CreativePlanValidator.validate(request, properties.maxBatchSize(), roles);
         FrozenDelegation frozen = new FrozenDelegation(request, snapshots);
         String actor = CreativeActor.user(context.userId());
@@ -98,6 +106,27 @@ public class CreativeDelegationService {
     public boolean hasDraft(String runId, String stepId) {
         return graph.plans(runId).stream().anyMatch(plan -> plan.getParentStepId().equals(stepId)
                 && plan.getStatus() == DelegationStatus.DRAFT);
+    }
+
+    /** 在 Run 锁内统计全部已接受的临时规格，草稿、完成和修订计划均不返还容量。 */
+    private void checkDynamicBudget(List<CreativeDelegation> plans, FrozenDelegation proposed, DynamicAgentRunBudget budget) {
+        var all = new ArrayList<FrozenDelegation>();
+        plans.forEach(plan -> all.add(codec.read(plan.getFrozenJson(), FrozenDelegation.class))); all.add(proposed);
+        int count = 0; long characters = 0; long turns = 0;
+        var kernels = new HashSet<String>();
+        for (var plan : all) for (int index = 0; index < plan.request().nodes().size(); index++) {
+            var spec = plan.request().nodes().get(index).dynamicAgent();
+            if (Objects.isNull(spec)) continue;
+            count++; characters += spec.systemPrompt().length();
+            var snapshot = plan.blueprints().get(index); turns += snapshot.maxTurns() + 1;
+            kernels.add(snapshot.fingerprint());
+        }
+        if (count == 0) return;
+        if (Objects.isNull(budget) || Objects.isNull(budget.estimatedUsdPerTurn()) || count > budget.maxAgents()
+                || kernels.size() > budget.maxKernels() || characters > budget.maxPromptCharacters() || turns > budget.maxReservedTurns()
+                || budget.estimatedUsdPerTurn().multiply(BigDecimal.valueOf(turns)).compareTo(budget.maxEstimatedUsd()) > 0) {
+            throw new AgentRuntimeException(CreativeErrorCode.BUDGET_EXCEEDED, DynamicAgentMessages.EXHAUSTED);
+        }
     }
 
     /** 非 Director、已提交审批或缺失可信工具标识时拒绝委派。 */

@@ -2464,6 +2464,8 @@ ADR 与 API/事件契约
 
 ### 阶段 8：受限运行时动态 Agent
 
+实现与边界见 [阶段 8：受限运行时临时 Agent](manga-phase8-runtime-agents.md)。临时声明复用持久化 DAG，继承父模型、只读能力求交，数量与规划成本按 Run 冻结；不开放递归和 SDK 动态 SubAgent。
+
 #### 目标
 
 允许 Director 在预算和权限范围内声明临时 Agent。
