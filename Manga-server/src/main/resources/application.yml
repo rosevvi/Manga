@@ -271,6 +271,37 @@ manga:
       max-estimated-usd: 1
       # 运维提供每轮规划估值，单位 USD；留空时禁止新建临时 Agent。
       estimated-usd-per-turn: ${MANGA_DYNAMIC_AGENT_ESTIMATED_USD_PER_TURN:}
+    # 模型调用治理；每日金额是规划预留额度，供应商实际费用由账本和对账结果说明。
+    operations:
+      # 每个模型配置跨实例的并发上限。
+      max-concurrent: ${MANGA_MODEL_MAX_CONCURRENT:4}
+      # 每配置固定分钟窗受理次数，窗口交界可能出现短时双倍突发。
+      requests-per-minute: ${MANGA_MODEL_REQUESTS_PER_MINUTE:60}
+      # 连续 429、5xx、网络或超时故障达到此值后熔断。
+      failure-threshold: 3
+      # 熔断冷却，结束后仅放行一个探测调用。
+      circuit-cooldown: 30s
+      # 单次模型请求最长时间，取本值和 Run 剩余时间的较小值。
+      call-timeout: 2m
+      # 每个实际模型请求规划预留 USD，失败、未知及取消均不退款。
+      reserved-usd-per-call: ${MANGA_MODEL_RESERVED_USD_PER_CALL:0.05}
+      # 每配置 UTC 当日规划预留上限 USD，跨进程共享。
+      daily-reserved-usd: ${MANGA_MODEL_DAILY_RESERVED_USD:10}
+      # 恢复扫描间隔；不会重新发送已失联的供应商请求。
+      scan-interval: 30s
+      # 终态且投影完成的 Run 超过此时长创建无损审计归档，不删除在线来源。
+      archive-after: 30d
+      # 每类归档数据最大行数，超限拒绝，转离线数据库备份。
+      archive-max-rows: 10000
+      # USD/百万 token；此处为官方标准 token 费率参考，代理供应商需覆盖，未配置模型显示未定价。
+      prices:
+        "[gpt-5.4]":
+          # 非缓存输入单价。
+          input: 2.50
+          # 缓存命中输入单价，缓存 token 是输入的子集。
+          cached-input: 0.25
+          # 输出单价；推理 token 已包含在输出中，不重复相加。
+          output: 15.00
     # 管理员专业 Agent 配置、版本与只读测试边界。
     profile-management:
       # 平台配置身份总数上限，包含内置定义。
@@ -348,7 +379,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # 指标接口仅允许管理员访问，health/info 保持公开摘要。
+        include: health,info,metrics
   endpoint:
     health:
       show-details: never

@@ -36,6 +36,8 @@ import ProjectModule from './ProjectModule'
 import StoryboardModule from './StoryboardModule'
 import AiProviderSettings from './AiProviderSettings'
 import AdminAgentProfiles from './AdminAgentProfiles'
+import RuntimeOperations from './RuntimeOperations'
+import { OPERATIONS_NAV } from '../api/runtimeOperationsApi'
 import { AGENT_ADMIN_ROLE, AGENT_PROFILE_NAV } from '../constants/agentProfile'
 import ProjectWorkspace from './ProjectWorkspace'
 import MangaAssistant from './MangaAssistant'
@@ -53,6 +55,7 @@ const SIDEBAR_NAV_ITEMS = [
   { id: 'ai-tools', labelKey: 'dashboard.nav.aiTools', icon: WandSparkles },
   { id: 'ai-settings', labelKey: 'dashboard.nav.aiSettings', icon: Settings2 },
   { id: AGENT_PROFILE_NAV, labelKey: 'dashboard.nav.agentProfiles', icon: Sparkles, adminOnly: true },
+  { id: OPERATIONS_NAV, labelKey: 'dashboard.nav.runtimeOperations', icon: Grid2X2, adminOnly: true },
   { id: 'creations', labelKey: 'dashboard.nav.creations', icon: GalleryVerticalEnd },
   { id: 'favorites', labelKey: 'dashboard.nav.favorites', icon: Heart },
   { id: 'trash', labelKey: 'dashboard.nav.trash', icon: Trash2 },
@@ -340,6 +343,8 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
           />
         ) : activeNav === 'ai-settings' ? (
           <AiProviderSettings accessToken={accessToken} isGuest={isGuest} />
+        ) : activeNav === OPERATIONS_NAV && isAdmin ? (
+          <RuntimeOperations accessToken={accessToken} />
         ) : activeNav === AGENT_PROFILE_NAV && isAdmin ? (
           <AdminAgentProfiles accessToken={accessToken} projects={projects} />
         ) : (

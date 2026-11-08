@@ -4,6 +4,8 @@ import com.manga.agent.blueprint.AgentBlueprint;
 import com.manga.agent.blueprint.AgentBlueprintPreflight;
 import com.manga.agent.model.AgentModelFactory;
 import com.manga.agent.model.OwnedChatModel;
+import com.manga.agent.operations.MeteredModelFactory;
+import com.manga.agent.capability.AgentRuntimeContext;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.harness.agent.HarnessAgent;
@@ -26,6 +28,7 @@ public class MangaHarnessFactory {
     private final AgentModelFactory modelFactory;
     private final CapabilityToolkitFactory toolkitFactory;
     private final AgentStateStore stateStore;
+    private final MeteredModelFactory meteredModels;
 
     /**
      * 先完成配置契约预检，再创建模型和 Toolkit；中途失败时立即关闭已创建资源。
@@ -38,7 +41,7 @@ public class MangaHarnessFactory {
             toolkit = toolkitFactory.create(blueprint);
             Toolkit stableToolkit = toolkit;
             HarnessProvider provider = context -> new AgentScopeHarnessLease(
-                    buildHarness(blueprint, model, stableToolkit.copy()), context);
+                    buildHarness(blueprint, model, stableToolkit.copy(), context), context);
             return new AgentKernel(blueprint, model, stableToolkit, provider);
         } catch (RuntimeException | Error exception) {
             if (Objects.nonNull(toolkit)) {
@@ -53,13 +56,14 @@ public class MangaHarnessFactory {
     private HarnessAgent buildHarness(
             AgentBlueprint blueprint,
             OwnedChatModel model,
-            Toolkit toolkit) {
+            Toolkit toolkit,
+            AgentRuntimeContext context) {
         return HarnessAgent.builder()
                 .agentId(blueprint.kernelKey().value())
                 .name(blueprint.profileId())
                 .description(AGENT_DESCRIPTION)
                 .sysPrompt(blueprint.systemPrompt())
-                .model(model.model())
+                .model(meteredModels.wrap(model.model(), blueprint, context))
                 .toolkit(toolkit)
                 .permissionContext(MangaToolPermissionPolicy.forBlueprint(blueprint))
                 .stateStore(stateStore)

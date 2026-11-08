@@ -4,6 +4,7 @@ import com.manga.agent.generation.GenerationConstants;
 
 import com.manga.common.constant.SecurityConstants;
 import com.manga.common.enums.CommonResponseCode;
+import com.manga.common.enums.UserRole;
 import com.manga.common.security.SecurityErrorResponseWriter;
 import com.manga.common.security.TokenAuthenticationFilter;
 import com.manga.config.properties.MangaSecurityProperties;
@@ -58,6 +59,7 @@ public class SecurityConfig {
                                 "/error"
                         )
                         .permitAll()
+                        .requestMatchers("/actuator/**").hasAuthority(UserRole.ADMIN.authority())
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, exception) -> {

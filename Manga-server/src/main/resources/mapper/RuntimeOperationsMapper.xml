@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.RuntimeOperationsMapper">
+    <insert id="ensureGate">
+        INSERT INTO manga_provider_call_gate(config_id, window_started_at, window_requests, consecutive_failures, created_by, updated_by)
+        VALUES (#{configId}, CURRENT_TIMESTAMP, 0, 0, #{actor}, #{actor})
+        ON DUPLICATE KEY UPDATE config_id = #{configId}
+    </insert>
+    <select id="lockGate" resultType="com.manga.entity.ProviderCallGate">
+        SELECT id, config_id, window_started_at, window_requests, consecutive_failures, open_until, created_at, updated_at, created_by, updated_by
+        FROM manga_provider_call_gate WHERE config_id = #{configId} FOR UPDATE
+    </select>
+    <update id="saveGate">
+        UPDATE manga_provider_call_gate SET window_started_at = #{gate.windowStartedAt}, window_requests = #{gate.windowRequests},
+        consecutive_failures = #{gate.consecutiveFailures}, open_until = #{gate.openUntil}, updated_at = CURRENT_TIMESTAMP, updated_by = #{actor}
+        WHERE config_id = #{gate.configId}
+    </update>
+    <select id="activeCalls" resultType="int">
+        SELECT COUNT(*) FROM manga_model_call_ledger WHERE config_id = #{configId} AND status = 'STARTED' AND expires_at &gt; #{now}
+    </select>
+    <select id="dailyReserved" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(reserved_usd), 0) FROM manga_model_call_ledger WHERE config_id = #{configId} AND started_at &gt;= #{start}
+    </select>
+    <update id="finish">
+        UPDATE manga_model_call_ledger SET status = #{call.status}, usage_reported = #{call.usageReported},
+        input_tokens = #{call.inputTokens}, output_tokens = #{call.outputTokens}, cached_tokens = #{call.cachedTokens},
+        reasoning_tokens = #{call.reasoningTokens}, cache_creation_tokens = #{call.cacheCreationTokens},
+        tool_use_prompt_tokens = #{call.toolUsePromptTokens}, calculated_usd = #{call.calculatedUsd}, failure_type = #{call.failureType},
+        finished_at = #{call.finishedAt}, updated_at = CURRENT_TIMESTAMP, updated_by = #{actor}
+        WHERE call_id = #{call.callId} AND status = 'STARTED'
+    </update>
+    <select id="lockCall" resultType="com.manga.entity.ModelCallLedger">
+        SELECT id, call_id, run_id, step_id, owner_epoch, config_id, model_name, blueprint_fingerprint, status, usage_reported,
+        input_tokens, output_tokens, cached_tokens, reasoning_tokens, cache_creation_tokens, tool_use_prompt_tokens,
+        input_price, cached_input_price, output_price, reserved_usd, calculated_usd, settled_usd, settled_by, settled_at,
+        settlement_note, failure_type, started_at, expires_at, finished_at, created_at, updated_at, created_by, updated_by
+        FROM manga_model_call_ledger WHERE call_id = #{callId} FOR UPDATE
+    </select>
+    <update id="settle">
+        UPDATE manga_model_call_ledger SET settled_usd = #{amount}, settled_by = #{userId}, settled_at = #{now},
+        settlement_note = #{note}, updated_at = CURRENT_TIMESTAMP, updated_by = #{userId}
+        WHERE call_id = #{callId} AND status != 'STARTED' AND settled_usd IS NULL
+    </update>
+    <select id="stale" resultType="com.manga.entity.ModelCallLedger">
+        SELECT id, call_id, run_id, step_id, owner_epoch, config_id, model_name, blueprint_fingerprint, status, usage_reported, input_tokens, output_tokens, cached_tokens, reasoning_tokens, cache_creation_tokens, tool_use_prompt_tokens, input_price, cached_input_price, output_price, reserved_usd, calculated_usd, settled_usd, settled_by, settled_at, settlement_note, failure_type, started_at, expires_at, finished_at, created_at, updated_at, created_by, updated_by FROM manga_model_call_ledger WHERE status = 'STARTED' AND expires_at &lt;= #{now} ORDER BY id LIMIT 100
+    </select>
+    <select id="byRun" resultType="com.manga.entity.ModelCallLedger">
+        SELECT id, call_id, run_id, step_id, owner_epoch, config_id, model_name, blueprint_fingerprint, status, usage_reported, input_tokens, output_tokens, cached_tokens, reasoning_tokens, cache_creation_tokens, tool_use_prompt_tokens, input_price, cached_input_price, output_price, reserved_usd, calculated_usd, settled_usd, settled_by, settled_at, settlement_note, failure_type, started_at, expires_at, finished_at, created_at, updated_at, created_by, updated_by FROM manga_model_call_ledger WHERE run_id = #{runId}
+        <if test="beforeId != null">AND id &lt; #{beforeId}</if>
+        ORDER BY id DESC LIMIT 100
+    </select>
+    <select id="overview" resultType="map">
+        SELECT status, COUNT(*) AS calls, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
+        SUM(calculated_usd) AS calculated_usd, SUM(settled_usd) AS settled_usd,
+        SUM(CASE WHEN calculated_usd IS NULL THEN 1 ELSE 0 END) AS unpriced_or_unknown_calls,
+        SUM(CASE WHEN status != 'SUCCEEDED' THEN 1 ELSE 0 END) AS possibly_partial_calls
+        FROM manga_model_call_ledger WHERE started_at &gt;= #{since}
+        GROUP BY status
+    </select>
+    <select id="gates" resultType="com.manga.entity.ProviderCallGate">
+        SELECT id, config_id, window_started_at, window_requests, consecutive_failures, open_until, created_at, updated_at, created_by, updated_by
+        FROM manga_provider_call_gate ORDER BY id DESC LIMIT 100
+    </select>
+    <select id="backlog" resultType="map">
+        SELECT status, COUNT(*) AS runs, MIN(created_at) AS oldest_created_at FROM manga_creative_run GROUP BY status
+    </select>
+    <select id="archiveCandidates" resultType="string">
+        SELECT r.run_id FROM manga_creative_run r
+        LEFT JOIN manga_creative_run_archive a ON a.run_id = r.run_id
+        WHERE r.status IN ('COMPLETED', 'FAILED', 'CANCELLED') AND r.finished_at &lt; #{before}
+        AND a.id IS NULL ORDER BY r.id LIMIT 10
+    </select>
+    <select id="archive" resultType="com.manga.entity.CreativeRunArchive">
+        SELECT id, run_id, schema_version, payload_json, sha256, created_at, updated_at, created_by, updated_by
+        FROM manga_creative_run_archive WHERE run_id = #{runId}
+    </select>
+    <insert id="insertArchive">
+        INSERT INTO manga_creative_run_archive(run_id, schema_version, payload_json, sha256, created_by, updated_by)
+        VALUES(#{runId}, #{schemaVersion}, #{payloadJson}, #{sha256}, #{createdBy}, #{updatedBy})
+    </insert>
+    <select id="archiveSteps" resultType="map">
+        SELECT step_id, parent_step_id, step_type, status, blueprint_snapshot_json, input_json, result_json, output_json,
+        owner_epoch, state_session_id, delegation_plan_id, node_key FROM manga_creative_step WHERE run_id = #{runId} ORDER BY id LIMIT #{limit}
+    </select>
+    <select id="archiveEvents" resultType="map">
+        SELECT sequence_no, event_type, step_id, payload_json, schema_version, source, correlation_id, created_at
+        FROM manga_creative_event WHERE run_id = #{runId} ORDER BY sequence_no LIMIT #{limit}
+    </select>
+    <select id="archiveMessages" resultType="map">
+        SELECT id, conversation_id, run_id, role, status, content, projection_key, tool_call_id, tool_name, tool_status, first_sequence, last_sequence, created_at
+        FROM manga_creative_message WHERE run_id = #{runId} ORDER BY id LIMIT #{limit}
+    </select>
+    <select id="archivePlans" resultType="map">
+        SELECT plan_id, parent_step_id, frozen_json, status, round_no FROM manga_creative_delegation WHERE run_id = #{runId} ORDER BY id LIMIT #{limit}
+    </select>
+    <select id="archiveChanges" resultType="map">
+        SELECT change_set_id, step_id, status, kind, schema_version, base_project_revision, base_chapter_revision,
+        before_json, payload_json, result_json FROM manga_creative_change_set WHERE run_id = #{runId} ORDER BY id LIMIT #{limit}
+    </select>
+    <select id="archiveApprovals" resultType="map">
+        SELECT a.id, a.change_set_id, a.status, a.expires_at, a.decided_by, a.decided_at, a.comment,
+        a.created_at, a.updated_at, a.created_by, a.updated_by FROM manga_creative_approval a
+        JOIN manga_creative_change_set c ON c.change_set_id = a.change_set_id WHERE c.run_id = #{runId} ORDER BY a.id LIMIT #{limit}
+    </select>
+    <select id="activeJobs" resultType="int">
+        SELECT COUNT(*) FROM manga_generation_job WHERE run_id = #{runId} AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED')
+    </select>
+    <select id="archivePayloadSize" resultType="long">
+        SELECT
+        (SELECT COALESCE(SUM(CHAR_LENGTH(COALESCE(blueprint_snapshot_json, '')) + CHAR_LENGTH(input_json)
+            + CHAR_LENGTH(COALESCE(output_json, '')) + CHAR_LENGTH(COALESCE(result_json, ''))), 0)
+            FROM manga_creative_step WHERE run_id = #{runId})
+        + (SELECT COALESCE(SUM(CHAR_LENGTH(payload_json)), 0) FROM manga_creative_event WHERE run_id = #{runId})
+        + (SELECT COALESCE(SUM(CHAR_LENGTH(content)), 0) FROM manga_creative_message WHERE run_id = #{runId})
+        + (SELECT COALESCE(SUM(CHAR_LENGTH(frozen_json)), 0) FROM manga_creative_delegation WHERE run_id = #{runId})
+        + (SELECT COALESCE(SUM(CHAR_LENGTH(before_json) + CHAR_LENGTH(payload_json) + CHAR_LENGTH(COALESCE(result_json, ''))), 0)
+            FROM manga_creative_change_set WHERE run_id = #{runId})
+        + (SELECT COALESCE(SUM(CHAR_LENGTH(COALESCE(a.comment, ''))), 0) FROM manga_creative_approval a
+            JOIN manga_creative_change_set c ON c.change_set_id = a.change_set_id WHERE c.run_id = #{runId})
+    </select>
+</mapper>
