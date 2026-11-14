@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.manga.common.enums.AiProviderType;
+import com.manga.common.enums.AiModelType;
 import com.manga.common.enums.AiProxyType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -34,6 +35,8 @@ public class AiProviderConfig {
     private String baseUrl;
     /** 默认模型编码。 */
     private String defaultModel;
+    /** 模型用途，默认配置按用途隔离。 */
+    private AiModelType modelType;
     /** AES-GCM 加密后的 API Key 密文。 */
     @ToString.Exclude
     private String apiKeyCiphertext;

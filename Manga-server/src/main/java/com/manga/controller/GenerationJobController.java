@@ -4,12 +4,14 @@ import com.manga.agent.generation.GenerationConstants;
 import com.manga.agent.generation.GenerationJobQueryService;
 import com.manga.agent.generation.GenerationJobService;
 import com.manga.agent.generation.GenerationJobView;
+import com.manga.agent.generation.VideoGenerationQuoteService;
 import com.manga.agent.generation.ImageGenerationOption;
 import com.manga.agent.generation.ImageGenerationQuoteService;
 import com.manga.agent.generation.ArtifactApplicationService;
 import com.manga.agent.generation.ArtifactAdoptionPreview;
 import com.manga.agent.generation.ArtifactAdoptionResult;
 import com.manga.common.api.ApiResponse;
+import com.manga.common.enums.AiModelType;
 import com.manga.common.constant.OpenApiConstants;
 import com.manga.common.security.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +33,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.CacheControl;
 
 /** 图片作业监测与人工核对接口，付费提交只能通过 ChangeSet 审批创建。 */
 @RestController
@@ -44,7 +48,16 @@ public class GenerationJobController {
     private final GenerationJobQueryService query;
     private final GenerationJobService lifecycle;
     private final ImageGenerationQuoteService quotes;
+    private final VideoGenerationQuoteService videoQuotes;
     private final ArtifactApplicationService artifacts;
+
+    /** 获取经过所有权校验的新下载链接，禁止代理缓存签名。 */
+    @GetMapping("/{jobId}/download")
+    @Operation(summary = "下载生成媒体", description = "只为当前用户已转存产物生成新下载链接，OSS 响应带 attachment。")
+    public ResponseEntity<ApiResponse<GenerationJobQueryService.Download>> download(@PathVariable @Size(max = 36) String jobId) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(query.download(SecurityUtils.requireCurrentUserId(), jobId)));
+    }
     /** 采用前先展示目标当前图片，并取得新的乐观版本。 */
     @GetMapping("/{jobId}/adoption-preview")
     @Operation(summary = "预览采用生成图片", description = "返回当前镜头图片、生成产物及项目 revision；不会修改镜头。")
@@ -72,21 +85,29 @@ public class GenerationJobController {
         log.debug("Generation options userId={} count={}", userId, result.size());
         return ApiResponse.success(result);
     }
+    /** 查询当前用户可用的视频模型，默认项排在最前。 */
+    @GetMapping("/video-options")
+    @Operation(summary = "查询可选视频模型配置", description = "仅返回启用且已保存凭据的 Agnes 视频配置和 720P 每秒预估价格。")
+    public ApiResponse<List<ImageGenerationOption>> videoOptions() {
+        return ApiResponse.success(videoQuotes.options(SecurityUtils.requireCurrentUserId()));
+    }
     /** 从数据库恢复项目或指定运行下的生成卡片。 */
     @GetMapping
-    @Operation(summary = "查询图片作业", description = "返回真实阶段和可空百分比；beforeId 用于每页 25 条历史查询。")
+    @Operation(summary = "查询媒体作业", description = "返回图片或视频作业状态和真实进度，支持游标分页。")
     public ApiResponse<List<GenerationJobView>> list(@RequestParam @Positive long projectId,
             @RequestParam(required = false) @Size(max = 36) String runId,
             @RequestParam(required = false) @Size(max = 36) String conversationId,
-            @RequestParam(required = false) @Positive Long beforeId) {
+            @RequestParam(required = false) @Positive Long beforeId,
+            @RequestParam(required = false) @Positive Long shotId,
+            @RequestParam(required = false) AiModelType mediaType) {
         long userId = SecurityUtils.requireCurrentUserId();
-        List<GenerationJobView> result = query.list(userId, projectId, runId, conversationId, beforeId);
+        List<GenerationJobView> result = query.list(userId, projectId, runId, conversationId, beforeId, shotId, mediaType);
         log.debug("Generation list userId={} projectId={} runId={} count={}", userId, projectId, runId, result.size());
         return ApiResponse.success(result);
     }
     /** 单项快照不返回供应商原始响应、密钥和图片 Base64。 */
     @GetMapping("/{jobId}")
-    @Operation(summary = "查询图片作业详情", description = "用于 SSE 重连和刷新恢复，产物链接仅在转存完成后提供。")
+    @Operation(summary = "查询媒体作业详情", description = "用于 SSE 重连和刷新恢复，产物链接仅在转存完成后提供。")
     public ApiResponse<GenerationJobView> find(@PathVariable @Size(max = 36) String jobId) {
         long userId = SecurityUtils.requireCurrentUserId(); GenerationJobView result = query.find(userId, jobId);
         log.debug("Generation snapshot userId={} jobId={} status={}", userId, jobId, result.status());

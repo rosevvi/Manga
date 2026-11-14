@@ -7,5 +7,10 @@ public enum ChangeSetKind {
     /** 在一个章节下批量追加分镜草稿。 */
     STORYBOARD,
     /** 批准后提交单张镜头图片作业，不在审批事务调用供应商。 */
-    IMAGE_GENERATION
+    IMAGE_GENERATION,
+    /** 批准后提交单个镜头视频作业。 */
+    VIDEO_GENERATION;
+
+    /** 这类提案批准后应等待外部作业。 */
+    public boolean waitsForJob() { return this == IMAGE_GENERATION || this == VIDEO_GENERATION; }
 }

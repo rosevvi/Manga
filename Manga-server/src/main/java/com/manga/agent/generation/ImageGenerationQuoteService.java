@@ -1,6 +1,7 @@
 package com.manga.agent.generation;
 
 import com.manga.common.enums.AiProviderType;
+import com.manga.common.enums.AiModelType;
 import com.manga.common.exception.BusinessException;
 import com.manga.dto.ResolvedAiProviderConfig;
 import com.manga.service.AiProviderConfigService;
@@ -28,6 +29,7 @@ public class ImageGenerationQuoteService {
     public List<ImageGenerationOption> options(long userId) {
         List<ImageGenerationOption> result = new ArrayList<>();
         repository.findAllOwnedBy(userId).stream().filter(config -> Boolean.TRUE.equals(config.getEnabled())
+                && config.getModelType() == AiModelType.IMAGE && GenerationConstants.OPENAI_MODEL.equals(config.getDefaultModel())
                 && COMPATIBLE_TYPES.contains(config.getProviderType())).forEach(config -> result.add(new ImageGenerationOption(
                 GenerationProviderKey.OPENAI, config.getId(), config.getName(), GenerationConstants.OPENAI_MODEL,
                 properties.imagePrices().get(GenerationConstants.OPENAI_MODEL), GenerationConstants.CURRENCY)));
@@ -45,12 +47,12 @@ public class ImageGenerationQuoteService {
         GenerationConfigSnapshot snapshot = null;
         if (input.provider() == GenerationProviderKey.FAKE) {
             if (!GenerationConstants.FAKE_MODEL.equals(input.model())) throw new BusinessException(GenerationError.INVALID);
-        } else {
+        } else if (input.provider() == GenerationProviderKey.OPENAI) {
             snapshot = GenerationConfigSnapshot.from(resolve(input.configId(), userId));
             if (!GenerationConstants.OPENAI_MODEL.equals(input.model())) throw new BusinessException(GenerationError.INVALID);
             price = properties.imagePrices().get(input.model());
             if (Objects.isNull(price) || price.signum() <= 0) throw new BusinessException(GenerationError.INVALID);
-        }
+        } else throw new BusinessException(GenerationError.INVALID);
         return new ImageGenerationChange(input.shotId(), input.provider(),
                 input.provider() == GenerationProviderKey.FAKE ? null : input.configId(), input.model(), input.prompt().trim(),
                 input.width(), input.height(), price, GenerationConstants.CURRENCY, snapshot);
@@ -59,7 +61,7 @@ public class ImageGenerationQuoteService {
     /** 校验配置归属、启用状态和 HTTPS；网络地址只能来自用户已保存的配置。 */
     public ResolvedAiProviderConfig resolve(Long configId, long userId) {
         if (Objects.isNull(configId)) throw new BusinessException(GenerationError.INVALID);
-        ResolvedAiProviderConfig config = configs.resolveOwned(userId, configId)
+        ResolvedAiProviderConfig config = configs.resolveOwned(userId, configId, AiModelType.IMAGE)
                 .orElseThrow(() -> new BusinessException(GenerationError.AUTHENTICATION));
         URI endpoint;
         try { endpoint = URI.create(config.baseUrl()); }
@@ -67,6 +69,7 @@ public class ImageGenerationQuoteService {
         if (!COMPATIBLE_TYPES.contains(config.providerType()) || !"https".equals(endpoint.getScheme())
                 || Objects.isNull(endpoint.getHost()) || Objects.nonNull(endpoint.getUserInfo())
                 || Objects.nonNull(endpoint.getQuery()) || Objects.nonNull(endpoint.getFragment())
+                || !GenerationConstants.OPENAI_MODEL.equals(config.defaultModel())
                 || Objects.isNull(config.apiKey()) || config.apiKey().isBlank()) throw new BusinessException(GenerationError.INVALID);
         return config;
     }

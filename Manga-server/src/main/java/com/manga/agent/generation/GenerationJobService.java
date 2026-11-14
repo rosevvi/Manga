@@ -3,6 +3,7 @@ package com.manga.agent.generation;
 import com.manga.agent.application.CreativeEventService;
 import com.manga.agent.application.CreativeIdentifierGenerator;
 import com.manga.agent.changeset.ChangeSetCodec;
+import com.manga.agent.changeset.ChangeSetKind;
 import com.manga.agent.changeset.ChangeSetConstants;
 import com.manga.agent.changeset.CreativeRunStopped;
 import com.manga.agent.config.CreativeRuntimeProperties;
@@ -10,6 +11,7 @@ import com.manga.agent.domain.CreativeActor;
 import com.manga.agent.domain.CreativeDispatchOutboxStatus;
 import com.manga.agent.domain.CreativeEventType;
 import com.manga.agent.domain.CreativeRunStatus;
+import com.manga.agent.domain.CreativeOperationType;
 import com.manga.agent.domain.SystemActor;
 import com.manga.agent.event.CreativeEventSources;
 import com.manga.agent.execution.CreativeDispatchSignal;
@@ -59,6 +61,7 @@ public class GenerationJobService {
     private final GenerationProperties properties;
     private final GenerationProviderRegistry providers;
     private final ImageGenerationQuoteService quotes;
+    private final VideoGenerationQuoteService videoQuotes;
     private final ChangeSetCodec codec;
     private final ApplicationEventPublisher publisher;
     private final GenerationMediaObjectRepository media;
@@ -67,18 +70,38 @@ public class GenerationJobService {
     /** 批准事务内创建单次提交意图；价格或端点变化要求重新生成预览。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean enqueue(CreativeChangeSet proposal, long userId, String actor) {
-        ImageGenerationChange input = codec.read(proposal.getPayloadJson(), ImageGenerationChange.class);
+        Long shotId;
+        Long configId;
+        GenerationProviderKey provider;
+        GenerationConfigSnapshot snapshot;
+        Object approved;
         try {
-            if (!input.equals(quotes.canonicalize(input, userId))) return false;
+            if (proposal.getKind() == ChangeSetKind.VIDEO_GENERATION) {
+                var video = codec.read(proposal.getPayloadJson(), VideoGenerationChange.class);
+                if (!video.equals(videoQuotes.canonicalize(video, userId))) return false;
+                shotId = video.shotId();
+                configId = video.configId();
+                provider = GenerationProviderKey.AGNES;
+                snapshot = video.configSnapshot();
+                approved = video;
+            } else {
+                var image = codec.read(proposal.getPayloadJson(), ImageGenerationChange.class);
+                if (!image.equals(quotes.canonicalize(image, userId))) return false;
+                shotId = image.shotId();
+                configId = image.configId();
+                provider = image.provider();
+                snapshot = image.configSnapshot();
+                approved = image;
+            }
         } catch (BusinessException exception) {
             // 禁用、删除或更换端点均要求重新预览，不能沿用旧的费用批准。
             return false;
         }
-        String config = input.provider() == GenerationProviderKey.FAKE ? null : codec.write(input.configSnapshot());
+        String config = snapshot == null ? null : codec.write(snapshot);
         jobs.create(GenerationJob.builder().jobId(UUID.randomUUID().toString()).runId(proposal.getRunId())
                 .stepId(proposal.getStepId()).changeSetId(proposal.getChangeSetId()).userId(userId)
-                .projectId(proposal.getProjectId()).shotId(input.shotId()).provider(input.provider()).configId(input.configId())
-                .configSnapshotJson(config).requestJson(codec.write(input)).status(GenerationJobStatus.PENDING_SUBMISSION)
+                .projectId(proposal.getProjectId()).shotId(shotId).provider(provider).configId(configId)
+                .configSnapshotJson(config).requestJson(codec.write(approved)).status(GenerationJobStatus.PENDING_SUBMISSION)
                 .ownerEpoch(0L).cancelRequested(false).attempts(0).nextActionAt(LocalDateTime.now())
                 .createdBy(actor).updatedBy(actor).build());
         return true;
@@ -146,7 +169,7 @@ public class GenerationJobService {
         } else if (snapshot.status().isTerminal()) {
             terminal(job, snapshot.status(), snapshot.error());
         } else {
-            transition(job, snapshot.status()); job.setResultBase64(snapshot.imageBase64());
+            transition(job, snapshot.status()); job.setResultBase64(snapshot.imageBase64()); job.setResultUrl(snapshot.resultUrl());
         }
         release(job); jobs.save(job, claim.getOwnerEpoch());
         if (job.getStatus().isTerminal()) finish(job); else {
@@ -171,7 +194,7 @@ public class GenerationJobService {
         else {
             jobs.createArtifact(CreativeArtifact.builder().jobId(job.getJobId()).runId(job.getRunId()).stepId(job.getStepId())
                     .changeSetId(job.getChangeSetId()).userId(job.getUserId()).projectId(job.getProjectId()).shotId(job.getShotId())
-                    .url(object.getUrl()).mediaObjectId(mediaObjectId).mediaType("image/png").byteSize(bytes).sha256(digest).createdBy(actor()).updatedBy(actor()).build());
+                    .url(object.getUrl()).mediaObjectId(mediaObjectId).mediaType(object.reference().format().mimeType()).byteSize(bytes).sha256(digest).createdBy(actor()).updatedBy(actor()).build());
             media.publish(mediaObjectId, actor());
             terminal(job, GenerationJobStatus.SUCCEEDED, null);
         }
@@ -186,7 +209,7 @@ public class GenerationJobService {
         runs.lockByRunId(claim.getRunId()); GenerationJob job = jobs.lock(claim.getJobId());
         if (!owned(job, claim) || job.getStatus() != GenerationJobStatus.MATERIALIZING) throw new GenerationException(GenerationError.STATE);
         return media.create(GenerationMediaObject.builder().jobId(job.getJobId()).ownerEpoch(job.getOwnerEpoch())
-                .storageType(reference.storageType()).storageNamespace(reference.namespace()).objectName(reference.name()).url(reference.url())
+                .storageType(reference.storageType()).storageNamespace(reference.namespace()).objectName(reference.name()).url(reference.url()).mediaFormat(reference.format())
                 .status(GenerationMediaStatus.PENDING).attempts(0).nextAttemptAt(LocalDateTime.now().plus(cleanupProperties.grace()))
                 .createdBy(actor()).updatedBy(actor()).build());
     }
@@ -269,7 +292,7 @@ public class GenerationJobService {
     }
     /** 终态撤销执行权，清除暂存媒体，避免长期重复保留大对象。 */
     private void terminal(GenerationJob job, GenerationJobStatus status, GenerationError error) {
-        transition(job, status); job.setFinishedAt(LocalDateTime.now()); job.setResultBase64(null);
+        transition(job, status); job.setFinishedAt(LocalDateTime.now()); job.setResultBase64(null); job.setResultUrl(null);
         job.setErrorCode(Objects.isNull(error) ? null : error.code()); job.setErrorMessage(Objects.isNull(error) ? null : error.message()); release(job);
         if (status == GenerationJobStatus.SUCCEEDED) job.setProgress(100);
     }
@@ -289,10 +312,10 @@ public class GenerationJobService {
                 : job.getStatus() == GenerationJobStatus.CANCELLED ? CreativeEventType.JOB_CANCELLED : CreativeEventType.JOB_FAILED);
         CreativeRun run = runs.lockByRunId(job.getRunId());
         if (run.getStatus().isTerminal() || run.getStatus() == CreativeRunStatus.CANCEL_REQUESTED) return;
-        String sessionId = identifiers.nextStateSessionId();
+        String sessionId = run.getOperationType() == CreativeOperationType.GENERATE_SHOT_VIDEO ? null : identifiers.nextStateSessionId();
         if (!steps.resumeJob(job.getStepId(), sessionId, codec.write(summary(job)), ChangeSetConstants.RESUME_MAX_ATTEMPTS, actor())) return;
         run.setDeadlineAt(LocalDateTime.now().plus(runtime.runTimeout())); run.setUpdatedBy(actor()); runs.update(run);
-        sessions.register(run, sessionId);
+        if (Objects.nonNull(sessionId)) sessions.register(run, sessionId);
         CreativeStep step = steps.findByStepId(job.getStepId()).orElseThrow();
         dispatch.create(CreativeDispatchOutbox.builder().stepId(step.getStepId()).scheduleVersion(step.getScheduleVersion())
                 .status(CreativeDispatchOutboxStatus.PENDING).attempts(0).createdBy(actor()).updatedBy(actor()).build());

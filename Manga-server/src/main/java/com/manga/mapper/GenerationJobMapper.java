@@ -16,7 +16,8 @@ public interface GenerationJobMapper extends BaseMapper<GenerationJob> {
     /** 不读取大媒体和配置快照的列表。 */
     List<GenerationJob> findVisible(@Param("userId") long userId, @Param("projectId") long projectId,
             @Param("runId") String runId, @Param("conversationId") String conversationId,
-            @Param("beforeId") Long beforeId, @Param("limit") int limit);
+            @Param("beforeId") Long beforeId, @Param("limit") int limit,
+            @Param("shotId") Long shotId, @Param("mediaKind") String mediaKind);
     /** 查询需要跟随 Run 撤销采用权的作业。 */
     List<String> findByRun(@Param("runId") String runId);
     /** 串行化供应商并发准入。 */

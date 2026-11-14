@@ -35,7 +35,7 @@ public class MangaAgentInvoker {
             SessionSerialGate sessionSerialGate,
             AgentStateStorePreflight stateStorePreflight,
             AgentKernelPool kernelPool,
-            @Qualifier(AsyncConstants.MANGA_COMMON_TASK_SCHEDULER) TaskScheduler taskScheduler,
+            @Qualifier(AsyncConstants.MANGA_LEASE_SCHEDULER) TaskScheduler taskScheduler,
             AgentHarnessProperties properties) {
         this.sessionSerialGate = sessionSerialGate;
         this.stateStorePreflight = stateStorePreflight;

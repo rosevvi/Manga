@@ -122,6 +122,13 @@
           AND lease_until &gt; #{now}
     </update>
 
+    <update id="initializeClaimLease">
+        UPDATE manga_creative_step
+        SET lease_until = #{leaseUntil}, updated_by = #{updatedBy}
+        WHERE step_id = #{stepId} AND status = 'RUNNING'
+          AND owner_instance_id = #{ownerInstanceId} AND owner_epoch = #{ownerEpoch}
+    </update>
+
     <update id="failOwned">
         UPDATE manga_creative_step
         SET status = 'FAILED', error_code = #{errorCode}, error_message = #{errorMessage},
@@ -158,6 +165,22 @@
         WHERE step_id = #{stepId} AND status = 'RUNNING'
           AND owner_epoch = #{ownerEpoch} AND lease_until &lt;= #{now}
           AND attempt_no &lt; max_attempts
+    </update>
+
+    <update id="failExpiredAfterModel">
+        UPDATE manga_creative_step
+        SET status = 'FAILED', lease_until = NULL, finished_at = #{now},
+            error_code = #{errorCode}, error_message = #{errorMessage}, updated_by = #{updatedBy}
+        WHERE step_id = #{stepId} AND status = 'RUNNING'
+          AND owner_epoch = #{ownerEpoch} AND lease_until &lt;= #{now}
+          AND result_json IS NULL
+          AND generation_result_json IS NULL
+          AND EXISTS (SELECT 1 FROM manga_model_call_ledger c
+                      WHERE c.step_id = #{stepId} AND c.owner_epoch = #{ownerEpoch})
+          AND NOT EXISTS (SELECT 1 FROM manga_creative_change_set s
+                          WHERE s.step_id = #{stepId} AND s.status = 'DRAFT')
+          AND NOT EXISTS (SELECT 1 FROM manga_creative_delegation d
+                          WHERE d.parent_step_id = #{stepId} AND d.status = 'DRAFT')
     </update>
 
     <update id="cancelExpired">

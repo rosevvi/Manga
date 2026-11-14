@@ -10,6 +10,8 @@ public final class CreativeEventSources {
 
     /** AgentScope 模型与工具执行适配层。 */
     public static final String AGENT_SCOPE = "agent/agentscope";
+    /** 子 Agent 的执行事实，不拼入主助手正文。 */
+    public static final String WORKER = "agent/worker";
 
     /** 禁止实例化事件来源常量类。 */
     private CreativeEventSources() {

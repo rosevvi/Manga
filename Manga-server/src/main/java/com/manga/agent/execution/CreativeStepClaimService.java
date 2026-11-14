@@ -82,22 +82,10 @@ public class CreativeStepClaimService {
         eventService.append(step.getRunId(), step.getStepId(), CreativeEventType.STEP_STARTED,
                 CreativeEventSources.RUNTIME, null,
                 new StepStartedEventPayload(step.getStepId(), step.getOwnerEpoch(), step.getAttemptNo()));
+        // 领取事务尚未提交，恢复器不能取得执行权；从提交前开始计算初始租约。
+        stepRepository.initializeClaimLease(stepId, owner, step.getOwnerEpoch(),
+                LocalDateTime.now().plus(properties.stepLease()), actor);
         return Optional.of(toClaim(step, run));
-    }
-
-    /** 查询当前实例仍持有的执行权，供执行异常后的围栏失败提交使用。 */
-    @Transactional(readOnly = true)
-    public Optional<ClaimedCreativeStep> findOwnedClaim(String stepId) {
-        CreativeStep step = stepRepository.findByStepId(stepId)
-                .filter(candidate -> instanceIdentity.value().equals(candidate.getOwnerInstanceId()))
-                .filter(candidate -> candidate.getStatus() == CreativeStepStatus.RUNNING
-                        || candidate.getStatus() == CreativeStepStatus.CANCEL_REQUESTED)
-                .orElse(null);
-        if (Objects.isNull(step)) {
-            return Optional.empty();
-        }
-        CreativeRun run = runRepository.findByRunId(step.getRunId()).orElse(null);
-        return Objects.isNull(run) ? Optional.empty() : Optional.of(toClaim(step, run));
     }
 
     /** 将已领取 Step 与所属 Run 的冻结上下文组合为执行权快照。 */

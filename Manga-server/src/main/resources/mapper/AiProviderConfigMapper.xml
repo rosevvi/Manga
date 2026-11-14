@@ -10,6 +10,7 @@
         <result property="name" column="name"/>
         <result property="providerType" column="provider_type" javaType="com.manga.common.enums.AiProviderType"/>
         <result property="baseUrl" column="base_url"/>
+        <result property="modelType" column="model_type"/>
         <result property="defaultModel" column="default_model"/>
         <result property="apiKeyCiphertext" column="api_key_ciphertext"/>
         <result property="apiKeyHint" column="api_key_hint"/>
@@ -29,7 +30,7 @@
     </resultMap>
 
     <select id="findAllOwnedBy" resultMap="aiProviderConfigResultMap">
-        SELECT id, owner_user_id, name, provider_type, base_url, default_model,
+        SELECT id, owner_user_id, name, provider_type, base_url, default_model, model_type,
                api_key_ciphertext, api_key_hint, proxy_type, proxy_host, proxy_port,
                proxy_username, proxy_password_ciphertext, proxy_password_hint,
                enabled, default_config, remark, created_at, updated_at, created_by, updated_by
@@ -39,7 +40,7 @@
     </select>
 
     <select id="findOwnedById" resultMap="aiProviderConfigResultMap">
-        SELECT id, owner_user_id, name, provider_type, base_url, default_model,
+        SELECT id, owner_user_id, name, provider_type, base_url, default_model, model_type,
                api_key_ciphertext, api_key_hint, proxy_type, proxy_host, proxy_port,
                proxy_username, proxy_password_ciphertext, proxy_password_hint,
                enabled, default_config, remark, created_at, updated_at, created_by, updated_by
@@ -49,13 +50,14 @@
     </select>
 
     <select id="findDefaultOwnedBy" resultMap="aiProviderConfigResultMap">
-        SELECT id, owner_user_id, name, provider_type, base_url, default_model,
+        SELECT id, owner_user_id, name, provider_type, base_url, default_model, model_type,
                api_key_ciphertext, api_key_hint, proxy_type, proxy_host, proxy_port,
                proxy_username, proxy_password_ciphertext, proxy_password_hint,
                enabled, default_config, remark, created_at, updated_at, created_by, updated_by
         FROM manga_ai_provider_config
         WHERE owner_user_id = #{ownerUserId}
           AND default_config = TRUE
+          AND model_type = 'TEXT'
           AND enabled = TRUE
         ORDER BY updated_at DESC, id DESC
         LIMIT 1
@@ -77,6 +79,7 @@
             provider_type = #{config.providerType},
             base_url = #{config.baseUrl},
             default_model = #{config.defaultModel},
+            model_type = #{config.modelType},
             api_key_ciphertext = #{config.apiKeyCiphertext},
             api_key_hint = #{config.apiKeyHint},
             proxy_type = #{config.proxyType},
@@ -98,6 +101,7 @@
         SET default_config = FALSE,
             updated_by = #{actor}
         WHERE owner_user_id = #{ownerUserId}
+          AND model_type = #{modelType}
           AND default_config = TRUE
     </update>
 

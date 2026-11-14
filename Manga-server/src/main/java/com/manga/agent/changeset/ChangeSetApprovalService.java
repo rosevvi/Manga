@@ -75,6 +75,7 @@ public class ChangeSetApprovalService {
             case GENERATE_SCRIPT_CHAPTER -> ChangeSetKind.SCRIPT;
             case GENERATE_CHAPTER_STORYBOARD -> ChangeSetKind.STORYBOARD;
             case GENERATE_SHOT_IMAGE -> ChangeSetKind.IMAGE_GENERATION;
+            case GENERATE_SHOT_VIDEO -> ChangeSetKind.VIDEO_GENERATION;
             default -> null;
         };
         if (Objects.isNull(required)) return;
@@ -221,7 +222,7 @@ public class ChangeSetApprovalService {
                             ? CreativeEventType.CHANGESET_APPLIED : CreativeEventType.CHANGESET_CONFLICTED,
                     CreativeEventSources.RUNTIME, proposal.getChangeSetId(), result);
         }
-        if (resume && status == ApprovalStatus.APPROVED && proposal.getKind() == ChangeSetKind.IMAGE_GENERATION) {
+        if (resume && status == ApprovalStatus.APPROVED && proposal.getKind().waitsForJob()) {
             generationJobs.await(proposal, proposal.getResultJson(), actor);
         } else if (resume) resume(run, proposal, actor);
         log.info("Creative approval decided runId={} stepId={} changeSetId={} status={} actorId={}",
@@ -233,7 +234,7 @@ public class ChangeSetApprovalService {
     private void resume(CreativeRun run, CreativeChangeSet proposal, String actor) {
         // 前面的审批事件已推进 sequence/cursor，更新 deadline 前必须重新读取，不能覆盖事件水位。
         run = runs.lockByRunId(run.getRunId());
-        String sessionId = identifiers.nextStateSessionId();
+        String sessionId = run.getOperationType() == CreativeOperationType.GENERATE_SHOT_VIDEO ? null : identifiers.nextStateSessionId();
         CreativeStepStateMachine.requireTransition(CreativeStepStatus.WAITING_APPROVAL, CreativeStepStatus.READY);
         if (!steps.resumeApproval(proposal.getStepId(), sessionId, proposal.getResultJson(), ChangeSetConstants.RESUME_MAX_ATTEMPTS, actor)) {
             throw new BusinessException(ChangeSetResponseCode.STATE_CONFLICT, HttpStatus.CONFLICT);
@@ -241,7 +242,7 @@ public class ChangeSetApprovalService {
         run.setDeadlineAt(LocalDateTime.now().plus(runtimeProperties.runTimeout()));
         run.setUpdatedBy(actor);
         runs.update(run);
-        sessions.register(run, sessionId);
+        if (Objects.nonNull(sessionId)) sessions.register(run, sessionId);
         CreativeStep step = steps.findByStepId(proposal.getStepId()).orElseThrow();
         outbox.create(CreativeDispatchOutbox.builder().stepId(step.getStepId()).scheduleVersion(step.getScheduleVersion())
                 .status(CreativeDispatchOutboxStatus.PENDING).attempts(0).createdBy(actor).updatedBy(actor).build());

@@ -18,6 +18,7 @@ import com.manga.agent.profile.AgentProfilePolicySupport;
 import com.manga.agent.capability.CapabilityName;
 import com.manga.common.exception.BusinessException;
 import com.manga.entity.AiProviderConfig;
+import com.manga.common.enums.AiModelType;
 import com.manga.repository.AiProviderConfigRepository;
 import org.springframework.stereotype.Component;
 
@@ -105,7 +106,8 @@ public class AgentBlueprintCompiler {
         if (Objects.isNull(config) || !Boolean.TRUE.equals(config.getEnabled())) {
             throw new BusinessException(AgentProfileResponseCode.MODEL_UNAVAILABLE);
         }
-        if (Objects.isNull(config.getDefaultModel()) || config.getDefaultModel().isBlank()) {
+        if ((Objects.nonNull(config.getModelType()) && config.getModelType() != AiModelType.TEXT)
+                || Objects.isNull(config.getDefaultModel()) || config.getDefaultModel().isBlank()) {
             throw new BusinessException(AgentProfileResponseCode.MODEL_UNAVAILABLE);
         }
         return config;

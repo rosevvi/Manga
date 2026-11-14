@@ -9,6 +9,9 @@ import com.manga.dto.AiProviderConfigResponse;
 import com.manga.dto.AiProviderConfigUpdateRequest;
 import com.manga.dto.AiProviderOptionResponse;
 import com.manga.service.AiProviderConfigService;
+import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +34,21 @@ import java.util.List;
 public class AiProviderConfigController {
 
     private final AiProviderConfigService configService;
+
+    /** 查看当前用户自己的密钥，响应禁止浏览器与中间缓存保存。 */
+    @PostMapping("/{configId}/reveal-key")
+    @Operation(summary = "临时显示 AI 配置密钥", description = "仅配置所有者可访问，返回值禁止缓存。")
+    public ResponseEntity<ApiResponse<RevealedKey>> revealKey(@PathVariable long configId) {
+        String key = configService.revealKey(configId);
+        log.info("AI key revealed configId={} success=true", configId);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.success(new RevealedKey(key)));
+    }
+
+    /** 仅用于眼睛按钮的短生命周期响应，禁止日志序列化。 */
+    public record RevealedKey(/** 明文密钥，仅当前弹窗内存持有。 */ String apiKey) {
+        /** 防止调试日志意外输出凭据。 */
+        @Override public String toString() { return "RevealedKey[redacted]"; }
+    }
 
     /** 查询可选 AI 服务商元数据。 */
     @GetMapping("/providers")

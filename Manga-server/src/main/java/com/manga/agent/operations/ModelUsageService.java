@@ -4,6 +4,7 @@ import com.manga.agent.blueprint.AgentBlueprint;
 import com.manga.agent.capability.AgentRuntimeContext;
 import com.manga.agent.collaboration.CollaborationGuard;
 import com.manga.agent.domain.CreativeErrorCode;
+import com.manga.agent.domain.CreativeOperationType;
 import com.manga.agent.domain.SystemActor;
 import com.manga.agent.harness.AgentRuntimeException;
 import com.manga.entity.ModelCallLedger;
@@ -70,7 +71,8 @@ public class ModelUsageService {
         call.setStatus(ModelCallStatus.STARTED); call.setUsageReported(false);
         call.setReservedUsd(properties.reservedUsdPerCall());
         call.setStartedAt(now);
-        Instant timeout = Instant.now().plus(properties.callTimeout());
+        Instant timeout = Instant.now().plus(run.getOperationType() == CreativeOperationType.GENERATE_CHAPTER_STORYBOARD
+                ? properties.storyboardCallTimeout() : properties.callTimeout());
         call.setExpiresAt(LocalDateTime.ofInstant(timeout.isBefore(context.deadline()) ? timeout : context.deadline(), ZoneOffset.UTC));
         var price = properties.prices().get(call.getModelName());
         if (Objects.nonNull(price)) {

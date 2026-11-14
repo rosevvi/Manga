@@ -57,6 +57,9 @@ public class GenerationJob {
     /** 已生成 PNG 暂存数据；转存后清除。 */
     @ToString.Exclude
     private String resultBase64;
+    /** 临时视频下载地址，完成后清除。 */
+    @ToString.Exclude
+    private String resultUrl;
     /** 公开错误编码。 */
     private String errorCode;
     /** 脱敏错误摘要。 */

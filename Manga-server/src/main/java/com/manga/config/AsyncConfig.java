@@ -69,6 +69,28 @@ public class AsyncConfig implements AsyncConfigurer {
         return scheduler;
     }
 
+    /** 心跳不与 Outbox、模型和文本持久化共用执行资源。 */
+    @Bean(name = AsyncConstants.MANGA_LEASE_SCHEDULER)
+    public ThreadPoolTaskScheduler mangaLeaseScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(properties.scheduledPoolSize());
+        scheduler.setThreadNamePrefix("manga-lease-");
+        scheduler.setRemoveOnCancelPolicy(true);
+        return scheduler;
+    }
+
+    /** 每次订阅串行消费，线程数与待处理任务均有界。 */
+    @Bean(name = AsyncConstants.MANGA_JOURNAL_SCHEDULER, destroyMethod = "dispose")
+    public Scheduler mangaJournalScheduler() {
+        return Schedulers.newBoundedElastic(properties.maxPoolSize(), properties.queueCapacity(), "manga-journal");
+    }
+
+    /** 此线程只发出计时信号，禁止执行阻塞数据库操作。 */
+    @Bean(name = AsyncConstants.MANGA_STREAM_TIMER, destroyMethod = "dispose")
+    public Scheduler mangaStreamTimer() {
+        return Schedulers.newSingle("manga-stream-timer");
+    }
+
     /** 返回 Spring 异步任务执行器。 */
     @Override
     public Executor getAsyncExecutor() {

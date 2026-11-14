@@ -14,6 +14,11 @@ export function getAiProviderConfigs(accessToken) {
   return authorizedRequest(accessToken, AI_PROVIDER_ENDPOINTS.configs)
 }
 
+/** 仅在用户点击眼睛时获取密钥，不缓存。 */
+export function revealAiProviderKey(accessToken, configId) {
+  return authorizedRequest(accessToken, `${aiProviderConfigEndpoint(configId)}/reveal-key`, { method: 'POST', cache: 'no-store' })
+}
+
 export function createAiProviderConfig(accessToken, config) {
   return authorizedRequest(accessToken, AI_PROVIDER_ENDPOINTS.configs, {
     method: 'POST',

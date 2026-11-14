@@ -1,6 +1,7 @@
 package com.manga.dto;
 
 import com.manga.common.enums.AiProviderType;
+import com.manga.common.enums.AiModelType;
 import com.manga.common.enums.AiProxyType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -28,6 +29,8 @@ public record AiProviderConfigCreateRequest(
         /** 默认模型编码。 */
         @Size(max = AI_MODEL_MAX_LENGTH, message = AI_MODEL_TOO_LONG)
         String defaultModel,
+        /** 此配置适用的模型用途。 */
+        AiModelType modelType,
         /** AI 服务 API Key 明文，仅在请求处理中短暂使用。 */
         @Size(max = AI_API_KEY_MAX_LENGTH, message = AI_API_KEY_TOO_LONG)
         String apiKey,

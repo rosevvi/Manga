@@ -2,6 +2,7 @@ package com.manga.repository;
 
 import com.manga.common.constant.ExceptionMessageConstants;
 import com.manga.entity.AiProviderConfig;
+import com.manga.common.enums.AiModelType;
 import com.manga.mapper.AiProviderConfigMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -61,8 +62,8 @@ public class AiProviderConfigRepository {
     }
 
     /** 清除用户 AI 服务配置的默认标记。 */
-    public void clearDefault(long ownerUserId, String actor) {
-        aiProviderConfigMapper.clearDefault(ownerUserId, actor);
+    public void clearDefault(long ownerUserId, AiModelType modelType, String actor) {
+        aiProviderConfigMapper.clearDefault(ownerUserId, modelType, actor);
     }
 
     /** 设置用户默认的 AI 服务配置。 */

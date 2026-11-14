@@ -10,6 +10,7 @@ import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.GenerationJobRepository;
 import com.manga.service.StoryboardShotService;
 import com.manga.service.MediaStorageService;
+import com.manga.service.storage.GeneratedMediaFormat;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -59,6 +60,7 @@ public class ArtifactApplicationService {
     /** 只有已经转存的成功产物可以采用，取消和未知作业都不提供采用入口。 */
     private CreativeArtifact requireArtifact(GenerationJob job) {
         if (job.getStatus() != GenerationJobStatus.SUCCEEDED) throw new BusinessException(GenerationError.STATE, HttpStatus.CONFLICT);
-        return jobs.artifact(job.getJobId()).orElseThrow(() -> new BusinessException(GenerationError.NOT_FOUND, HttpStatus.NOT_FOUND));
+        return jobs.artifact(job.getJobId()).filter(artifact -> GeneratedMediaFormat.PNG.mimeType().equals(artifact.getMediaType()))
+                .orElseThrow(() -> new BusinessException(GenerationError.NOT_FOUND, HttpStatus.NOT_FOUND));
     }
 }

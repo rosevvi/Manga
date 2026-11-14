@@ -10,6 +10,8 @@ import com.manga.agent.domain.CreativeRunStatus;
 import com.manga.agent.domain.CreativeStepStatus;
 import com.manga.agent.event.RunAcceptedEventPayload;
 import com.manga.agent.generation.ImageGenerationChange;
+import com.manga.agent.generation.VideoGenerationChange;
+import com.manga.agent.generation.VideoGenerationQuoteService;
 import com.manga.agent.generation.ImageGenerationQuoteService;
 import com.manga.common.exception.BusinessException;
 import com.manga.dto.ProjectScriptChapterResponse;
@@ -50,6 +52,7 @@ public class ChangeSetProposalService {
     private final ProjectScriptService scripts;
     private final ChangeSetCodec codec;
     private final ImageGenerationQuoteService generationQuotes;
+    private final VideoGenerationQuoteService videoQuotes;
     private final StoryboardShotRepository shots;
     private final CreativeReviewGate reviewGate;
 
@@ -70,6 +73,7 @@ public class ChangeSetProposalService {
         }
         Object payload;
         Long chapterId;
+        Long mediaShotId = null;
         if (kind == ChangeSetKind.SCRIPT) {
             ScriptChangeSet script = codec.validate(input, ScriptChangeSet.class);
             payload = script;
@@ -78,19 +82,25 @@ public class ChangeSetProposalService {
             StoryboardChangeSet storyboard = codec.validate(input, StoryboardChangeSet.class);
             payload = storyboard;
             chapterId = storyboard.chapterId();
+        } else if (kind == ChangeSetKind.VIDEO_GENERATION) {
+            VideoGenerationChange video = videoQuotes.canonicalize(codec.validate(input, VideoGenerationChange.class), run.getUserId());
+            payload = video;
+            mediaShotId = video.shotId();
+            chapterId = mediaChapter(run, mediaShotId);
         } else {
             ImageGenerationChange image = generationQuotes.canonicalize(codec.validate(input, ImageGenerationChange.class), run.getUserId());
-            var shot = shots.findByProjectAndId(run.getProjectId(), image.shotId())
-                    .orElseThrow(() -> new BusinessException(ChangeSetResponseCode.NOT_FOUND));
             payload = image;
-            chapterId = shot.getChapterId();
+            mediaShotId = image.shotId();
+            chapterId = mediaChapter(run, mediaShotId);
         }
         if ((run.getOperationType() == CreativeOperationType.GENERATE_CHAPTER_STORYBOARD
                 && (kind != ChangeSetKind.STORYBOARD || !Objects.equals(chapterId, run.getTargetId())))
                 || (run.getOperationType() == CreativeOperationType.GENERATE_SCRIPT_CHAPTER
                 && (kind != ChangeSetKind.SCRIPT || Objects.nonNull(chapterId)))
                 || (run.getOperationType() == CreativeOperationType.GENERATE_SHOT_IMAGE
-                && (kind != ChangeSetKind.IMAGE_GENERATION || !Objects.equals(((ImageGenerationChange) payload).shotId(), run.getTargetId())))) {
+                && (kind != ChangeSetKind.IMAGE_GENERATION || !Objects.equals(mediaShotId, run.getTargetId())))
+                || (run.getOperationType() == CreativeOperationType.GENERATE_SHOT_VIDEO
+                && (kind != ChangeSetKind.VIDEO_GENERATION || !Objects.equals(mediaShotId, run.getTargetId())))) {
             throw new BusinessException(ChangeSetResponseCode.INVALID);
         }
         MangaProject project = revisions.lock(run.getProjectId(), run.getUserId());
@@ -106,7 +116,7 @@ public class ChangeSetProposalService {
         } else if (kind == ChangeSetKind.STORYBOARD) {
             before = storyboards.findAllForUser(project.getId(), run.getUserId(), chapterId);
         } else {
-            before = shots.findByProjectAndId(project.getId(), ((ImageGenerationChange) payload).shotId()).orElseThrow();
+            before = shots.findByProjectAndId(project.getId(), mediaShotId).orElseThrow();
         }
         String actor = CreativeActor.user(context.userId());
         CreativeChangeSet proposal = CreativeChangeSet.builder().changeSetId(UUID.randomUUID().toString())
@@ -118,6 +128,12 @@ public class ChangeSetProposalService {
                 .beforeJson(codec.write(before)).payloadJson(codec.write(payload)).createdBy(actor).updatedBy(actor).build();
         proposals.create(proposal);
         return new ProposalReceipt(proposal.getChangeSetId(), proposal.getStatus());
+    }
+
+    /** 媒体目标必须属于当前项目。 */
+    private Long mediaChapter(CreativeRun run, Long shotId) {
+        return shots.findByProjectAndId(run.getProjectId(), shotId)
+                .orElseThrow(() -> new BusinessException(ChangeSetResponseCode.NOT_FOUND)).getChapterId();
     }
 
     /** 只有仍持有租约、项目及提案权限的真实执行上下文可以生成草稿。 */

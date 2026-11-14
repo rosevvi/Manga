@@ -5,12 +5,13 @@ import { AGENT_PROFILE_LABEL, CREATIVE_PLAN_STATUS_LABEL, CREATIVE_STEP_STATUS_L
 import './creative-run-graph.css'
 
 /** 通过持久化快照恢复协作树和依赖；有界轮询补偿断线，不拼接内部 Agent 文本。 */
-export default function CreativeRunGraph({ accessToken, runId }) {
+export default function CreativeRunGraph({ accessToken, runId, snapshot }) {
   const [graph, setGraph] = useState(null)
   const [error, setError] = useState('')
   const [stopping, setStopping] = useState(false)
   const scope = useRef(0)
   useEffect(() => {
+    if (snapshot) { setGraph(snapshot); return undefined }
     if (!runId) return undefined
     scope.current += 1
     let stopped = false
@@ -28,7 +29,7 @@ export default function CreativeRunGraph({ accessToken, runId }) {
     }
     refresh()
     return () => { stopped = true; scope.current += 1; window.clearTimeout(timer) }
-  }, [accessToken, runId])
+  }, [accessToken, runId, snapshot])
 
   /** 停止作用于整条协作链，按钮直接说明范围，避免误解为只取消一个分支。 */
   const stop = async (stepId) => {

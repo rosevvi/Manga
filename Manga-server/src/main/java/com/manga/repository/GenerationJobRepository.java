@@ -37,7 +37,12 @@ public class GenerationJobRepository {
     public List<String> byRun(String runId) { return mapper.findByRun(runId); }
     /** 查询权限范围内有界历史。 */
     public List<GenerationJob> visible(long userId, long projectId, String runId, String conversationId, Long beforeId, int limit) {
-        return mapper.findVisible(userId, projectId, runId, conversationId, beforeId, limit);
+        return visible(userId, projectId, runId, conversationId, beforeId, limit, null, null);
+    }
+    /** 镜头与媒体类型筛选在分页前完成，避免客户端过滤丢失历史。 */
+    public List<GenerationJob> visible(long userId, long projectId, String runId, String conversationId,
+            Long beforeId, int limit, Long shotId, String mediaKind) {
+        return mapper.findVisible(userId, projectId, runId, conversationId, beforeId, limit, shotId, mediaKind);
     }
     /** 暴露窄接口以执行跨实例容量判断。 */
     public boolean capacity(GenerationJob job, int providerLimit, int userLimit) {

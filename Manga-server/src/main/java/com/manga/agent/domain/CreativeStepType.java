@@ -12,5 +12,8 @@ public enum CreativeStepType {
     JOIN,
 
     /** 使用已冻结 Blueprint 执行一次受控 AgentScope 调用。 */
-    AGENT_INVOCATION
+    AGENT_INVOCATION,
+
+    /** 精确使用用户已提交的媒体参数创建提案，无需模型推理。 */
+    VIDEO_PROPOSAL
 }

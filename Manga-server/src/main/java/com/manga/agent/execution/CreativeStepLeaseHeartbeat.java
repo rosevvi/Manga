@@ -13,10 +13,12 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 周期续签数据库 Step owner lease，并在执行权丢失时终止 Agent 流。
  */
+@Slf4j
 public final class CreativeStepLeaseHeartbeat implements AutoCloseable {
 
     private final ClaimedCreativeStep step;
@@ -55,6 +57,7 @@ public final class CreativeStepLeaseHeartbeat implements AutoCloseable {
         if (closed.get()) {
             return;
         }
+        long started = System.nanoTime();
         try {
             if (!lifecycleService.renewLease(step)) {
                 failure.tryEmitValue(renewalFailure());
@@ -66,6 +69,9 @@ public final class CreativeStepLeaseHeartbeat implements AutoCloseable {
                     CreativeRuntimeMessages.AGENT_STEP_OWNER_LEASE_LOST,
                     throwable));
             close();
+        } finally {
+            log.debug("Step lease renewed stepId={} epoch={} durationMs={} stopped={}",
+                    step.stepId(), step.ownerEpoch(), (System.nanoTime() - started) / 1_000_000, closed.get());
         }
     }
 

@@ -38,7 +38,7 @@ public class ChangeSetApplicationService {
                     List.of(scripts.applyApproved(proposal.getProjectId(), userId, actor, codec.read(proposal.getPayloadJson(), ScriptChangeSet.class))));
             case STORYBOARD -> new ApprovalResult(proposal.getChangeSetId(), ApprovalStatus.APPROVED, comment,
                     storyboards.applyApproved(proposal.getProjectId(), userId, actor, codec.read(proposal.getPayloadJson(), StoryboardChangeSet.class)));
-            case IMAGE_GENERATION -> new ApprovalResult(proposal.getChangeSetId(), generationJobs.enqueue(proposal, userId, actor)
+            case IMAGE_GENERATION, VIDEO_GENERATION -> new ApprovalResult(proposal.getChangeSetId(), generationJobs.enqueue(proposal, userId, actor)
                     ? ApprovalStatus.APPROVED : ApprovalStatus.CONFLICTED, comment, List.of());
         };
     }

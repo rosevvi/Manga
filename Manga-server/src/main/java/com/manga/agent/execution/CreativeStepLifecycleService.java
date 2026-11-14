@@ -16,11 +16,14 @@ import com.manga.agent.event.ContentDeltaEventPayload;
 import com.manga.agent.event.CreativeEventSources;
 import com.manga.agent.event.StepCompletedEventPayload;
 import com.manga.agent.event.ToolExecutionEventPayload;
+import com.manga.agent.event.ToolActivitySummaries;
+import com.manga.agent.event.StepFailedEventPayload;
 import com.manga.agent.harness.AgentRuntimeException;
 import com.manga.entity.CreativeStep;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.CreativeStepRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +37,7 @@ import com.manga.agent.collaboration.DynamicAgentBlueprintFactory;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CreativeStepLifecycleService {
 
     private final CreativeStepRepository stepRepository;
@@ -44,6 +48,7 @@ public class CreativeStepLifecycleService {
     private final AgentStateSessionService sessions;
     private final ApplicationEventPublisher publisher;
     private final AgentBlueprintCodec blueprints;
+    private final ToolActivitySummaries summaries;
 
     /** 判断当前执行器是否仍持有有效运行权；取消或租约过期时返回 false。 */
     @Transactional(readOnly = true)
@@ -68,7 +73,8 @@ public class CreativeStepLifecycleService {
     @Transactional
     public boolean appendToolStarted(ClaimedCreativeStep claimed, String toolCallId, String toolName) {
         return appendOwnedEvent(claimed, CreativeEventType.TOOL_STARTED,
-                new ToolExecutionEventPayload(toolCallId, toolName, CreativeToolStatus.RUNNING));
+                new ToolExecutionEventPayload(toolCallId, toolName, CreativeToolStatus.RUNNING,
+                        2, claimed.ownerEpoch(), null, null, LocalDateTime.now(), null));
     }
 
     /** 追加不暴露参数和结果正文的工具完成事件。 */
@@ -78,8 +84,12 @@ public class CreativeStepLifecycleService {
             String toolCallId,
             String toolName,
             CreativeToolStatus status) {
+        var summary = summaries.take(claimed.runId(), claimed.stepId(), claimed.ownerEpoch(), toolCallId);
         return appendOwnedEvent(claimed, CreativeEventType.TOOL_COMPLETED,
-                new ToolExecutionEventPayload(toolCallId, toolName, status));
+                new ToolExecutionEventPayload(toolCallId, toolName, status, 2, claimed.ownerEpoch(),
+                        Objects.isNull(summary) ? null : summary.inputSummary(),
+                        Objects.isNull(summary) ? null : summary.resultSummary(),
+                        Objects.isNull(summary) ? null : summary.startedAt(), LocalDateTime.now()));
     }
 
     /** 周期续签 Step 执行租约；取消、过期或 owner 变化时返回 false。 */
@@ -99,15 +109,18 @@ public class CreativeStepLifecycleService {
             ClaimedCreativeStep claimed,
             CreativeEventType eventType,
             Object payload) {
+        long started = System.nanoTime();
         runRepository.lockByRunId(claimed.runId());
         if (!renewLease(claimed)) {
             return false;
         }
-        // Worker 的内部文本和工具噪声不投影到用户对话；结果通过步骤树提供。
+        // Worker 执行细节写入 Journal，正文投影按 source 排除，时间线仍可重建。
         CreativeStep current = stepRepository.findByStepId(claimed.stepId()).orElseThrow();
-        if (Objects.nonNull(current.getParentStepId())) return true;
         eventService.append(claimed.runId(), claimed.stepId(), eventType,
-                CreativeEventSources.AGENT_SCOPE, null, payload);
+                Objects.nonNull(current.getParentStepId()) ? CreativeEventSources.WORKER : CreativeEventSources.AGENT_SCOPE,
+                null, payload);
+        log.debug("Agent event persisted stepId={} epoch={} type={} durationMs={}",
+                claimed.stepId(), claimed.ownerEpoch(), eventType, (System.nanoTime() - started) / 1_000_000);
         return true;
     }
 
@@ -145,15 +158,9 @@ public class CreativeStepLifecycleService {
     @Transactional
     public void fail(ClaimedCreativeStep claimed, Throwable failure) {
         runRepository.lockByRunId(claimed.runId());
-        AgentRuntimeException runtimeException = failure instanceof AgentRuntimeException agentFailure
-                ? agentFailure
-                : null;
-        String errorMessage = Objects.nonNull(runtimeException)
-                ? runtimeException.getMessage()
-                : CreativeRuntimeMessages.AGENT_STEP_EXECUTION_FAILED;
-        CreativeErrorCode errorCode = Objects.nonNull(runtimeException)
-                ? runtimeException.errorCode()
-                : CreativeErrorCode.CAPABILITY_EXECUTION_FAILED;
+        AgentRuntimeException runtimeException = CreativeExecutionFailure.classify(failure);
+        String errorMessage = runtimeException.getMessage();
+        CreativeErrorCode errorCode = runtimeException.errorCode();
         boolean failed = stepRepository.failOwned(claimed.stepId(), claimed.ownerInstanceId(),
                 claimed.ownerEpoch(), errorCode.code(), errorMessage,
                 LocalDateTime.now(), SystemActor.STEP_EXECUTION.code());
@@ -162,7 +169,7 @@ public class CreativeStepLifecycleService {
             return;
         }
         eventService.append(claimed.runId(), claimed.stepId(), CreativeEventType.STEP_FAILED,
-                CreativeEventSources.RUNTIME, null, null);
+                CreativeEventSources.RUNTIME, null, new StepFailedEventPayload(2, claimed.ownerEpoch(), errorCode.code(), errorMessage));
         sessions.retireSession(claimed.stateSessionId());
         publisher.publishEvent(new CreativeStepSettled(claimed.runId()));
         aggregationService.aggregate(claimed.runId());

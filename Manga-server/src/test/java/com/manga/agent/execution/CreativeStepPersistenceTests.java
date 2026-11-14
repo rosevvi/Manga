@@ -87,6 +87,24 @@ class CreativeStepPersistenceTests {
                 Integer.class, stepId)).isEqualTo(1);
     }
 
+    /** 失联时已有模型调用，不能因恢复扫描而再次付费调用同一任务。 */
+    @Test
+    void shouldNotReplayExpiredStepAfterModelCall() {
+        String runId = insertRun();
+        String stepId = insertStep(runId, "RUNNING", "lost-worker", 5L, 1, 1L);
+        jdbcTemplate.update("""
+                INSERT INTO manga_model_call_ledger (call_id, run_id, step_id, owner_epoch, config_id,
+                    model_name, blueprint_fingerprint, status, reserved_usd, started_at, expires_at, created_by, updated_by)
+                VALUES (?, ?, ?, 5, 100, 'test', ?, 'STARTED', 0.05, ?, ?, 'test', 'test')
+                """, UUID.randomUUID().toString(), runId, stepId, "b".repeat(64), LocalDateTime.now().minusMinutes(2), LocalDateTime.now().plusMinutes(3));
+        var expired = stepRepository.findByStepId(stepId).orElseThrow();
+        assertThat(recoveryService.recover(expired, LocalDateTime.now())).isEmpty();
+        var stopped = stepRepository.findByStepId(stepId).orElseThrow();
+        assertThat(stopped.getStatus().name()).isEqualTo("FAILED");
+        assertThat(stopped.getErrorCode()).isEqualTo("MODEL_RESULT_UNCERTAIN");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM manga_creative_dispatch_outbox WHERE step_id = ?", Integer.class, stepId)).isZero();
+    }
+
     /** 并发事件提交由 Run 行锁串行分配 sequence，不产生重复或空洞。 */
     @Test
     void shouldAllocateContiguousEventSequenceConcurrently() throws Exception {

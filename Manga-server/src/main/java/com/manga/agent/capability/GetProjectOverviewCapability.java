@@ -49,7 +49,7 @@ public class GetProjectOverviewCapability extends AbstractProjectReadCapability 
                 project.getStatus(),
                 project.getWorkflowStage(),
                 project.getShotCount()
-        ));
+        ), CapabilitySummary.project(project.getId(), project.getName(), project.getShotCount()));
     }
 
     /** Director 可见的项目概览投影。 */

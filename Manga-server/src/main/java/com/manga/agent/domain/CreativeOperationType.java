@@ -16,5 +16,7 @@ public enum CreativeOperationType {
     /** 为项目生成待审批的新章节提案。 */
     GENERATE_SCRIPT_CHAPTER,
     /** 为单个镜头提交待审批图片生成提案。 */
-    GENERATE_SHOT_IMAGE
+    GENERATE_SHOT_IMAGE,
+    /** 为单个镜头提交视频提案。 */
+    GENERATE_SHOT_VIDEO
 }

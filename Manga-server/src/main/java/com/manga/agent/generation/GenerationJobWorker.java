@@ -6,6 +6,7 @@ import com.manga.repository.GenerationJobRepository;
 import com.manga.repository.GenerationCallbackRepository;
 import com.manga.service.MediaStorageService;
 import com.manga.service.storage.GeneratedMediaReference;
+import com.manga.service.storage.GeneratedMediaFormat;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -79,9 +80,11 @@ public class GenerationJobWorker {
                             new GenerationSnapshot(GenerationJobStatus.CANCELLED, null, null, null)));
                     return;
                 }
-                byte[] data = decode(job.getResultBase64());
+                byte[] data = Objects.nonNull(job.getResultUrl())
+                        ? provider.download(job) : decode(job.getResultBase64());
+                GeneratedMediaFormat format = provider.format();
                 GeneratedMediaReference reference;
-                try { reference = storage.prepareGenerated(job.getJobId(), job.getOwnerEpoch()); }
+                try { reference = storage.prepareGenerated(job.getJobId(), job.getOwnerEpoch(), format); }
                 catch (RuntimeException exception) { throw new GenerationException(GenerationError.STORAGE); }
                 var object = lifecycle.prepareMedia(job, reference);
                 try { storage.storeGeneratedBytes(data, reference); }

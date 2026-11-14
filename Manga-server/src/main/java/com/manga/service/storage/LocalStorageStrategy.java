@@ -81,23 +81,23 @@ public class LocalStorageStrategy implements StorageStrategy {
 
     /** 位置只由当前配置根目录、固定生成目录和服务端代次名称构造。 */
     @Override
-    public GeneratedMediaReference generatedReference(String jobId, long epoch) {
+    public GeneratedMediaReference generatedReference(String jobId, long epoch, GeneratedMediaFormat format) {
         String name = GeneratedMediaNames.of(jobId, epoch);
         return new GeneratedMediaReference(getType(), generatedNamespace(), name,
-                normalizePublicPath() + "/" + StorageConstants.GENERATED_DIRECTORY + "/" + name + "." + StorageConstants.GENERATED_FORMAT);
+                normalizePublicPath() + "/" + StorageConstants.GENERATED_DIRECTORY + "/" + name + "." + format.extension(), format);
     }
     /** 同代次只覆盖同一文件，发布前仍需数据库确认当前执行权。 */
     @Override
     public void writeGenerated(byte[] data, GeneratedMediaReference reference) {
         GeneratedMediaNames.require(reference, getType(), generatedNamespace());
-        storeNamedBytes(data, StorageConstants.GENERATED_DIRECTORY, StorageConstants.GENERATED_FORMAT, reference.name());
+        storeNamedBytes(data, StorageConstants.GENERATED_DIRECTORY, reference.format().extension(), reference.name());
     }
     /** 只删除固定生成目录内登记的普通文件，不递归删除目录。 */
     @Override
     public void deleteGenerated(GeneratedMediaReference reference) {
         GeneratedMediaNames.require(reference, getType(), generatedNamespace());
         Path directory = resolveBaseDirectory().resolve(StorageConstants.GENERATED_DIRECTORY).normalize();
-        Path target = directory.resolve(reference.name() + "." + StorageConstants.GENERATED_FORMAT).normalize();
+        Path target = directory.resolve(reference.name() + "." + reference.format().extension()).normalize();
         if (!target.getParent().equals(directory) || Files.isSymbolicLink(directory)) throw new IllegalArgumentException(StorageConstants.GENERATED_REFERENCE_INVALID);
         try { Files.deleteIfExists(target); Files.deleteIfExists(target.resolveSibling(target.getFileName() + ".part")); }
         catch (IOException exception) { throw new IllegalStateException(STORAGE_FILE_SAVE_FAILED, exception); }

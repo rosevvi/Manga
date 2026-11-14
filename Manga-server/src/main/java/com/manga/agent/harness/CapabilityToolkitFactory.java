@@ -6,6 +6,7 @@ import com.manga.agent.blueprint.CapabilityManifest;
 import com.manga.agent.capability.CapabilityName;
 import com.manga.agent.capability.CapabilityRegistry;
 import com.manga.agent.domain.CreativeErrorCode;
+import com.manga.agent.event.ToolActivitySummaries;
 import com.manga.agent.domain.CreativeRuntimeMessages;
 import io.agentscope.core.tool.Toolkit;
 import lombok.RequiredArgsConstructor;
@@ -23,13 +24,14 @@ public class CapabilityToolkitFactory {
 
     private final CapabilityRegistry capabilityRegistry;
     private final ObjectMapper objectMapper;
+    private final ToolActivitySummaries summaries;
 
     /** 注册 Blueprint 明确列出的全部能力，并复核最终工具集合完全相等。 */
     public Toolkit create(AgentBlueprint blueprint) {
         Toolkit toolkit = new Toolkit();
         for (CapabilityManifest manifest : blueprint.capabilities()) {
             toolkit.registerAgentTool(new MangaCapabilityTool(
-                    capabilityRegistry.require(manifest.name()), objectMapper));
+                    capabilityRegistry.require(manifest.name()), objectMapper, summaries));
         }
         Set<String> expected = blueprint.capabilities().stream()
                 .map(CapabilityManifest::name)

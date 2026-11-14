@@ -44,6 +44,11 @@ public interface CreativeStepMapper extends BaseMapper<CreativeStep> {
             @Param("updatedBy") String updatedBy);
 
     /** 使用 owner epoch 围栏续租运行中的 Step。 */
+    /** 仅在领取事务提交前刷新初始租约，不作为过期后的续租入口。 */
+    int initializeClaimLease(@Param("stepId") String stepId,
+            @Param("ownerInstanceId") String ownerInstanceId, @Param("ownerEpoch") long ownerEpoch,
+            @Param("leaseUntil") LocalDateTime leaseUntil, @Param("updatedBy") String updatedBy);
+
     int renewLease(@Param("stepId") String stepId,
             @Param("ownerInstanceId") String ownerInstanceId,
             @Param("ownerEpoch") long ownerEpoch,
@@ -89,6 +94,11 @@ public interface CreativeStepMapper extends BaseMapper<CreativeStep> {
             @Param("ownerEpoch") long ownerEpoch,
             @Param("now") LocalDateTime now,
             @Param("updatedBy") String updatedBy);
+
+    /** 已发生模型调用且无持久化检查点的过期步骤只能失败，不能自动重发。 */
+    int failExpiredAfterModel(@Param("stepId") String stepId, @Param("ownerEpoch") long ownerEpoch,
+            @Param("now") LocalDateTime now, @Param("errorCode") String errorCode,
+            @Param("errorMessage") String errorMessage, @Param("updatedBy") String updatedBy);
 
     /** 将重试次数耗尽且租约过期的 Step 原子标记为失败。 */
     int failExpiredExhausted(@Param("stepId") String stepId,

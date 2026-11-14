@@ -12,7 +12,7 @@
     <select id="lock" resultType="com.manga.entity.GenerationJob">
         SELECT id, job_id, run_id, step_id, change_set_id, user_id,
                project_id, shot_id, provider, config_id, config_snapshot_json, request_json,
-               status, provider_job_id, progress, cancel_requested, result_base64, error_code,
+               status, provider_job_id, progress, cancel_requested, result_base64, result_url, error_code,
                error_message, owner_instance_id, owner_epoch, lease_until, attempts, next_action_at,
                submitted_at, finished_at, reconciled_by, reconciled_at, reconciliation_note, created_at,
                updated_at, created_by, updated_by
@@ -33,6 +33,11 @@
         FROM manga_generation_job
         WHERE user_id = #{userId} AND project_id = #{projectId}
         <if test="runId != null">AND run_id = #{runId}</if>
+        <if test="shotId != null">AND shot_id = #{shotId}</if>
+        <if test="mediaKind != null">
+            AND EXISTS (SELECT 1 FROM manga_creative_change_set s
+                        WHERE s.change_set_id = manga_generation_job.change_set_id AND s.kind = #{mediaKind})
+        </if>
         <if test="conversationId != null">
             AND EXISTS (SELECT 1 FROM manga_creative_run r WHERE r.run_id = manga_generation_job.run_id
                         AND r.conversation_id = #{conversationId})
@@ -60,6 +65,7 @@
         progress = #{job.progress},
         cancel_requested = #{job.cancelRequested},
         result_base64 = #{job.resultBase64},
+        result_url = #{job.resultUrl},
         error_code = #{job.errorCode},
         error_message = #{job.errorMessage},
         owner_instance_id = #{job.ownerInstanceId},

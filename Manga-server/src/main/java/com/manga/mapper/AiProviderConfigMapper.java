@@ -2,6 +2,7 @@ package com.manga.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.manga.entity.AiProviderConfig;
+import com.manga.common.enums.AiModelType;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -28,7 +29,7 @@ public interface AiProviderConfigMapper extends BaseMapper<AiProviderConfig> {
     int updateOwned(@Param("config") AiProviderConfig config, @Param("ownerUserId") long ownerUserId);
 
     /** 清除用户AI 服务配置的默认标记。 */
-    int clearDefault(@Param("ownerUserId") long ownerUserId, @Param("actor") String actor);
+    int clearDefault(@Param("ownerUserId") long ownerUserId, @Param("modelType") AiModelType modelType, @Param("actor") String actor);
 
     /** 设置用户默认的AI 服务配置。 */
     int setDefault(

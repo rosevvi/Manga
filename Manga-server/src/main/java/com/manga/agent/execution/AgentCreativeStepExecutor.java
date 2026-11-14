@@ -34,6 +34,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import reactor.core.scheduler.Scheduler;
 import java.time.ZoneId;
 import java.util.Objects;
 
@@ -49,6 +50,8 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
     private final CreativeExecutionProperties executionProperties;
     private final TaskScheduler taskScheduler;
     private final ObjectMapper objectMapper;
+    private final Scheduler journalScheduler;
+    private final Scheduler streamTimer;
     private final ChangeSetApprovalService approvals;
     private final CreativeDelegationService delegation;
     private final CreativeGraphService graph;
@@ -61,12 +64,16 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
             MangaAgentInvoker agentInvoker,
             CreativeStepLifecycleService lifecycleService,
             CreativeExecutionProperties executionProperties,
-            @Qualifier(AsyncConstants.MANGA_COMMON_TASK_SCHEDULER) TaskScheduler taskScheduler,
+            @Qualifier(AsyncConstants.MANGA_LEASE_SCHEDULER) TaskScheduler taskScheduler,
+            @Qualifier(AsyncConstants.MANGA_JOURNAL_SCHEDULER) Scheduler journalScheduler,
+            @Qualifier(AsyncConstants.MANGA_STREAM_TIMER) Scheduler streamTimer,
             ObjectMapper objectMapper,
             ChangeSetApprovalService approvals,
             CreativeDelegationService delegation, CreativeGraphService graph, CreativeStepResultService results,
             CreativeRunBudgetService budgets, CreativeReviewGate reviewGate) {
         this.blueprintCodec = blueprintCodec;
+        this.journalScheduler = journalScheduler;
+        this.streamTimer = streamTimer;
         this.agentInvoker = agentInvoker;
         this.lifecycleService = lifecycleService;
         this.executionProperties = executionProperties;
@@ -89,6 +96,14 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
     /** 执行模型和提案工具；等待审批时释放资源，手动任务必须产出所需提案。 */
     @Override
     public void execute(ClaimedCreativeStep step) {
+        try (CreativeStepLeaseHeartbeat heartbeat = new CreativeStepLeaseHeartbeat(
+                step, lifecycleService, executionProperties.stepLease(), taskScheduler)) {
+            executeOwned(step, heartbeat);
+        }
+    }
+
+    /** 心跳覆盖预检、预算、Kernel 获取、模型流和终态提交。 */
+    private void executeOwned(ClaimedCreativeStep step, CreativeStepLeaseHeartbeat heartbeat) {
         AgentBlueprint blueprint = restoreBlueprint(step);
         // 上次执行可能在草稿落库后进程退出；此时直接开放审批，不再次调用模型。
         if (approvals.hasDraft(step.stepId()) && approvals.suspendIfProposed(step)) return;
@@ -100,8 +115,7 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
         budgets.reserve(step, blueprint);
         AgentRuntimeContext context = runtimeContext(step);
         StringBuilder content = new StringBuilder();
-        try (CreativeStepLeaseHeartbeat heartbeat = new CreativeStepLeaseHeartbeat(
-                step, lifecycleService, executionProperties.stepLease(), taskScheduler)) {
+        {
             String instruction = input.instruction();
             if (Objects.nonNull(input.target())) instruction += ChangeSetConstants.TARGET_TEMPLATE
                     .formatted(input.target().resourceType(), input.target().resourceId());
@@ -109,7 +123,13 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
                             event -> event instanceof ToolResultEndEvent && (approvals.hasDraft(step.stepId())
                                     || delegation.hasDraft(step.runId(), step.stepId()) || Objects.nonNull(results.submitted(step.stepId()))))
                     .takeUntilOther(heartbeat.lossSignal())
-                    .doOnNext(event -> commitEvent(step, event, content))
+                    .transform(events -> CreativeAgentEventBuffer.coalesce(events, streamTimer))
+                    // delayError 保证失败前已接收的文本和工具按序落库。
+                    .publishOn(journalScheduler, true, CreativeAgentEventBuffer.JOURNAL_PREFETCH)
+                    .doOnNext(entry -> {
+                        if (Objects.nonNull(entry.delta())) flushText(step, new StringBuilder(entry.delta()), content);
+                        else commitEvent(step, entry.event(), content);
+                    })
                     .blockLast();
         }
         if (approvals.suspendIfProposed(step)) return;
@@ -127,6 +147,16 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
         reviewGate.requirePassedStep(step.stepId());
         approvals.requireGenerationResult(step, input.operationType());
         lifecycleService.complete(step, write(new AgentStepResult(content.toString())));
+    }
+
+    /** 一次追加合并文本，围栏拒绝时立即停止当前执行器。 */
+    private void flushText(ClaimedCreativeStep step, StringBuilder pending, StringBuilder content) {
+        if (pending.isEmpty()) return;
+        String text = pending.toString();
+        if (!lifecycleService.appendDelta(step, text)) throw new AgentRuntimeException(
+                CreativeErrorCode.OWNER_LEASE_LOST, CreativeRuntimeMessages.AGENT_STEP_OWNER_LEASE_LOST);
+        content.append(text);
+        pending.setLength(0);
     }
 
     /** 恢复 Blueprint，并复核 Step 独立保存的指纹列。 */

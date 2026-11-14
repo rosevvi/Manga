@@ -36,7 +36,7 @@ public class CreativeReviewGate {
         var latest = graph.plans(parent.getRunId()).stream()
                 .filter(plan -> plan.getParentStepId().equals(parent.getStepId()))
                 .max(Comparator.comparingInt(plan -> plan.getRoundNo())).orElse(null);
-        if (Objects.isNull(latest) || kind == ChangeSetKind.IMAGE_GENERATION) return;
+        if (Objects.isNull(latest) || kind.waitsForJob()) return;
         StepResultKind expected = kind == ChangeSetKind.SCRIPT ? StepResultKind.SCRIPT_DRAFT : StepResultKind.STORYBOARD_DRAFT;
         String canonical = canonicalCandidate(kind, input);
         boolean matched = steps.findByRunId(parent.getRunId()).stream()

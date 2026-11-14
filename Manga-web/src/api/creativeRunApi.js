@@ -7,7 +7,8 @@ export const CREATIVE_RUN_ENDPOINT = '/creative-runs'
 
 /** 从服务端找回项目手动任务，活动任务独立于历史分页返回。 */
 export function listProjectCreativeRuns(accessToken, projectId, beforeId) {
-  const query = new URLSearchParams({ projectId: String(projectId) })
+  const query = new URLSearchParams()
+  if (projectId) query.set('projectId', String(projectId))
   if (beforeId) query.set('beforeId', String(beforeId))
   return authorizedRequest(accessToken, `${CREATIVE_RUN_ENDPOINT}?${query}`)
 }
@@ -42,6 +43,11 @@ export function createManualRun(accessToken, request) {
 /** 查询当前用户拥有的 Run 快照。 */
 export function getCreativeRun(accessToken, runId) {
   return authorizedRequest(accessToken, `${CREATIVE_RUN_ENDPOINT}/${encodeURIComponent(runId)}`)
+}
+
+/** 按持久化事件序号读取安全时间线。 */
+export function getCreativeRunTimeline(accessToken, runId, afterSequence = 0) {
+  return authorizedRequest(accessToken, `${CREATIVE_RUN_ENDPOINT}/${encodeURIComponent(runId)}/timeline?afterSequence=${afterSequence}&limit=100`)
 }
 
 /** 从数据库恢复协作计划、依赖图、当前执行角色和预算。 */

@@ -10,6 +10,7 @@ import com.manga.agent.domain.CreativeRuntimeMessages;
 import com.manga.agent.domain.CreativeToolStatus;
 import com.manga.agent.domain.SystemActor;
 import com.manga.agent.event.ContentDeltaEventPayload;
+import com.manga.agent.event.CreativeEventSources;
 import com.manga.agent.event.RunAcceptedEventPayload;
 import com.manga.agent.event.ToolExecutionEventPayload;
 import com.manga.entity.CreativeEvent;
@@ -79,6 +80,7 @@ public class CreativeMessageProjector {
 
     /** 只投影用户可见事实，Run 终态统一收敛消息和未完成工具状态。 */
     private void apply(CreativeRun run, CreativeEvent event) {
+        if (CreativeEventSources.WORKER.equals(event.getSource())) return;
         switch (event.getEventType()) {
             case RUN_ACCEPTED -> {
                 RunAcceptedEventPayload payload = read(event, RunAcceptedEventPayload.class);

@@ -9,7 +9,10 @@ public enum AiProviderType {
             List.of("TEXT", "IMAGE", "VIDEO"), "OpenAI 官方模型和兼容的 Responses / Images / Video 能力"),
     /** OpenAI 兼容协议服务。 */
     OPENAI_COMPATIBLE("OpenAI Compatible", "", "", true,
-            List.of("TEXT"), "兼容 OpenAI Chat Completions 或 Responses 的第三方网关"),
+            List.of("TEXT", "IMAGE"), "兼容 OpenAI 文本与图片协议的第三方网关"),
+    /** Agnes 异步视频模型。 */
+    AGNES("Agnes AI", "https://apihub.agnes-ai.com", "agnes-video-2.5-flash", true,
+            List.of("VIDEO"), "Agnes Video 2.5 和 2.5 Flash"),
     /** Anthropic Claude 服务。 */
     ANTHROPIC("Anthropic", "https://api.anthropic.com", "claude-3-5-sonnet-latest", true,
             List.of("TEXT"), "Claude 系列文本与多模态理解模型"),

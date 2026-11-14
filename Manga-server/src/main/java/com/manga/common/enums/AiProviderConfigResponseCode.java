@@ -14,6 +14,10 @@ public enum AiProviderConfigResponseCode implements ResponseCode {
     SECRET_DECRYPTION_FAILED("AI_SECRET_DECRYPTION_FAILED", "API Key 无法解密，请重新保存该配置"),
     /** AI 服务基础地址无效。 */
     BASE_URL_INVALID("AI_BASE_URL_INVALID", "API Base URL 必须是有效的 HTTP 或 HTTPS 地址"),
+    /** 服务商与模型用途不匹配。 */
+    MODEL_TYPE_INVALID("AI_MODEL_TYPE_INVALID", "该服务商不支持所选模型用途"),
+    /** 切换供应商时不可沿用另一供应商的密钥。 */
+    AGNES_KEY_REQUIRED("AI_AGNES_KEY_REQUIRED", "更换 Agnes 服务商配置时请填写当前供应商的 API Key"),
     /** AI 出站代理配置无效。 */
     PROXY_CONFIG_INVALID("AI_PROXY_CONFIG_INVALID", "代理配置不正确");
 

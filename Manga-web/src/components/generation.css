@@ -8,7 +8,7 @@
 .generation-jobs [role="alert"], .image-generation-panel [role="alert"] { color: var(--workspace-danger); }
 .generation-card > a { display: grid; justify-items: start; gap: 6px; color: var(--workspace-accent); }
 .generation-card > button, .image-generation-form > button, .generation-reconcile > button { justify-self: start; }
-.generation-card img { display: block; max-width: 100%; max-height: 320px; object-fit: contain; margin-bottom: 8px; }
+.generation-card :is(img, video) { display: block; max-width: 100%; max-height: 320px; object-fit: contain; margin-bottom: 8px; }
 .generation-card progress { width: 100%; }
 .generation-card small { opacity: .75; }
 .generation-reconcile, .image-generation-form { display: grid; gap: 10px; }

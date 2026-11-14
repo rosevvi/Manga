@@ -2,9 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Bot,
-  Check,
   CheckCircle2,
-  ChevronDown,
   Eye,
   EyeOff,
   KeyRound,
@@ -28,18 +26,23 @@ import {
   testAiProviderConnection,
   testAiProviderDraftConnection,
   updateAiProviderConfig,
+  revealAiProviderKey,
 } from '../api/aiProviderApi'
 import { AI_CAPABILITY_LABELS, AI_CONFIG_LIMITS, AI_PROVIDER_OPTIONS, AI_PROXY_OPTIONS } from '../constants/aiProvider'
 import { useLanguage } from '../i18n/LanguageContext'
+import WorkspaceSelect from './WorkspaceSelect'
 import './ai-provider-settings.css'
 import './project-module.css'
 
 const DEFAULT_PROVIDER = AI_PROVIDER_OPTIONS[0]
+const MODEL_TYPE_LABEL = { TEXT: '文本模型', IMAGE: '图片模型', VIDEO: '视频模型' }
+
 const EMPTY_FORM = Object.freeze({
   name: '',
   providerType: DEFAULT_PROVIDER.value,
   baseUrl: DEFAULT_PROVIDER.baseUrl,
   defaultModel: DEFAULT_PROVIDER.model,
+  modelType: 'TEXT',
   apiKey: '',
   proxyType: 'NONE',
   proxyHost: '',
@@ -68,6 +71,10 @@ function AiProviderSettings({ accessToken, isGuest }) {
   const [editorConnectionResult, setEditorConnectionResult] = useState(null)
   const [connectionResults, setConnectionResults] = useState({})
   const [showApiKey, setShowApiKey] = useState(false)
+  const [revealedKey, setRevealedKey] = useState('')
+  const [replacingKey, setReplacingKey] = useState(false)
+  const [revealingKey, setRevealingKey] = useState(false)
+  const keyGeneration = useRef(0)
   const [showProxyPassword, setShowProxyPassword] = useState(false)
 
   const providerLookup = useMemo(
@@ -75,6 +82,34 @@ function AiProviderSettings({ accessToken, isGuest }) {
     [providerOptions],
   )
   const proxyEnabled = form.proxyType !== 'NONE'
+  const savedKey = Boolean(editingConfig?.hasApiKey && !replacingKey && form.providerType === editingConfig.providerType)
+
+  // 切换配置、供应商或关闭时使晚到的明文响应失效。
+  useEffect(() => {
+    keyGeneration.current += 1
+    setRevealedKey('')
+    setShowApiKey(false)
+    setReplacingKey(false)
+    setRevealingKey(false)
+    return () => { keyGeneration.current += 1 }
+  }, [editingConfig, form.providerType])
+
+  const toggleApiKey = async () => {
+    if (showApiKey) { setShowApiKey(false); setRevealedKey(''); return }
+    if (!savedKey) { setShowApiKey(true); return }
+    const generation = keyGeneration.current
+    setRevealingKey(true)
+    try {
+      const result = await revealAiProviderKey(accessToken, editingConfig.id)
+      if (generation !== keyGeneration.current) return
+      setRevealedKey(result.apiKey)
+      setShowApiKey(true)
+    } catch (failure) {
+      if (generation === keyGeneration.current) setError(failure.message)
+    } finally {
+      if (generation === keyGeneration.current) setRevealingKey(false)
+    }
+  }
   const proxyPort = proxyPortValue(form.proxyPort)
   const proxyInvalid = Boolean(proxyEnabled && (
     !form.proxyHost.trim()
@@ -109,6 +144,7 @@ function AiProviderSettings({ accessToken, isGuest }) {
   }, [loadConfigs])
 
   const openCreate = () => {
+    keyGeneration.current += 1; setRevealedKey(''); setRevealingKey(false)
     const provider = providerOptions[0] ?? DEFAULT_PROVIDER
     setEditingConfig(null)
     setForm({
@@ -116,6 +152,7 @@ function AiProviderSettings({ accessToken, isGuest }) {
       providerType: provider.value,
       baseUrl: provider.baseUrl,
       defaultModel: provider.model,
+      modelType: provider.capabilities[0] ?? 'TEXT',
       defaultConfig: configs.length === 0,
     })
     setError('')
@@ -126,13 +163,15 @@ function AiProviderSettings({ accessToken, isGuest }) {
   }
 
   const openEdit = (config) => {
+    keyGeneration.current += 1; setRevealedKey(''); setRevealingKey(false)
     setEditingConfig(config)
     setForm({
       name: config.name,
       providerType: config.providerType,
       baseUrl: config.baseUrl,
       defaultModel: config.defaultModel ?? '',
-      apiKey: config.apiKey ?? '',
+      modelType: config.modelType ?? 'TEXT',
+      apiKey: '',
       proxyType: config.proxyType ?? 'NONE',
       proxyHost: config.proxyHost ?? '',
       proxyPort: config.proxyPort ?? '',
@@ -151,6 +190,7 @@ function AiProviderSettings({ accessToken, isGuest }) {
   }
 
   const closeEditor = () => {
+    keyGeneration.current += 1; setRevealedKey(''); setRevealingKey(false)
     setEditingConfig(undefined)
     setForm(EMPTY_FORM)
     setError('')
@@ -171,6 +211,7 @@ function AiProviderSettings({ accessToken, isGuest }) {
   }
 
   const selectProvider = (providerType) => {
+    keyGeneration.current += 1; setRevealedKey(''); setShowApiKey(false); setRevealingKey(false)
     const previousProvider = providerLookup.get(form.providerType)
     const nextProvider = providerLookup.get(providerType)
     const canApplyDefaultUrl = !form.baseUrl || form.baseUrl === previousProvider?.baseUrl
@@ -178,15 +219,20 @@ function AiProviderSettings({ accessToken, isGuest }) {
     setForm((current) => ({
       ...current,
       providerType,
-      baseUrl: canApplyDefaultUrl ? nextProvider?.baseUrl ?? '' : current.baseUrl,
-      defaultModel: canApplyDefaultModel ? nextProvider?.model ?? '' : current.defaultModel,
+      modelType: nextProvider?.capabilities.includes(current.modelType) ? current.modelType : nextProvider?.capabilities[0] ?? 'TEXT',
+      baseUrl: canApplyDefaultUrl || providerType === 'AGNES' ? nextProvider?.baseUrl ?? '' : current.baseUrl,
+      defaultModel: canApplyDefaultModel || providerType === 'AGNES' ? nextProvider?.model ?? '' : current.defaultModel,
+      apiKey: providerType === current.providerType ? current.apiKey : '',
     }))
   }
 
   const applyProviderPreset = (provider) => {
+    keyGeneration.current += 1; setRevealedKey(''); setShowApiKey(false); setRevealingKey(false)
     setForm((current) => ({
       ...current,
       providerType: provider.value,
+      modelType: provider.capabilities.includes(current.modelType) ? current.modelType : provider.capabilities[0] ?? 'TEXT',
+      apiKey: provider.value === current.providerType ? current.apiKey : '',
       name: current.name || provider.label,
       baseUrl: provider.baseUrl || current.baseUrl,
       defaultModel: provider.model || current.defaultModel,
@@ -247,7 +293,8 @@ function AiProviderSettings({ accessToken, isGuest }) {
         providerType: config.providerType,
         baseUrl: config.baseUrl,
         defaultModel: config.defaultModel,
-        apiKey: config.apiKey ?? '',
+        modelType: config.modelType ?? 'TEXT',
+        apiKey: '',
         proxyType: config.proxyType ?? 'NONE',
         proxyHost: config.proxyHost ?? '',
         proxyPort: config.proxyPort,
@@ -368,7 +415,7 @@ function AiProviderSettings({ accessToken, isGuest }) {
                 </div>
                 <div className="ai-config-details">
                   <div><Server size={14} /><span><small>{translate('aiConfig.baseUrl')}</small><strong>{config.baseUrl}</strong></span></div>
-                  <div><Bot size={14} /><span><small>{translate('aiConfig.model')}</small><strong>{config.defaultModel || config.recommendedModel || provider.model || translate('aiConfig.modelUnset')}</strong></span></div>
+                  <div><Bot size={14} /><span><small>{MODEL_TYPE_LABEL[config.modelType] || translate('aiConfig.model')}</small><strong>{config.defaultModel || config.recommendedModel || provider.model || translate('aiConfig.modelUnset')}</strong></span></div>
                   <div><KeyRound size={14} /><span><small>{translate('aiConfig.apiKey')}</small><strong>{config.hasApiKey ? config.apiKeyHint : translate(config.apiKeyRequired ? 'aiConfig.keyRequired' : 'aiConfig.keyUnset')}</strong></span></div>
                   <div><Network size={14} /><span><small>{translate('aiConfig.proxy.title')}</small><strong>{proxyLabel(config.proxyType, translate)}</strong></span></div>
                 </div>
@@ -433,9 +480,10 @@ function AiProviderSettings({ accessToken, isGuest }) {
                 <input maxLength={AI_CONFIG_LIMITS.name} value={form.name} onChange={(event) => updateForm('name', event.target.value)} />
                 {fieldErrors.name && <small className="workspace-field-error">{fieldErrors.name}</small>}
               </label>
-              <label className="workspace-field">
+              <div className="workspace-field">
                 <span>{translate('aiConfig.field.provider')}</span>
                 <AiSelectMenu
+                  label={translate('aiConfig.field.provider')}
                   value={form.providerType}
                   options={providerOptions.map((provider) => ({
                     value: provider.value,
@@ -444,38 +492,61 @@ function AiProviderSettings({ accessToken, isGuest }) {
                   }))}
                   onChange={selectProvider}
                 />
-              </label>
+              </div>
               <label className="workspace-field field-wide">
                 <span>{translate('aiConfig.field.baseUrl')}</span>
                 <input type="url" maxLength={AI_CONFIG_LIMITS.baseUrl} value={form.baseUrl} onChange={(event) => updateForm('baseUrl', event.target.value)} placeholder="https://api.example.com" />
                 {fieldErrors.baseUrl && <small className="workspace-field-error">{fieldErrors.baseUrl}</small>}
               </label>
-              <label className="workspace-field"><span>{translate('aiConfig.field.model')}</span><input maxLength={AI_CONFIG_LIMITS.model} value={form.defaultModel} onChange={(event) => setForm({ ...form, defaultModel: event.target.value })} placeholder={translate('aiConfig.modelPlaceholder')} /></label>
+              <div className="workspace-field">
+                <span>{translate('aiConfig.modelType')}</span>
+                <AiSelectMenu
+                  label={translate('aiConfig.modelType')}
+                  value={form.modelType}
+                  options={(providerLookup.get(form.providerType)?.capabilities || ['TEXT']).map((type) => ({
+                    value: type,
+                    label: MODEL_TYPE_LABEL[type],
+                  }))}
+                  onChange={(modelType) => setForm({ ...form, modelType, defaultConfig: false })}
+                />
+              </div>
+              <label className="workspace-field">
+                <span>{translate('aiConfig.field.model')}</span>
+                <input maxLength={AI_CONFIG_LIMITS.model} value={form.defaultModel}
+                  onChange={(event) => updateForm('defaultModel', event.target.value)}
+                  placeholder={providerLookup.get(form.providerType)?.model || translate('aiConfig.modelPlaceholder')} />
+              </label>
               <label className="workspace-field">
                 <span>{translate('aiConfig.field.apiKey')}</span>
                 <div className="ai-secret-input">
                   <input
-                    type={editingConfig?.hasApiKey && form.apiKey && !showApiKey ? 'text' : showApiKey ? 'text' : 'password'}
+                    type={savedKey || showApiKey ? 'text' : 'password'}
                     autoComplete="new-password"
                     maxLength={AI_CONFIG_LIMITS.apiKey}
-                    value={editingConfig?.hasApiKey && form.apiKey && !showApiKey ? maskApiKey(form.apiKey) : form.apiKey}
-                    readOnly={Boolean(editingConfig?.hasApiKey && form.apiKey && !showApiKey)}
+                    value={savedKey ? (showApiKey ? revealedKey : editingConfig.apiKeyHint) : form.apiKey}
+                    readOnly={savedKey}
                     onChange={(event) => updateForm('apiKey', event.target.value)}
-                    placeholder="sk-..."
+                    placeholder={editingConfig?.hasApiKey ? editingConfig.apiKeyHint : "sk-..."}
                   />
                   <button
                     type="button"
                     aria-label={translate(showApiKey ? 'aiConfig.hideApiKey' : 'aiConfig.showApiKey')}
                     title={translate(showApiKey ? 'aiConfig.hideApiKey' : 'aiConfig.showApiKey')}
-                    onClick={() => setShowApiKey((visible) => !visible)}
+                    disabled={revealingKey}
+                    onClick={toggleApiKey}
                   >
                     {showApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
+                {savedKey && <button type="button" className="key-replace-button" onClick={() => {
+                  keyGeneration.current += 1
+                  setRevealedKey(''); setShowApiKey(false); setReplacingKey(true)
+                }}>更换密钥</button>}
               </label>
-              <label className="workspace-field">
+              <div className="workspace-field">
                 <span className="ai-label-with-icon"><Network size={13} />{translate('aiConfig.proxy.title')}</span>
                 <AiSelectMenu
+                  label={translate('aiConfig.proxy.title')}
                   value={form.proxyType}
                   options={AI_PROXY_OPTIONS.map((option) => ({
                     value: option.value,
@@ -483,7 +554,7 @@ function AiProviderSettings({ accessToken, isGuest }) {
                   }))}
                   onChange={(proxyType) => setForm({ ...form, ...proxyDefaults(proxyType) })}
                 />
-              </label>
+              </div>
               {proxyEnabled && (
                 <>
                   <label className="workspace-field">
@@ -547,61 +618,7 @@ function AiProviderSettings({ accessToken, isGuest }) {
 }
 
 /** 在 AI 配置弹窗中提供与系统暗色风格一致的轻量下拉菜单。 */
-function AiSelectMenu({ value, options, onChange, compact = false }) {
-  const [open, setOpen] = useState(false)
-  const containerRef = useRef(null)
-  const selectedOption = options.find((option) => option.value === value) ?? options[0]
-
-  useEffect(() => {
-    /** 点击控件外部时关闭下拉菜单。 */
-    const closeOnOutsideClick = (event) => {
-      if (!containerRef.current?.contains(event.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', closeOnOutsideClick)
-    return () => document.removeEventListener('mousedown', closeOnOutsideClick)
-  }, [])
-
-  /** 选择当前项并收起菜单。 */
-  const selectOption = (nextValue) => {
-    onChange(nextValue)
-    setOpen(false)
-  }
-
-  return (
-    <div className={compact ? 'ai-select compact' : 'ai-select'} ref={containerRef}>
-      <button
-        className="ai-select-button"
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span>{selectedOption?.label}</span>
-        <ChevronDown className={open ? 'open' : ''} size={14} />
-      </button>
-      {open && (
-        <div className="ai-select-menu" role="menu">
-          {options.map((option) => (
-            <button
-              className={option.value === value ? 'active' : ''}
-              key={option.value}
-              type="button"
-              role="menuitemradio"
-              aria-checked={option.value === value}
-              onClick={() => selectOption(option.value)}
-            >
-              <span>
-                <strong>{option.label}</strong>
-                {option.description && <small>{option.description}</small>}
-              </span>
-              {option.value === value && <Check size={14} />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+function AiSelectMenu(props) { return <WorkspaceSelect {...props} /> }
 
 function normalizeProviderOption(provider) {
   return {
@@ -620,6 +637,7 @@ function configPayload(form) {
   return {
     name: form.name,
     providerType: form.providerType,
+    modelType: form.modelType,
     baseUrl: form.baseUrl,
     defaultModel: form.defaultModel,
     apiKey: form.apiKey,
@@ -641,12 +659,6 @@ function proxyPortValue(value) {
   }
   const port = Number(value)
   return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : null
-}
-
-function maskApiKey(value) {
-  if (!value) return ''
-  if (value.length <= 8) return `${value.slice(0, 2)}••••${value.slice(-2)}`
-  return `${value.slice(0, 4)}••••${value.slice(-4)}`
 }
 
 function proxyDefaults(proxyType) {

@@ -68,6 +68,11 @@ public class CreativeStepRepository {
     }
 
     /** 使用围栏条件续租运行中的 Step。 */
+    /** 在原子领取事务内设置提交后的初始租约。 */
+    public void initializeClaimLease(String stepId, String owner, long epoch, LocalDateTime leaseUntil, String actor) {
+        mapper.initializeClaimLease(stepId, owner, epoch, leaseUntil, actor);
+    }
+
     public boolean renewLease(String stepId, String owner, long epoch, LocalDateTime now,
             LocalDateTime leaseUntil, String actor) {
         return mapper.renewLease(stepId, owner, epoch, now, leaseUntil, actor) == 1;
@@ -103,6 +108,11 @@ public class CreativeStepRepository {
     /** 恢复租约过期的 Step。 */
     public boolean recoverExpired(CreativeStep step, LocalDateTime now, String actor) {
         return mapper.recoverExpired(step.getStepId(), step.getOwnerEpoch(), now, actor) == 1;
+    }
+
+    /** 原子拒绝没有可恢复检查点的已计费执行。 */
+    public boolean failExpiredAfterModel(CreativeStep step, LocalDateTime now, String errorCode, String message, String actor) {
+        return mapper.failExpiredAfterModel(step.getStepId(), step.getOwnerEpoch(), now, errorCode, message, actor) == 1;
     }
 
     /** 将重试耗尽且租约过期的 Step 置为失败终态。 */

@@ -53,7 +53,7 @@ public class GetScriptStructureCapability extends AbstractProjectReadCapability 
         long projectId = requireAccessibleProject(context).getId();
         ProjectScript script = scriptRepository.findByProjectId(projectId).orElse(null);
         if (Objects.isNull(script)) {
-            return result(new ScriptStructure(false, null, null, null, 0, List.of()));
+            return result(new ScriptStructure(false, null, null, null, 0, List.of()), CapabilitySummary.script(null, 0));
         }
         List<ChapterSummary> chapters = chapterRepository.findSummaries(script.getId()).stream()
                 .map(chapter -> new ChapterSummary(
@@ -67,7 +67,7 @@ public class GetScriptStructureCapability extends AbstractProjectReadCapability 
                 script.getParseStatus(),
                 script.getChapterCount(),
                 chapters
-        ));
+        ), CapabilitySummary.script(script.getTitle(), chapters.size()));
     }
 
     /** Director 可见的剧本结构投影。 */

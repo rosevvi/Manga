@@ -124,18 +124,18 @@
         WHERE run_id = #{runId}
     </update>
     <select id="findManual" resultMap="creativeRunResultMap">
-        SELECT id, run_id, operation_type, target_id, status, created_at
+        SELECT id, run_id, project_id, operation_type, target_id, status, created_at
         FROM manga_creative_run
-        WHERE user_id = #{userId} AND project_id = #{projectId} AND trigger_source = 'MANUAL'
-          AND operation_type IN ('GENERATE_SCRIPT_CHAPTER', 'GENERATE_CHAPTER_STORYBOARD', 'GENERATE_SHOT_IMAGE')
+        WHERE user_id = #{userId} AND trigger_source = 'MANUAL'
+        <if test="projectId != null">AND project_id = #{projectId}</if>
         <if test="beforeId != null">AND id &lt; #{beforeId}</if>
         ORDER BY id DESC LIMIT #{limit}
     </select>
     <select id="findActiveManual" resultMap="creativeRunResultMap">
-        SELECT id, run_id, operation_type, target_id, status, created_at
+        SELECT id, run_id, project_id, operation_type, target_id, status, created_at
         FROM manga_creative_run
-        WHERE user_id = #{userId} AND project_id = #{projectId} AND trigger_source = 'MANUAL'
-          AND operation_type IN ('GENERATE_SCRIPT_CHAPTER', 'GENERATE_CHAPTER_STORYBOARD', 'GENERATE_SHOT_IMAGE')
+        WHERE user_id = #{userId} AND trigger_source = 'MANUAL'
+        <if test="projectId != null">AND project_id = #{projectId}</if>
           AND status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED')
         ORDER BY id DESC LIMIT 1
     </select>

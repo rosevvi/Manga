@@ -3,7 +3,7 @@
 <mapper namespace="com.manga.mapper.GenerationMediaObjectMapper">
     <select id="lock" resultType="com.manga.entity.GenerationMediaObject">
         SELECT id, job_id, owner_epoch, storage_type, storage_namespace,
-               object_name, url, status, claim_owner, claim_until,
+               object_name, url, media_format, status, claim_owner, claim_until,
                next_attempt_at, attempts, created_at, updated_at, created_by,
                updated_by
         FROM manga_generation_media_object WHERE id = #{id} FOR UPDATE

@@ -22,6 +22,8 @@ public record RuntimeOperationsProperties(
         /** 连续可重试故障达到此值后打开熔断。 */ @DefaultValue("3") @Min(1) int failureThreshold,
         /** 熔断冷却时长。 */ @DefaultValue("30s") Duration circuitCooldown,
         /** 每次调用的最长时间，过期按用量未知处理。 */ @DefaultValue("2m") Duration callTimeout,
+        /** 分镜及协作子步骤单次调用总时限。 */ @DefaultValue("5m") Duration storyboardCallTimeout,
+        /** 连续未收到供应商数据的时限。 */ @DefaultValue("2m") Duration idleTimeout,
         /** 每次调用保守预留费用，USD；不代表供应商结算额。 */ @DefaultValue("0.05") @DecimalMin("0.000001") BigDecimal reservedUsdPerCall,
         /** 每配置每日 UTC 规划预留额，失败不退款。 */ @DefaultValue("10") @DecimalMin("0.01") BigDecimal dailyReservedUsd,
         /** 仅精确模型名匹配，未配置时记录为未定价，不冒充零费用。 */ @DefaultValue @Valid Map<String, TokenPrice> prices,
@@ -32,6 +34,8 @@ public record RuntimeOperationsProperties(
     public RuntimeOperationsProperties {
         prices = Objects.isNull(prices) ? Map.of() : Map.copyOf(prices);
         if (circuitCooldown.isNegative() || circuitCooldown.isZero() || callTimeout.isNegative() || callTimeout.isZero()
+                || storyboardCallTimeout.isNegative() || storyboardCallTimeout.isZero()
+                || idleTimeout.isNegative() || idleTimeout.isZero()
                 || archiveAfter.isNegative() || archiveAfter.isZero()) throw new IllegalArgumentException(RuntimeOperationsConstants.INVALID_DURATION);
     }
     /** 按百万 token 计价，cached 是输入 token 的子集，reasoning 不再重复计入输出。 */

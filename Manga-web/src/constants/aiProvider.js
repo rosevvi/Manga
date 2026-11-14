@@ -36,12 +36,21 @@ export const AI_PROVIDER_OPTIONS = Object.freeze([
     description: 'OpenAI 官方模型和生成接口',
   },
   {
+    value: 'AGNES',
+    label: 'Agnes AI',
+    baseUrl: 'https://apihub.agnes-ai.com',
+    model: 'agnes-video-2.5-flash',
+    apiKeyRequired: true,
+    capabilities: ['VIDEO'],
+    description: 'Agnes Video 2.5 和 2.5 Flash',
+  },
+  {
     value: 'OPENAI_COMPATIBLE',
     label: 'OpenAI Compatible',
     baseUrl: '',
     model: '',
     apiKeyRequired: true,
-    capabilities: ['TEXT'],
+    capabilities: ['TEXT', 'IMAGE'],
     description: '兼容 OpenAI 协议的第三方网关',
   },
   {

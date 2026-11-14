@@ -283,6 +283,10 @@ manga:
       circuit-cooldown: 30s
       # 单次模型请求最长时间，取本值和 Run 剩余时间的较小值。
       call-timeout: 2m
+      # 分镜及协作步骤单次模型调用总时限，持续输出不会重置。
+      storyboard-call-timeout: ${MANGA_STORYBOARD_MODEL_TIMEOUT:5m}
+      # 按供应商数据重置，数据库写入耗时不算供应商静默。
+      idle-timeout: ${MANGA_MODEL_IDLE_TIMEOUT:2m}
       # 每个实际模型请求规划预留 USD，失败、未知及取消均不退款。
       reserved-usd-per-call: ${MANGA_MODEL_RESERVED_USD_PER_CALL:0.05}
       # 每配置 UTC 当日规划预留上限 USD，跨进程共享。

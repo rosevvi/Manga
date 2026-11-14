@@ -160,6 +160,16 @@ Redis 建连超时、命令超时、Manga 业务 Key 前缀、扫码会话过期
 
 Manga 访问令牌继续使用无状态 JWT。当前没有退出登录、强制下线或令牌撤销需求，因此不把每个 JWT 重复保存到 Redis，避免所有鉴权请求额外访问一次 Redis；增加撤销需求时再接入 `jti` 黑名单或会话注册表。
 
+## Agnes 镜头视频
+
+在「AI 配置」新建 Agnes AI 视频模型，选择 `agnes-video-2.5-flash` 或 `agnes-video-2.5`，填写该用户的 API Key。默认网关为 `https://apihub.agnes-ai.com`，可在视频类别单独设为默认。
+
+进入项目分镜，选择「视频」、镜头和模型，填写画面提示词，预览并批准费用。首版支持文生视频、720P、4–12 秒。按两款模型的公开标价估算为 `0.025 USD/秒`，实际以供应商账单为准。生成完成后在任务卡播放 MP4。
+
+本地后端启动时由 Flyway 应用 V13。转存沿用媒体大小上限 `manga.creative.generation.max-media-bytes`。提交结果不明时，平台保留待核对状态，避免自动重复提交付费请求。
+
+协议来源为 [Agnes Video 2.5](https://wiki.agnes-ai.com/en/docs/agnes-video-25.md) 和 [Agnes Video 2.5 Flash](https://wiki.agnes-ai.com/en/docs/agnes-video-25-flash.md)。
+
 ## 阿里云 OSS 存储
 
 图片上传支持本地磁盘和阿里云 OSS 两种策略。存储策略只从 `.env` 或操作系统环境变量读取，不写入数据库；默认使用 OSS，填写以下配置即可：

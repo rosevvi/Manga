@@ -17,11 +17,11 @@ public class CreativeRunRepository {
 
     private final CreativeRunMapper mapper;
     /** 按用户和项目读取手动任务历史。 */
-    public List<CreativeRun> findManual(long userId, long projectId, Long beforeId, int limit) {
+    public List<CreativeRun> findManual(long userId, Long projectId, Long beforeId, int limit) {
         return mapper.findManual(userId, projectId, beforeId, limit);
     }
     /** 查询项目内最新活动的手动生成任务。 */
-    public Optional<CreativeRun> findActiveManual(long userId, long projectId) {
+    public Optional<CreativeRun> findActiveManual(long userId, Long projectId) {
         return Optional.ofNullable(mapper.findActiveManual(userId, projectId));
     }
     /** 查找需要推进消息投影的会话 Run。 */

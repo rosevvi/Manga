@@ -1,89 +1,44 @@
 import { useEffect, useRef, useState } from 'react'
+import { Bot } from 'lucide-react'
 import { listProjectCreativeRuns } from '../api/creativeRunApi'
-import { APPROVAL_POLL_MS } from '../constants/changeSet'
-import { CREATIVE_OPERATION } from '../constants/creative'
+import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
+import { openCreativeTask, creativeTaskName, RUN_STATUS_LABEL } from './creativeTaskEvents'
 
-/** 空闲时仍检查其他窗口发起的项目任务。 */
-const IDLE_RUN_POLL_MS = 30000
-
-/** 按项目从数据库恢复任务，包括已生成提案和仍在执行的任务。 */
-export default function ProjectCreativeTaskHistory({ accessToken, projectId, selectedRunId, reloadKey, onSelect, onActiveChanged }) {
-  const [items, setItems] = useState([])
-  const [cursor, setCursor] = useState(null)
+/** 页面仅保留紧凑任务状态；详情、历史和审批统一在任务中心中查看。 */
+export default function ProjectCreativeTaskHistory({ accessToken, projectId, reloadKey, onActiveChanged }) {
+  const [task, setTask] = useState(null)
   const [error, setError] = useState('')
-  const [loadingMore, setLoadingMore] = useState(false)
-  const callbacks = useRef({ selectedRunId, onSelect, onActiveChanged })
-  callbacks.current = { selectedRunId, onSelect, onActiveChanged }
-  const scope = useRef(0)
-  const earlierLoaded = useRef(false)
-
-  /** 首次优先恢复活动任务，后续轮询保持用户选择的历史任务。 */
+  const callback = useRef(onActiveChanged)
+  callback.current = onActiveChanged
   useEffect(() => {
-    const current = ++scope.current
+    let stopped = false
     let busy = false
     let timer
     let active = false
-    setItems([]); setCursor(null); setError(''); setLoadingMore(false); earlierLoaded.current = false
+    setTask(null); setError('')
     const refresh = async () => {
-      if (busy || document.hidden || scope.current !== current) return
-      window.clearTimeout(timer)
+      if (busy || stopped || document.hidden || !projectId) return
       busy = true
+      window.clearTimeout(timer)
       try {
         const page = await listProjectCreativeRuns(accessToken, projectId)
-        if (scope.current !== current) return
-        const incoming = page.activeRun ? [...page.items, page.activeRun] : page.items
-        setItems((previous) => [...new Map([...previous, ...incoming].map((item) => [item.runId, item])).values()]
-          .sort((left, right) => right.id - left.id))
-        if (!earlierLoaded.current) setCursor(page.nextBeforeId)
+        if (stopped) return
+        setTask(page.activeRun || page.items[0] || null)
         active = Boolean(page.activeRun)
-        callbacks.current.onActiveChanged(active)
-        if (!callbacks.current.selectedRunId) callbacks.current.onSelect(page.activeRun?.runId || page.items[0]?.runId || null)
+        callback.current?.(active)
         setError('')
-      } catch (failure) { if (scope.current === current) setError(failure.message) }
-      finally {
-        busy = false
-        if (scope.current === current) {
-          timer = window.setTimeout(refresh, active ? APPROVAL_POLL_MS : IDLE_RUN_POLL_MS)
-        }
-      }
+      } catch (failure) { if (!stopped) setError(failure.message) }
+      finally { busy = false; if (!stopped) timer = window.setTimeout(refresh, active ? 5000 : 30000) }
     }
+    const changed = (event) => { if (String(event.detail?.projectId) === String(projectId)) void refresh() }
     void refresh()
+    window.addEventListener(CREATIVE_PROJECT_CHANGED, changed)
     document.addEventListener('visibilitychange', refresh)
-    return () => {
-      scope.current += 1
-      window.clearTimeout(timer)
-      document.removeEventListener('visibilitychange', refresh)
-    }
+    return () => { stopped = true; window.clearTimeout(timer); window.removeEventListener(CREATIVE_PROJECT_CHANGED, changed); document.removeEventListener('visibilitychange', refresh) }
   }, [accessToken, projectId, reloadKey])
-
-  /** 用稳定主键查询更早任务，不要求浏览器预先知道 Run ID。 */
-  const more = async () => {
-    const current = scope.current
-    setLoadingMore(true)
-    try {
-      const page = await listProjectCreativeRuns(accessToken, projectId, cursor)
-      if (scope.current !== current) return
-      earlierLoaded.current = true
-      setItems((previous) => [...new Map([...previous, ...page.items].map((item) => [item.runId, item])).values()]
-        .sort((left, right) => right.id - left.id))
-      setCursor(page.nextBeforeId)
-    } catch (failure) { if (scope.current === current) setError(failure.message) }
-    finally { if (scope.current === current) setLoadingMore(false) }
-  }
-
-  return <section className="script-import-panel">
-    <h3>手动创作任务</h3>
-    <div className="project-task-picker">
-      <select aria-label="选择项目创作任务" value={selectedRunId || ''} onChange={(event) => onSelect(event.target.value || null)}>
-        <option value="">选择任务</option>
-        {items.map((item) => <option key={item.runId} value={item.runId}>
-          {item.operationType === CREATIVE_OPERATION.GENERATE_SHOT_IMAGE ? `镜头 ${item.targetId} 图片`
-            : item.operationType === CREATIVE_OPERATION.GENERATE_SCRIPT_CHAPTER ? '章节提案' : `章节 ${item.targetId} 分镜`}
-          {' · '}{item.status}{' · '}{item.createdAt?.replace('T', ' ')}
-        </option>)}
-      </select>
-      {cursor && <button className="workspace-secondary" type="button" disabled={loadingMore} onClick={more}>更早任务</button>}
-    </div>
-    {error && <p className="creative-panel-alert" role="alert">{error}</p>}
+  return <section className="compact-task-status" aria-label="项目创作任务">
+    <div><Bot size={16} /><span>{task ? `${creativeTaskName(task)} · ${RUN_STATUS_LABEL[task.status] || task.status}` : '创作任务与历史记录'}</span></div>
+    <button type="button" className="workspace-secondary" onClick={() => openCreativeTask(task?.runId, projectId)}>查看任务</button>
+    {error && <small role="alert">{error}</small>}
   </section>
 }

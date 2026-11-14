@@ -65,7 +65,7 @@ public class GetChapterContentCapability extends AbstractProjectReadCapability {
                 chapter.getStructureJson(),
                 chapter.getParseStatus(),
                 chapter.getStructureVersion()
-        ));
+        ), CapabilitySummary.chapter(chapter.getId(), chapter.getTitle()));
     }
 
     /** Director 可见的章节正文投影。 */

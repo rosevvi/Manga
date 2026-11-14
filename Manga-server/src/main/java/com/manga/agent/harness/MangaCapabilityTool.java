@@ -16,6 +16,8 @@ import reactor.core.publisher.Mono;
 
 import java.util.Map;
 import java.util.Objects;
+import java.time.LocalDateTime;
+import com.manga.agent.event.ToolActivitySummaries;
 
 /**
  * 将 Manga 类型化 Capability 安全适配为 AgentScope Tool。
@@ -28,12 +30,14 @@ public final class MangaCapabilityTool extends ToolBase {
     private final MangaAgentCapability capability;
     private final CapabilityDescriptor descriptor;
     private final ObjectMapper objectMapper;
+    private final ToolActivitySummaries summaries;
 
-    public MangaCapabilityTool(MangaAgentCapability capability, ObjectMapper objectMapper) {
+    public MangaCapabilityTool(MangaAgentCapability capability, ObjectMapper objectMapper, ToolActivitySummaries summaries) {
         super(toolDefinition(capability.descriptor(), objectMapper));
         this.capability = capability;
         this.descriptor = capability.descriptor();
         this.objectMapper = objectMapper;
+        this.summaries = summaries;
     }
 
     /** 从调用上下文解析身份和项目边界后执行能力，并返回结构化 JSON 文本。 */
@@ -53,10 +57,13 @@ public final class MangaCapabilityTool extends ToolBase {
                         CreativeRuntimeMessages.CAPABILITY_PERMISSION_DENIED_TEMPLATE
                                 .formatted(descriptor.name().code()));
             }
+            LocalDateTime started = LocalDateTime.now();
             CapabilityResult result = capability.execute(
                     new CapabilityCommand(objectMapper.valueToTree(param.getInput()),
                             Objects.isNull(param.getToolUseBlock()) ? null : param.getToolUseBlock().getId()),
                     context);
+            summaries.record(context, Objects.isNull(param.getToolUseBlock()) ? null : param.getToolUseBlock().getId(),
+                    result.summary(), started);
             return ToolResultBlock.text(result.data().toString());
         });
     }

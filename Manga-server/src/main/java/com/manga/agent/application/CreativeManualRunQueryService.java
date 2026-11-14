@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 /** 按认证用户和项目找回手动创作任务，不依赖浏览器缓存。 */
 @Service
 @RequiredArgsConstructor
@@ -19,8 +20,8 @@ public class CreativeManualRunQueryService {
     private final CreativeRunRepository runs;
     /** 验证所有者后返回历史页与活动任务；分页不会遗漏更早的未决审批。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public CreativeManualRunPage list(long userId, long projectId, Long beforeId) {
-        projects.requireOwnedProject(projectId, userId);
+    public CreativeManualRunPage list(long userId, Long projectId, Long beforeId) {
+        if (Objects.nonNull(projectId)) projects.requireOwnedProject(projectId, userId);
         List<CreativeRun> rows = runs.findManual(userId, projectId, beforeId, PAGE_SIZE + 1);
         List<CreativeRun> page = rows.stream().limit(PAGE_SIZE).toList();
         return new CreativeManualRunPage(page.stream().map(this::item).toList(),
@@ -30,6 +31,6 @@ public class CreativeManualRunQueryService {
     /** 只公开选择任务所需的稳定字段。 */
     private CreativeManualRunPage.Item item(CreativeRun run) {
         return new CreativeManualRunPage.Item(run.getId(), run.getRunId(), run.getOperationType(),
-                run.getTargetId(), run.getStatus(), run.getCreatedAt());
+                run.getTargetId(), run.getStatus(), run.getCreatedAt(), run.getProjectId());
     }
 }

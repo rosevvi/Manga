@@ -6,6 +6,8 @@ import com.manga.agent.api.CreativeApiConstants;
 import com.manga.agent.api.CreativeEventCursor;
 import com.manga.agent.api.CreativeManualRunPage;
 import com.manga.agent.api.CreativeRunResponse;
+import com.manga.agent.api.CreativeTimelinePage;
+import com.manga.agent.application.CreativeTimelineQueryService;
 import com.manga.agent.application.CancelCreativeRunCommand;
 import com.manga.agent.application.CreativeEventStreamService;
 import com.manga.agent.application.CreativeManualRunQueryService;
@@ -56,11 +58,20 @@ public class CreativeRunController {
     private final CreativeRuntime creativeRuntime;
     private final CreativeRunQueryService runQueryService;
     private final CreativeEventStreamService eventStreamService;
+    private final CreativeTimelineQueryService timeline;
+
+    /** 从安全事件事实按游标重建执行过程，关闭页面后也可恢复。 */
+    @GetMapping("/{runId}/timeline")
+    @Operation(summary = "查询创作任务执行时间线", description = "按事件序号分页，返回 Agent、工具摘要及恢复水位，不包含提示词和凭据。")
+    public ApiResponse<CreativeTimelinePage> timeline(@PathVariable String runId,
+            @RequestParam(defaultValue = "0") long afterSequence, @RequestParam(defaultValue = "100") int limit) {
+        return ApiResponse.success(timeline.find(runId, SecurityUtils.requireCurrentUserId(), afterSequence, limit));
+    }
 
     /** 从服务端找回当前用户项目内的手动生成任务和未决审批。 */
     @GetMapping
     @Operation(summary = "查询项目手动创作任务", description = "返回任务历史分页及最新活动任务，支持清除缓存和跨设备恢复。")
-    public ApiResponse<CreativeManualRunPage> listManual(@RequestParam @Positive long projectId,
+    public ApiResponse<CreativeManualRunPage> listManual(@RequestParam(required = false) @Positive Long projectId,
             @RequestParam(required = false) @Positive Long beforeId) {
         long userId = SecurityUtils.requireCurrentUserId();
         CreativeManualRunPage page = manualRunQueryService.list(userId, projectId, beforeId);

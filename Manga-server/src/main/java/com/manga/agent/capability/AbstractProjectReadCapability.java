@@ -36,4 +36,9 @@ abstract class AbstractProjectReadCapability implements MangaAgentCapability {
         JsonNode data = objectMapper.valueToTree(projection);
         return new CapabilityResult(data);
     }
+
+    /** 公开摘要由领域工具生成，转换 JSON 不影响摘要的类型契约。 */
+    protected CapabilityResult result(Object projection, CapabilitySummary summary) {
+        return new CapabilityResult(objectMapper.valueToTree(projection), summary);
+    }
 }

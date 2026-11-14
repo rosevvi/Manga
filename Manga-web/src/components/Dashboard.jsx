@@ -41,6 +41,7 @@ import MediaImage from './MediaImage'
 import { OPERATIONS_NAV } from '../api/runtimeOperationsApi'
 import { AGENT_ADMIN_ROLE, AGENT_PROFILE_NAV } from '../constants/agentProfile'
 import ProjectWorkspace from './ProjectWorkspace'
+import { confirmCreativeNavigation } from './useUnsavedChanges'
 import MangaAssistant from './MangaAssistant'
 import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
 import { getActiveTasks, getProjects } from '../api/projectApi'
@@ -136,7 +137,7 @@ function projectRoute(pathname = window.location.pathname) {
   if (!match) return null
   return {
     projectId: Number(match[1]),
-    stage: match[2]?.startsWith('script/chapters') ? 'SCRIPT_CHAPTER' : match[2] === 'storyboards' ? 'STORYBOARD' : match[2] ? match[2].toUpperCase() : 'OVERVIEW',
+    stage: match[2]?.startsWith('script/chapters') ? 'SCRIPT_CHAPTER' : ['storyboards', 'generation'].includes(match[2]) ? 'STORYBOARD' : match[2] ? match[2].toUpperCase() : 'OVERVIEW',
     chapterId: match[3] ? Number(match[3]) : null,
   }
 }
@@ -230,7 +231,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
         setProjectStage(route.stage)
         setSelectedChapterId(route.chapterId)
         setActiveNav(route.stage === 'STORYBOARD' ? 'storyboards' : 'project')
-      }
+      } else setActiveNav('projects')
     }
     window.addEventListener('popstate', handleHistoryChange)
     return () => window.removeEventListener('popstate', handleHistoryChange)
@@ -238,6 +239,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
 
   /** 切换控制台功能并在窄屏下关闭侧栏。 */
   const selectNavigation = (navigationId) => {
+    if (!confirmCreativeNavigation()) return
     if (window.location.pathname.startsWith('/console/projects/')) {
       window.history.pushState(null, '', '/console')
       setProjectStage('OVERVIEW')
@@ -247,6 +249,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   }
 
   const navigateProject = (project, stage = 'OVERVIEW') => {
+    if (!confirmCreativeNavigation()) return
     setSelectedProjectId(project.id)
     setProjectStage(stage)
     setSelectedChapterId(null)
@@ -263,6 +266,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   const openStoryboard = (project) => navigateProject(project, 'STORYBOARD')
 
   const openChapter = (chapterId) => {
+    if (!confirmCreativeNavigation()) return
     setSelectedChapterId(chapterId)
     setProjectStage('SCRIPT_CHAPTER')
     window.history.pushState(null, '', `/console/projects/${encodeURIComponent(selectedProjectId)}/script/chapters/${encodeURIComponent(chapterId)}`)
@@ -276,7 +280,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   return (
     <div className="dashboard-shell">
       <aside className={sidebarOpen ? 'dashboard-sidebar open' : 'dashboard-sidebar'}>
-        <button className="dashboard-logo" type="button" onClick={onExit}>
+          <button className="dashboard-logo" type="button" onClick={() => { if (confirmCreativeNavigation()) onExit() }}>
           Manga
           <Sparkles size={12} />
         </button>
@@ -332,7 +336,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
           <UserAccountMenu
             authSession={authSession}
             displayName={displayName}
-            onLogout={onLogout}
+            onLogout={() => { if (confirmCreativeNavigation()) onLogout() }}
             onUserUpdated={onUserUpdated}
           />
         </div>
@@ -365,8 +369,9 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
             accessToken={accessToken}
             projects={projects}
             selectedProjectId={selectedProjectId}
-            onSelectProject={setSelectedProjectId}
+            onSelectProject={(id) => navigateProject({ id }, 'STORYBOARD')}
             onBackToProjects={() => selectNavigation('projects')}
+            onNavigateStage={navigateProjectStage}
           />
         ) : activeNav === 'ai-settings' ? (
           <AiProviderSettings accessToken={accessToken} isGuest={isGuest} />
@@ -461,7 +466,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
           </>
         )}
       </main>
-      {!isGuest && <MangaAssistant accessToken={accessToken} userId={authSession?.user?.id} projectId={selectedProjectId} />}
+      {!isGuest && <MangaAssistant accessToken={accessToken} userId={authSession?.user?.id} projectId={['project', 'storyboards'].includes(activeNav) ? selectedProjectId : null} />}
     </div>
   )
 }

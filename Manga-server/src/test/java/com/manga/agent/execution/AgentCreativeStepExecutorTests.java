@@ -31,6 +31,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.scheduling.TaskScheduler;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
+import reactor.core.scheduler.Scheduler;
+import org.junit.jupiter.api.AfterEach;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -46,6 +49,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.inOrder;
 
 /**
  * 验证 Agent Step 会恢复冻结 Blueprint、流式提交公开事件并使用围栏完成。
@@ -55,6 +59,10 @@ class AgentCreativeStepExecutorTests {
     /** 测试租约时长，对应心跳每十秒续签一次。 */
     private static final Duration STEP_LEASE = Duration.ofSeconds(30);
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Scheduler streamTimer = Schedulers.newSingle("test-stream-timer");
+
+    @AfterEach
+    void disposeTimer() { streamTimer.dispose(); }
 
     @Test
     void shouldStreamAgentEventsAndCompleteWithAuditableOutput() throws Exception {
@@ -65,6 +73,7 @@ class AgentCreativeStepExecutorTests {
         CreativeGraphService graph = mock(CreativeGraphService.class);
         when(graph.instruction(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
         CreativeStepLifecycleService lifecycleService = mock(CreativeStepLifecycleService.class);
+        CreativeRunBudgetService budgets = mock(CreativeRunBudgetService.class);
         TaskScheduler scheduler = mock(TaskScheduler.class);
         @SuppressWarnings("rawtypes")
         ScheduledFuture scheduledFuture = mock(ScheduledFuture.class);
@@ -94,8 +103,9 @@ class AgentCreativeStepExecutorTests {
                 lifecycleService,
                 properties(),
                 scheduler,
+                Schedulers.immediate(), streamTimer,
                 objectMapper, approvals, mock(CreativeDelegationService.class), graph,
-                mock(CreativeStepResultService.class), mock(CreativeRunBudgetService.class), mock(CreativeReviewGate.class));
+                mock(CreativeStepResultService.class), budgets, mock(CreativeReviewGate.class));
 
         executor.execute(claimed);
 
@@ -108,6 +118,12 @@ class AgentCreativeStepExecutorTests {
         verify(lifecycleService).appendDelta(claimed, "第二段");
         verify(lifecycleService).complete(claimed, "{\"content\":\"第一段第二段\"}");
         verify(scheduledFuture).cancel(false);
+        var order = inOrder(scheduler, blueprintCodec, budgets, lifecycleService, scheduledFuture);
+        order.verify(scheduler).scheduleAtFixedRate(any(Runnable.class), any(Instant.class), eq(Duration.ofSeconds(10)));
+        order.verify(blueprintCodec).deserialize(claimed.blueprintSnapshotJson());
+        order.verify(budgets).reserve(claimed, blueprint);
+        order.verify(lifecycleService).complete(claimed, "{\"content\":\"第一段第二段\"}");
+        order.verify(scheduledFuture).cancel(false);
     }
 
     /** 构造测试用且指纹稳定的最小 Blueprint。 */

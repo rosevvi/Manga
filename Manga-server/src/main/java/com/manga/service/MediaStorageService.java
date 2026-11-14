@@ -5,6 +5,7 @@ import com.manga.config.properties.AliyunOssProperties;
 import com.manga.service.storage.StorageStrategy;
 import com.manga.service.storage.AliyunOssStorageStrategy;
 import com.manga.service.storage.GeneratedMediaReference;
+import com.manga.service.storage.GeneratedMediaFormat;
 import java.util.Objects;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -55,8 +56,18 @@ public class MediaStorageService {
         return aliyunOss.previewGeneratedImage(url);
     }
 
+    /** 业务层验证产物所有者后，为本地媒体或 OSS 返回可下载链接。 */
+    public String downloadGeneratedMedia(String url) {
+        return aliyunOss.downloadGeneratedMedia(url);
+    }
+
     /** 先生成位置并登记，再允许执行物理写入。 */
     public GeneratedMediaReference prepareGenerated(String jobId, long epoch) { return resolveStrategy().generatedReference(jobId, epoch); }
+    /** 为视频或图片登记转存位置。 */
+    public GeneratedMediaReference prepareGenerated(String jobId, long epoch, GeneratedMediaFormat format) {
+        return format == GeneratedMediaFormat.PNG ? prepareGenerated(jobId, epoch)
+                : resolveStrategy().generatedReference(jobId, epoch, format);
+    }
     /** 写入已登记位置，禁止客户端上传任意删除或写入地址。 */
     public void storeGeneratedBytes(byte[] data, GeneratedMediaReference reference) { requireStrategy(reference).writeGenerated(data, reference); }
     /** 回收只操作引用指定的策略，不跟随当前默认存储切换。 */

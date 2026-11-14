@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.manga.agent.generation.GenerationMediaStatus;
 import com.manga.service.storage.GeneratedMediaReference;
+import com.manga.service.storage.GeneratedMediaFormat;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -31,6 +32,8 @@ public class GenerationMediaObject {
     private String objectName;
     /** 预先确定的平台访问地址。 */
     private String url;
+    /** 物理媒体格式，供写入和回收使用。 */
+    private GeneratedMediaFormat mediaFormat;
     /** 发布和回收状态。 */
     private GenerationMediaStatus status;
     /** 回收令牌。 */
@@ -50,6 +53,6 @@ public class GenerationMediaObject {
     /** 更新操作者。 */
     private String updatedBy;
     /** 恢复受限物理引用，不使用 URL 反推删除路径。 */
-    public GeneratedMediaReference reference() { return new GeneratedMediaReference(storageType, storageNamespace, objectName, url); }
+    public GeneratedMediaReference reference() { return new GeneratedMediaReference(storageType, storageNamespace, objectName, url, mediaFormat == null ? GeneratedMediaFormat.PNG : mediaFormat); }
 }
 

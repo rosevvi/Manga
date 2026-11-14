@@ -1,12 +1,13 @@
 package com.manga.dto;
 
 import com.manga.common.enums.AiProviderType;
+import com.manga.common.enums.AiModelType;
 import com.manga.common.enums.AiProxyType;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-/** 返回 AI 服务配置摘要及供已授权编辑使用的 API Key。 */
+/** 返回 AI 服务配置摘要，凭据仅在服务端解密使用。 */
 public record AiProviderConfigResponse(
         /** AI 服务配置主键。 */
         Long id,
@@ -18,12 +19,12 @@ public record AiProviderConfigResponse(
         String baseUrl,
         /** 默认模型编码。 */
         String defaultModel,
+        /** 此配置适用的模型用途。 */
+        AiModelType modelType,
         /** 是否已经保存 API Key。 */
         boolean hasApiKey,
         /** API Key 脱敏摘要。 */
         String apiKeyHint,
-        /** API Key 明文，仅返回给当前已授权用户的配置管理页面。 */
-        String apiKey,
         /** 服务商显示名称。 */
         String providerLabel,
         /** 服务商能力说明。 */

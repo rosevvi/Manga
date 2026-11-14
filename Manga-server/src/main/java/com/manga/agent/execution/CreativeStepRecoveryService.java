@@ -60,6 +60,15 @@ public class CreativeStepRecoveryService {
             }
             return Optional.empty();
         }
+        if (stepRepository.failExpiredAfterModel(step, now, CreativeErrorCode.MODEL_RESULT_UNCERTAIN.code(),
+                CreativeExecutionFailure.UNCERTAIN, actor)) {
+            eventService.append(step.getRunId(), step.getStepId(), CreativeEventType.STEP_FAILED,
+                    CreativeEventSources.RUNTIME, null, null);
+            sessions.retireSession(step.getStateSessionId());
+            publisher.publishEvent(new CreativeStepSettled(step.getRunId()));
+            aggregationService.aggregate(step.getRunId());
+            return Optional.empty();
+        }
         if (!stepRepository.recoverExpired(step, now, actor)) {
             boolean failed = stepRepository.failExpiredExhausted(step, now,
                     CreativeErrorCode.OWNER_LEASE_LOST.code(), CreativeRuntimeMessages.STEP_LEASE_RETRIES_EXHAUSTED, actor);

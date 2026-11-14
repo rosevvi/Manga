@@ -8,7 +8,7 @@ public enum GenerationError implements ResponseCode {
     /** 无权限访问。 */ NOT_FOUND("GENERATION_NOT_FOUND", "生成作业不存在或无权访问"),
     /** 状态竞争。 */ STATE("GENERATION_STATE_CONFLICT", "作业状态已变化，请刷新后重试"),
     /** 供应商明确拒绝。 */ REJECTED("GENERATION_REJECTED", "供应商拒绝生成请求，请检查模型、权限和参数"),
-    /** 认证失效。 */ AUTHENTICATION("GENERATION_AUTHENTICATION", "图片供应商配置不可用或认证失败"),
+    /** 认证失效。 */ AUTHENTICATION("GENERATION_AUTHENTICATION", "生成供应商配置不可用或认证失败"),
     /** 限流，不做隐式重新扣费提交。 */ RATE_LIMIT("GENERATION_RATE_LIMIT", "供应商限流，请稍后发起新的生成请求"),
     /** 网络结果未知。 */ SUBMISSION_UNKNOWN("GENERATION_SUBMISSION_UNKNOWN", "提交结果不明确，已停止自动重提，请核对供应商作业"),
     /** 读取失败允许退避。 */ TRANSIENT("GENERATION_TRANSIENT", "供应商暂时不可访问，正在退避重试"),

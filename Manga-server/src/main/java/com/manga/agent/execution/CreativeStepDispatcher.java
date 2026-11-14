@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 
 /**
@@ -38,18 +39,24 @@ public class CreativeStepDispatcher {
 
     /** 原子领取后路由到类型化执行器；未领取表示重复或过期信号。 */
     private void dispatch(String stepId, long scheduleVersion) {
+        ClaimedCreativeStep owned = null;
+        long started = System.nanoTime();
         try {
             Optional<ClaimedCreativeStep> claimed = claimService.claim(stepId, scheduleVersion);
             if (claimed.isEmpty()) {
                 return;
             }
             ClaimedCreativeStep step = claimed.get();
+            owned = step;
+            log.info("Creative Step claimed stepId={} epoch={} durationMs={}",
+                    stepId, step.ownerEpoch(), (System.nanoTime() - started) / 1_000_000);
             executorRegistry.require(step.stepType()).execute(step);
         } catch (RuntimeException exception) {
-            log.error("Creative Step dispatch or execution failed stepId={} scheduleVersion={}",
-                    stepId, scheduleVersion, exception);
-            claimService.findOwnedClaim(stepId)
-                    .ifPresent(step -> lifecycleService.fail(step, exception));
+            log.error("Creative Step failed stepId={} scheduleVersion={} epoch={} failureType={} code={}",
+                    stepId, scheduleVersion, Objects.isNull(owned) ? null : owned.ownerEpoch(),
+                    exception.getClass().getSimpleName(), CreativeExecutionFailure.classify(exception).errorCode());
+            // 失败只能提交最初取得的代次，禁止重新查询后来执行器的所有权。
+            if (Objects.nonNull(owned)) lifecycleService.fail(owned, exception);
         }
     }
 }

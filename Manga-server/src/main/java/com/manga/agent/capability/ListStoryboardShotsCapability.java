@@ -50,7 +50,7 @@ public class ListStoryboardShotsCapability extends AbstractProjectReadCapability
         List<ShotView> shots = shotRepository.findAllByProjectId(projectId, chapterId).stream()
                 .map(this::toView)
                 .toList();
-        return result(new StoryboardShots(chapterId, shots.size(), shots));
+        return result(new StoryboardShots(chapterId, shots.size(), shots), CapabilitySummary.shots(chapterId, shots.size()));
     }
 
     private ShotView toView(StoryboardShot shot) {

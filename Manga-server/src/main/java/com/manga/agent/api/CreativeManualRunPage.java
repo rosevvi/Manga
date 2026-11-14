@@ -17,6 +17,7 @@ public record CreativeManualRunPage(
             /** 业务操作类型。 */ CreativeOperationType operationType,
             /** 可选目标主键。 */ Long targetId,
             /** 当前状态。 */ CreativeRunStatus status,
-            /** 受理时间。 */ LocalDateTime createdAt
+            /** 受理时间。 */ LocalDateTime createdAt,
+            /** 所属项目，用于任务中心跨项目定位。 */ Long projectId
     ) { }
 }

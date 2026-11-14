@@ -3,9 +3,12 @@ package com.manga.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.common.constant.AiSecretConstants;
+import com.manga.agent.generation.AgnesVideoModel;
+import com.manga.agent.generation.VideoGenerationQuoteService;
 import com.manga.common.constant.AiProviderConstants;
 import com.manga.common.enums.AiProviderConfigResponseCode;
 import com.manga.common.enums.AiProviderType;
+import com.manga.common.enums.AiModelType;
 import com.manga.common.enums.AiProxyType;
 import com.manga.common.exception.BusinessException;
 import com.manga.common.security.SecurityUtils;
@@ -35,6 +38,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /** 管理用户 AI 接入配置，并在服务端加密保存 API Key。 */
@@ -64,6 +68,13 @@ public class AiProviderConfigService {
     private final ObjectMapper objectMapper;
     private final AiProviderHttpClient aiProviderHttpClient;
 
+    /** 仅向配置所有者临时返回解密密钥；调用方必须禁止缓存且不得记录返回值。 */
+    @Transactional(readOnly = true)
+    public String revealKey(long configId) {
+        AiProviderConfig config = requireOwned(configId, SecurityUtils.requireCurrentUserId());
+        return Objects.isNull(config.getApiKeyCiphertext()) ? "" : secretCipher.decrypt(config.getApiKeyCiphertext());
+    }
+
     /** 查询可供前端展示的 AI 服务商元数据。 */
     public List<AiProviderOptionResponse> findProviderOptions() {
         return Arrays.stream(AiProviderType.values())
@@ -86,7 +97,10 @@ public class AiProviderConfigService {
         String actor = SecurityUtils.requireCurrentUsername();
         String name = request.name().trim();
         requireUniqueName(ownerUserId, name, null);
-        boolean firstConfig = configRepository.findAllOwnedBy(ownerUserId).isEmpty();
+        AiModelType modelType = modelType(request.providerType(), request.modelType());
+        validateAgnes(request.providerType(), request.baseUrl(), request.defaultModel());
+        boolean firstConfig = configRepository.findAllOwnedBy(ownerUserId).stream()
+                .noneMatch(item -> item.getModelType() == modelType);
         boolean defaultConfig = firstConfig || Boolean.TRUE.equals(request.defaultConfig());
         String apiKey = normalize(request.apiKey());
         ProxySaveFields proxyFields = proxySaveFields(
@@ -98,6 +112,7 @@ public class AiProviderConfigService {
                 .providerType(request.providerType())
                 .baseUrl(normalizeBaseUrl(request.baseUrl()))
                 .defaultModel(normalize(request.defaultModel()))
+                .modelType(modelType)
                 .apiKeyCiphertext(apiKey == null ? null : secretCipher.encrypt(apiKey))
                 .apiKeyHint(maskSecret(apiKey))
                 .proxyType(proxyFields.proxyType())
@@ -113,7 +128,7 @@ public class AiProviderConfigService {
                 .updatedBy(actor)
                 .build();
         if (defaultConfig) {
-            configRepository.clearDefault(ownerUserId, actor);
+            configRepository.clearDefault(ownerUserId, modelType, actor);
         }
         configRepository.create(config);
         log.info("AI provider config created configId={} ownerUserId={} provider={} defaultConfig={}",
@@ -131,7 +146,14 @@ public class AiProviderConfigService {
         String name = request.name().trim();
         requireUniqueName(ownerUserId, name, configId);
         String newApiKey = normalize(request.apiKey());
+        if (changesAgnesProvider(current, request.providerType())
+                && newApiKey == null) {
+            throw new BusinessException(AiProviderConfigResponseCode.AGNES_KEY_REQUIRED);
+        }
         boolean keyChanged = newApiKey != null;
+        AiModelType modelType = modelType(request.providerType(),
+                request.modelType() == null ? current.getModelType() : request.modelType());
+        validateAgnes(request.providerType(), request.baseUrl(), request.defaultModel());
         boolean defaultConfig = request.defaultConfig() == null
                 ? Boolean.TRUE.equals(current.getDefaultConfig())
                 : request.defaultConfig();
@@ -142,7 +164,7 @@ public class AiProviderConfigService {
                 current.getProxyPasswordCiphertext(), current.getProxyPasswordHint());
         if (defaultConfig) {
             enabled = true;
-            configRepository.clearDefault(ownerUserId, actor);
+            configRepository.clearDefault(ownerUserId, modelType, actor);
         }
         AiProviderConfig config = AiProviderConfig.builder()
                 .id(configId)
@@ -150,6 +172,7 @@ public class AiProviderConfigService {
                 .providerType(request.providerType())
                 .baseUrl(normalizeBaseUrl(request.baseUrl()))
                 .defaultModel(normalize(request.defaultModel()))
+                .modelType(modelType)
                 .apiKeyCiphertext(newApiKey == null ? current.getApiKeyCiphertext() : secretCipher.encrypt(newApiKey))
                 .apiKeyHint(newApiKey == null ? current.getApiKeyHint() : maskSecret(newApiKey))
                 .proxyType(proxyFields.proxyType())
@@ -164,8 +187,8 @@ public class AiProviderConfigService {
                 .updatedBy(actor)
                 .build();
         configRepository.update(config, ownerUserId);
-        if (Boolean.TRUE.equals(current.getDefaultConfig()) && !defaultConfig) {
-            promoteFirstEnabled(ownerUserId, actor, configId);
+        if (Boolean.TRUE.equals(current.getDefaultConfig()) && (!defaultConfig || current.getModelType() != modelType)) {
+            promoteFirstEnabled(ownerUserId, current.getModelType(), actor, configId);
         }
         log.info("AI provider config updated configId={} ownerUserId={} provider={} enabled={} defaultConfig={} keyChanged={}",
                 configId, ownerUserId, config.getProviderType(), enabled, defaultConfig, keyChanged);
@@ -180,7 +203,7 @@ public class AiProviderConfigService {
         AiProviderConfig current = requireOwned(configId, ownerUserId);
         configRepository.delete(configId);
         if (Boolean.TRUE.equals(current.getDefaultConfig())) {
-            promoteFirstEnabled(ownerUserId, actor, configId);
+            promoteFirstEnabled(ownerUserId, current.getModelType(), actor, configId);
         }
         log.info("AI provider config deleted configId={} ownerUserId={}", configId, ownerUserId);
     }
@@ -190,8 +213,8 @@ public class AiProviderConfigService {
     public AiProviderConfigResponse setDefault(long configId) {
         long ownerUserId = SecurityUtils.requireCurrentUserId();
         String actor = SecurityUtils.requireCurrentUsername();
-        requireOwned(configId, ownerUserId);
-        configRepository.clearDefault(ownerUserId, actor);
+        AiProviderConfig current = requireOwned(configId, ownerUserId);
+        configRepository.clearDefault(ownerUserId, current.getModelType(), actor);
         configRepository.setDefault(configId, ownerUserId, actor);
         log.info("Default AI provider config changed configId={} ownerUserId={}", configId, ownerUserId);
         return toResponse(requireOwned(configId, ownerUserId));
@@ -216,7 +239,14 @@ public class AiProviderConfigService {
 
     /** 按显式用户范围解析运行时保存的 AI 配置，供异步助手恢复执行。 */
     public Optional<ResolvedAiProviderConfig> resolveOwned(long ownerUserId, long configId) {
-        return configRepository.findOwnedById(configId, ownerUserId).filter(config -> Boolean.TRUE.equals(config.getEnabled()))
+        return resolveOwned(ownerUserId, configId, null);
+    }
+
+    /** 在一次读取中校验配置用途与启用状态，避免并发变更后解密另一类型的配置。 */
+    public Optional<ResolvedAiProviderConfig> resolveOwned(long ownerUserId, long configId, AiModelType modelType) {
+        return configRepository.findOwnedById(configId, ownerUserId)
+                .filter(config -> Boolean.TRUE.equals(config.getEnabled()))
+                .filter(config -> modelType == null || config.getModelType() == modelType)
                 .map(config -> new ResolvedAiProviderConfig(
                         config.getId(), config.getProviderType(), config.getBaseUrl(), config.getDefaultModel(),
                         secretCipher.decrypt(config.getApiKeyCiphertext()), AiProxyType.normalize(config.getProxyType()),
@@ -240,6 +270,9 @@ public class AiProviderConfigService {
         long ownerUserId = SecurityUtils.requireCurrentUserId();
         AiProviderConfig savedConfig = request.configId() == null ? null : requireOwned(request.configId(), ownerUserId);
         String apiKey = normalize(request.apiKey());
+        if (savedConfig != null && changesAgnesProvider(savedConfig, request.providerType()) && apiKey == null) {
+            throw new BusinessException(AiProviderConfigResponseCode.AGNES_KEY_REQUIRED);
+        }
         if (apiKey == null && savedConfig != null) {
             apiKey = savedConfig.getApiKeyCiphertext() == null
                     ? null
@@ -262,6 +295,7 @@ public class AiProviderConfigService {
     /** 检测 AI 服务连接并生成安全结果摘要。 */
     private AiProviderConnectionTestResponse testConnection(AiProviderConfig config, String apiKey, String proxyPassword) {
         Instant startedAt = Instant.now();
+        validateAgnes(config.getProviderType(), config.getBaseUrl(), config.getDefaultModel());
         if (config.getProviderType().apiKeyRequired() && (apiKey == null || apiKey.isBlank())) {
             return connectionResult(false, null, AiProviderConstants.CONNECTION_TEST_API_KEY_REQUIRED, startedAt);
         }
@@ -315,12 +349,21 @@ public class AiProviderConfigService {
     }
 
     /** 选择首个启用配置作为默认项。 */
-    private void promoteFirstEnabled(long ownerUserId, String actor, long excludedConfigId) {
+    private void promoteFirstEnabled(long ownerUserId, AiModelType modelType, String actor, long excludedConfigId) {
         configRepository.findAllOwnedBy(ownerUserId).stream()
-                .filter(config -> config.getId() != excludedConfigId)
+                .filter(config -> config.getId() != excludedConfigId && config.getModelType() == modelType)
                 .filter(config -> Boolean.TRUE.equals(config.getEnabled()))
                 .findFirst()
                 .ifPresent(config -> configRepository.setDefault(config.getId(), ownerUserId, actor));
+    }
+
+    /** 校验所选用途是供应商声明支持的能力。 */
+    private AiModelType modelType(AiProviderType provider, AiModelType requested) {
+        AiModelType type = requested == null ? AiModelType.valueOf(provider.capabilities().getFirst()) : requested;
+        if (!provider.capabilities().contains(type.name())) {
+            throw new BusinessException(AiProviderConfigResponseCode.MODEL_TYPE_INVALID);
+        }
+        return type;
     }
 
     /** 校验并生成可持久化的代理配置字段。 */
@@ -435,8 +478,7 @@ public class AiProviderConfigService {
     private AiProviderConfigResponse toResponse(AiProviderConfig config) {
         return new AiProviderConfigResponse(
                 config.getId(), config.getName(), config.getProviderType(), config.getBaseUrl(),
-                config.getDefaultModel(), config.getApiKeyCiphertext() != null, config.getApiKeyHint(),
-                config.getApiKeyCiphertext() == null ? null : secretCipher.decrypt(config.getApiKeyCiphertext()),
+                config.getDefaultModel(), config.getModelType(), config.getApiKeyCiphertext() != null, config.getApiKeyHint(),
                 config.getProviderType().label(), config.getProviderType().description(),
                 config.getProviderType().recommendedModel(), config.getProviderType().apiKeyRequired(),
                 config.getProviderType().capabilities(),
@@ -444,6 +486,23 @@ public class AiProviderConfigService {
                 config.getProxyUsername(), config.getProxyPasswordCiphertext() != null, config.getProxyPasswordHint(),
                 Boolean.TRUE.equals(config.getEnabled()), Boolean.TRUE.equals(config.getDefaultConfig()),
                 config.getRemark(), config.getCreatedAt(), config.getUpdatedAt());
+    }
+
+    /** Agnes 凭据只允许用于文档列明的网关及已支持的视频模型。 */
+    private void validateAgnes(AiProviderType provider, String baseUrl, String model) {
+        if (provider != AiProviderType.AGNES) return;
+        if (!VideoGenerationQuoteService.supportsEndpoint(normalizeBaseUrl(baseUrl))) {
+            throw new BusinessException(AiProviderConfigResponseCode.BASE_URL_INVALID);
+        }
+        if (AgnesVideoModel.find(normalize(model)).isEmpty()) {
+            throw new BusinessException(AiProviderConfigResponseCode.MODEL_TYPE_INVALID);
+        }
+    }
+
+    /** 切换到或离开 Agnes 必须显式提交当前供应商的凭据。 */
+    private boolean changesAgnesProvider(AiProviderConfig current, AiProviderType requested) {
+        return current.getProviderType() != requested
+                && (current.getProviderType() == AiProviderType.AGNES || requested == AiProviderType.AGNES);
     }
 
     /** 判断连接测试是否需要校验模型。 */

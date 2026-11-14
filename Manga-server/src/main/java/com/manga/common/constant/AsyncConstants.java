@@ -21,6 +21,12 @@ public final class AsyncConstants {
     public static final String MANGA_BLOCKING_SCHEDULER = "mangaBlockingScheduler";
     /** Manga 通用定时任务调度器 Bean 名称。 */
     public static final String MANGA_COMMON_TASK_SCHEDULER = "mangaCommonTaskScheduler";
+    /** 租约续签专用调度器。 */
+    public static final String MANGA_LEASE_SCHEDULER = "mangaLeaseScheduler";
+    /** 有界事件持久化调度器。 */
+    public static final String MANGA_JOURNAL_SCHEDULER = "mangaJournalScheduler";
+    /** 非阻塞流计时器。 */
+    public static final String MANGA_STREAM_TIMER = "mangaStreamTimer";
     /** Spring 定时任务默认查找的调度器 Bean 名称。 */
     public static final String TASK_SCHEDULER = "taskScheduler";
 

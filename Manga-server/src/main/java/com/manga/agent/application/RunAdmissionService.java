@@ -141,6 +141,12 @@ public class RunAdmissionService {
         if (Objects.nonNull(projectId) && !projectId.equals(command.projectId())) {
             projectService.requireAccessibleProject(projectId, command.userId());
         }
+        boolean video = command.operationType() == CreativeOperationType.GENERATE_SHOT_VIDEO;
+        if (video && (command.target().resourceType() != CreativeResourceType.STORYBOARD_SHOT
+                || !command.permissionPolicy().allows(AgentPermissionPolicy.PROPOSE_CHANGES)
+                || shots.findByProjectAndId(projectId, command.target().resourceId()).isEmpty())) {
+            throw new BusinessException(CreativeRuntimeResponseCode.TARGET_RESOURCE_INVALID, HttpStatus.BAD_REQUEST);
+        }
         AgentStepConfiguration agentStep = Objects.isNull(sandbox) ? resolveAgentStep(command, projectId)
                 : new AgentStepConfiguration(sandbox, identifierGenerator.nextStateSessionId());
         CreativeRun run = createRun(command, conversation, projectId, requestFingerprint);
@@ -189,7 +195,8 @@ public class RunAdmissionService {
                 .stepId(identifierGenerator.nextStepId())
                 .runId(run.getRunId())
                 .stepType(Objects.isNull(agentStep)
-                        ? CreativeStepType.ROOT_WORKFLOW
+                        ? (command.operationType() == CreativeOperationType.GENERATE_SHOT_VIDEO
+                                ? CreativeStepType.VIDEO_PROPOSAL : CreativeStepType.ROOT_WORKFLOW)
                         : CreativeStepType.AGENT_INVOCATION)
                 .status(CreativeStepStatus.READY)
                 .delegationDepth(0).delegationRound(0).reservedEpoch(-1L)

@@ -5,6 +5,8 @@ import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
 import com.aliyun.oss.OSSException;
 import com.aliyun.oss.model.ObjectMetadata;
+import com.aliyun.oss.model.GeneratePresignedUrlRequest;
+import com.aliyun.oss.model.ResponseHeaderOverrides;
 import com.manga.config.properties.AliyunOssProperties;
 import com.manga.common.constant.StorageConstants;
 import jakarta.annotation.PreDestroy;
@@ -45,7 +47,7 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
             "[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\\.(?:jpe?g|png|webp|gif)");
     /** 生成图片仅允许读取作业 UUID 和写入代次对应的 PNG。 */
     private static final Pattern GENERATED_IMAGE_KEY = Pattern.compile(
-            "[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}-[1-9][0-9]*\\.png");
+            "[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}-[1-9][0-9]*\\.(?:png|mp4)");
     /** 预览链接每次随业务响应刷新，避免长期公开对象。 */
     private static final Duration PREVIEW_TTL = Duration.ofHours(1);
     /** 用户上传对象的所属路径。 */
@@ -82,8 +84,18 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
         return signImage(url, StorageConstants.GENERATED_DIRECTORY, GENERATED_IMAGE_KEY);
     }
 
+    /** 按已授权产物记录签署附件下载，跨域 OSS 地址也会返回下载响应头。 */
+    public String downloadGeneratedMedia(String url) {
+        return signImage(url, StorageConstants.GENERATED_DIRECTORY, GENERATED_IMAGE_KEY, true);
+    }
+
     /** 重新生成可读链接，仅接受当前 Bucket 中指定目录下的规范对象键。 */
     private String signImage(String url, String directory, Pattern namePattern) {
+        return signImage(url, directory, namePattern, false);
+    }
+
+    /** 签名覆盖响应头，不能由浏览器在现有签名后追加下载参数。 */
+    private String signImage(String url, String directory, Pattern namePattern, boolean download) {
         if (Objects.isNull(url) || !properties.configured()) {
             return url;
         }
@@ -100,8 +112,14 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
             if (!namePattern.matcher(name).matches()) {
                 return url;
             }
-            String signedUrl = ossClient().generatePresignedUrl(properties.bucketName(), keyPrefix + "/" + name,
-                    Date.from(Instant.now().plus(PREVIEW_TTL))).toExternalForm();
+            GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(properties.bucketName(), keyPrefix + "/" + name);
+            request.setExpiration(Date.from(Instant.now().plus(PREVIEW_TTL)));
+            if (download) {
+                ResponseHeaderOverrides headers = new ResponseHeaderOverrides();
+                headers.setContentDisposition("attachment; filename=\"" + name + "\"");
+                request.setResponseHeaders(headers);
+            }
+            String signedUrl = ossClient().generatePresignedUrl(request).toExternalForm();
             String signingOrigin = defaultPublicDomain();
             // 自定义域名直连同一个 Bucket 时，可使用同一对象签名访问。
             if (Objects.nonNull(properties.publicDomain()) && signedUrl.startsWith(signingOrigin + "/")) {
@@ -185,23 +203,23 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
 
     /** 冻结 Bucket、前缀和 Endpoint 对应的对象位置，不保存密钥。 */
     @Override
-    public GeneratedMediaReference generatedReference(String jobId, long epoch) {
+    public GeneratedMediaReference generatedReference(String jobId, long epoch, GeneratedMediaFormat format) {
         requireConfigured();
         String name = GeneratedMediaNames.of(jobId, epoch);
         return new GeneratedMediaReference(getType(), generatedNamespace(), name,
-                resolvePublicUrl(buildObjectKey(StorageConstants.GENERATED_DIRECTORY, StorageConstants.GENERATED_FORMAT, name)));
+                resolvePublicUrl(buildObjectKey(StorageConstants.GENERATED_DIRECTORY, format.extension(), name)), format);
     }
     /** 写入前再次确认物理位置，禁止静默切换 Bucket。 */
     @Override
     public void writeGenerated(byte[] data, GeneratedMediaReference reference) {
         requireConfigured(); GeneratedMediaNames.require(reference, getType(), generatedNamespace());
-        storeNamedBytes(data, StorageConstants.GENERATED_DIRECTORY, StorageConstants.GENERATED_FORMAT, reference.name());
+        storeNamedBytes(data, StorageConstants.GENERATED_DIRECTORY, reference.format().extension(), reference.name());
     }
     /** 幂等删除已登记对象，不使用用户提交的 URL 作为对象键。 */
     @Override
     public void deleteGenerated(GeneratedMediaReference reference) {
         requireConfigured(); GeneratedMediaNames.require(reference, getType(), generatedNamespace());
-        ossClient().deleteObject(properties.bucketName(), buildObjectKey(StorageConstants.GENERATED_DIRECTORY, StorageConstants.GENERATED_FORMAT, reference.name()));
+        ossClient().deleteObject(properties.bucketName(), buildObjectKey(StorageConstants.GENERATED_DIRECTORY, reference.format().extension(), reference.name()));
     }
     /** 命名空间不包含 AccessKey，配置改变后旧回收请求会安全失败。 */
     private String generatedNamespace() {

@@ -1,6 +1,7 @@
 package com.manga.integration.ai;
 
 import com.manga.common.constant.AiProviderConstants;
+import com.manga.agent.generation.AgnesVideoModel;
 import com.manga.common.enums.AiProviderType;
 import com.manga.integration.http.ExternalHttpClientFactory;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.util.LinkedHashMap;
+import java.time.Duration;
 import java.util.Map;
 
 /**
@@ -18,6 +20,9 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class AiProviderHttpClient {
+    /** 连接检测与生成使用独立的超时和响应大小。 */
+    private static final Duration AGNES_PROBE_TIMEOUT = Duration.ofSeconds(10);
+    private static final int AGNES_PROBE_RESPONSE_BYTES = 256 * 1024;
 
     /** 外部 HTTP 客户端工厂。 */
     private final ExternalHttpClientFactory externalHttpClientFactory;
@@ -27,6 +32,15 @@ public class AiProviderHttpClient {
      */
     public ResponseEntity<String> probe(AiProviderType providerType, String baseUrl, String apiKey,
             AiProviderProxySettings proxySettings) {
+        if (providerType == AiProviderType.AGNES) {
+            return externalHttpClientFactory.createBoundedWebClient(AgnesVideoModel.BASE_URL,
+                            proxySettings == null ? null : proxySettings.toExternalProxySettings(),
+                            AGNES_PROBE_TIMEOUT, AGNES_PROBE_RESPONSE_BYTES)
+                    .get().uri("/v1/models").headers(headers -> headers.setBearerAuth(apiKey))
+                    .exchangeToMono(response -> response.bodyToMono(String.class).defaultIfEmpty("")
+                            .map(body -> ResponseEntity.status(response.statusCode()).body(body)))
+                    .block(AGNES_PROBE_TIMEOUT);
+        }
         AiProviderApi api = externalHttpClientFactory.createRestService(
                 AiProviderApi.class,
                 baseUrl,
