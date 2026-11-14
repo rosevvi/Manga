@@ -1,8 +1,13 @@
 /* 图片任务使用现有工作区颜色变量，长标识和提示词允许换行。 */
-.generation-jobs, .image-generation-panel { display: grid; gap: 12px; margin: 16px 0; }
-.generation-card, .image-generation-panel { border: 1px solid var(--border-color, #ddd); border-radius: 12px; padding: 16px; }
+.generation-jobs, .image-generation-panel { display: grid; gap: 12px; min-width: 0; }
+.generation-jobs:empty { display: none; }
+.generation-card, .image-generation-panel { border: 1px solid var(--workspace-line); border-radius: var(--workspace-radius); background: var(--workspace-surface); padding: 16px; }
 .generation-card { display: grid; gap: 10px; overflow-wrap: anywhere; }
 .generation-card header, .generation-actions { display: flex; gap: 12px; justify-content: space-between; flex-wrap: wrap; }
+.generation-jobs h3, .image-generation-panel h3 { margin: 0; font-size: 15px; }
+.generation-jobs [role="alert"], .image-generation-panel [role="alert"] { color: var(--workspace-danger); }
+.generation-card > a { display: grid; justify-items: start; gap: 6px; color: var(--workspace-accent); }
+.generation-card > button, .image-generation-form > button, .generation-reconcile > button { justify-self: start; }
 .generation-card img { display: block; max-width: 100%; max-height: 320px; object-fit: contain; margin-bottom: 8px; }
 .generation-card progress { width: 100%; }
 .generation-card small { opacity: .75; }
@@ -11,6 +16,6 @@
 .image-generation-form label { display: grid; gap: 5px; }
 .image-generation-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* 采用前并排对比原图和新图，窄屏自动换行。 */
-.generation-adoption { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border-color, #ddd); border-radius: 8px; }
+.generation-adoption { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--workspace-line); border-radius: 8px; }
 .generation-adoption-images { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
 .generation-adoption-images img { max-height: 180px; }

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { acknowledgeUnknownJob, cancelGenerationJob, generationMediaUrl, listGenerationJobs, previewArtifactAdoption, adoptGeneratedArtifact } from '../api/generationApi'
+import { acknowledgeUnknownJob, cancelGenerationJob, listGenerationJobs, previewArtifactAdoption, adoptGeneratedArtifact } from '../api/generationApi'
+import { resolveMediaUrl } from '../api/mediaUrl'
+import MediaImage from './MediaImage'
 import { notifyCreativeProjectChanged } from './creativeProjectEvents'
 import { REVISION_CONFLICT_CODE } from '../constants/changeSet'
 import { GENERATION_PAGE_SIZE, GENERATION_POLL_MS, GENERATION_STATUS_LABEL, GENERATION_TERMINAL } from '../constants/generation'
@@ -35,10 +37,10 @@ export default function GenerationJobsPanel({ accessToken, projectId, runId, con
   return <section className="generation-jobs" aria-label="图片生成作业">
     {(jobs.length > 0 || error || cursors.length > 1) && <h3>图片生成作业</h3>}
     {jobs.map((job) => <GenerationCard key={job.jobId} job={job} accessToken={accessToken} onChanged={() => setRefreshKey((value) => value + 1)} />)}
-    <div className="generation-actions">
-      {cursors.length > 1 && <button type="button" onClick={() => setCursors((value) => value.slice(0, -1))}>较新作业</button>}
-      {jobs.length === GENERATION_PAGE_SIZE && <button type="button" onClick={() => setCursors((value) => [...value, jobs.at(-1).id])}>更早作业</button>}
-    </div>
+    {(cursors.length > 1 || jobs.length === GENERATION_PAGE_SIZE) && <div className="generation-actions">
+      {cursors.length > 1 && <button className="workspace-secondary" type="button" onClick={() => setCursors((value) => value.slice(0, -1))}>较新作业</button>}
+      {jobs.length === GENERATION_PAGE_SIZE && <button className="workspace-secondary" type="button" onClick={() => setCursors((value) => [...value, jobs.at(-1).id])}>更早作业</button>}
+    </div>}
     {error && <p role="alert">{error}</p>}
   </section>
 }
@@ -88,26 +90,29 @@ function GenerationCard({ job, accessToken, onChanged }) {
     {job.cancelRequested && <p>已撤销结果采用，供应商可能继续执行并计费。</p>}
     {job.errorMessage && <p role="status">{job.errorMessage}</p>}
     {job.reconciliationNote && <p>核对说明：{job.reconciliationNote}</p>}
-    {job.artifactUrl && <a href={generationMediaUrl(job.artifactUrl)} target="_blank" rel="noreferrer"><img src={generationMediaUrl(job.artifactUrl)} alt={`镜头 ${job.shotId} 的生成产物`} /><span>查看平台产物 #{job.artifactId}</span></a>}
-    {job.artifactUrl && <button type="button" disabled={busy} onClick={previewAdoption}>用作镜头图片</button>}
+    {job.artifactUrl && <a href={resolveMediaUrl(job.artifactUrl) || undefined} target="_blank" rel="noreferrer">
+      <MediaImage src={job.artifactUrl} alt={`镜头 ${job.shotId} 的生成产物`} showErrorText />
+      <span>查看平台产物 #{job.artifactId}</span>
+    </a>}
+    {job.artifactUrl && <button className="workspace-secondary" type="button" disabled={busy} onClick={previewAdoption}>用作镜头图片</button>}
     {job.adoptedAt && <small>最近采用：{job.adoptedAt.replace('T', ' ')} · 用户 #{job.adoptedBy}</small>}
     {adoption && <section className="generation-adoption" aria-label="确认采用图片">
       <strong>替换镜头「{adoption.target.title}」的图片</strong>
       <div className="generation-adoption-images"><div><small>当前图片</small>
-        {adoption.target.imageUrl ? <img src={generationMediaUrl(adoption.target.imageUrl)} alt="镜头当前图片" /> : <p>暂无图片</p>}</div>
-        <div><small>拟采用图片</small><img src={generationMediaUrl(adoption.artifactUrl)} alt="拟采用的生成图片" /></div></div>
+        <MediaImage src={adoption.target.imageUrl} alt="镜头当前图片" fallback={<p>暂无图片</p>} showErrorText /></div>
+        <div><small>拟采用图片</small><MediaImage src={adoption.artifactUrl} alt="拟采用的生成图片" showErrorText /></div></div>
       <p>只替换该镜头图片，不修改正文、对白或备注。预览后若项目发生变化，需要重新确认。</p>
       {adoptionConflict && <p role="alert">项目已被修改，尚未采用。请重新预览最新图片。</p>}
-      <div className="generation-actions"><button type="button" disabled={busy} onClick={() => { setAdoption(null); setAdoptionConflict(false) }}>取消</button>
-        {adoptionConflict ? <button type="button" disabled={busy} onClick={previewAdoption}>重新预览</button>
-          : <button type="button" disabled={busy} onClick={confirmAdoption}>确认采用</button>}</div>
+      <div className="generation-actions"><button className="workspace-secondary" type="button" disabled={busy} onClick={() => { setAdoption(null); setAdoptionConflict(false) }}>取消</button>
+        {adoptionConflict ? <button className="workspace-secondary" type="button" disabled={busy} onClick={previewAdoption}>重新预览</button>
+          : <button className="workspace-primary" type="button" disabled={busy} onClick={confirmAdoption}>确认采用</button>}</div>
     </section>}
-    {!GENERATION_TERMINAL.has(job.status) && !job.cancelRequested && <button type="button" disabled={busy} onClick={() => act(() => cancelGenerationJob(accessToken, job.jobId))}>取消结果采用</button>}
+    {!GENERATION_TERMINAL.has(job.status) && !job.cancelRequested && <button className="workspace-secondary" type="button" disabled={busy} onClick={() => act(() => cancelGenerationJob(accessToken, job.jobId))}>取消结果采用</button>}
     {job.status === 'UNKNOWN' && <div className="generation-reconcile">
       <p>系统不会自动重新提交。请在供应商核对执行结果及账单，再结束平台等待。</p>
       <label><input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} />我已核对供应商，理解此操作不会退款或远程取消</label>
       <textarea rows={2} maxLength={2000} placeholder="核对说明（请勿填写密钥）" value={note} onChange={(event) => setNote(event.target.value)} />
-      <button type="button" disabled={busy || !checked || !note.trim()} onClick={() => act(() => acknowledgeUnknownJob(accessToken, job.jobId, note))}>记录核对并结束等待</button>
+      <button className="workspace-secondary" type="button" disabled={busy || !checked || !note.trim()} onClick={() => act(() => acknowledgeUnknownJob(accessToken, job.jobId, note))}>记录核对并结束等待</button>
     </div>}
     <details><summary>来源记录</summary><small>Run：{job.runId}<br />Step：{job.stepId}<br />提案：{job.changeSetId}<br />Job：{job.jobId}</small></details>
     {error && <p role="alert">{error}</p>}

@@ -9,6 +9,7 @@ import com.manga.entity.GenerationJob;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.GenerationJobRepository;
 import com.manga.service.StoryboardShotService;
+import com.manga.service.MediaStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -24,12 +25,14 @@ public class ArtifactApplicationService {
     private final CreativeRunRepository runs;
     private final StoryboardShotService shots;
     private final CreativeEventService events;
+    private final MediaStorageService mediaStorageService;
     /** 展示当前镜头图片，生成时的旧版本不能直接作为采用许可。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ArtifactAdoptionPreview preview(String id, long userId) {
         GenerationJob job = requireJob(id, userId);
         CreativeArtifact artifact = requireArtifact(job);
-        return new ArtifactAdoptionPreview(id, artifact.getId(), artifact.getUrl(), shots.imageSnapshot(job.getProjectId(), job.getShotId(), userId));
+        return new ArtifactAdoptionPreview(id, artifact.getId(), mediaStorageService.previewGeneratedImage(artifact.getUrl()),
+                shots.imageSnapshot(job.getProjectId(), job.getShotId(), userId));
     }
     /** Run→Job→Project 固定锁顺序；同一预览请求重放返回原采用结果，不重新覆盖人工修改。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)

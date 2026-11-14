@@ -4,6 +4,7 @@ import com.manga.common.api.ApiResponse;
 import com.manga.common.security.SecurityUtils;
 import com.manga.dto.MediaUploadResponse;
 import com.manga.service.MediaUploadService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,13 +25,14 @@ public class MediaUploadController {
 
     /** 接收图片上传并返回可访问地址。 */
     @PostMapping("/images")
+    @Operation(summary = "上传创作图片并返回存储引用和预览地址")
     public ApiResponse<MediaUploadResponse> uploadImage(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "subDir", required = false) String subDir,
             HttpServletRequest request) {
         log.info("[MediaUploadController#uploadImage] request subject={} subDir={} contentType={} size={}",
                 SecurityUtils.getCurrentUsername(), subDir, file.getContentType(), file.getSize());
-        MediaUploadResponse result = uploadService.uploadImage(file, subDir, request);
+        MediaUploadResponse result = uploadService.uploadImage(SecurityUtils.requireCurrentUserId(), file, subDir, request);
         log.info("[MediaUploadController#uploadImage] response path={} size={}", result.path(), result.size());
         return ApiResponse.success(result);
     }

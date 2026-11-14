@@ -59,7 +59,7 @@ export default function ManualCreativeTaskPanel({ accessToken, projectId, runId,
   return <section className="script-analysis-panel">
     <h3>AI 创作任务 · {run?.status === 'WAITING' ? '等待协作、审批或外部作业' : run?.status || '正在加载'}</h3>
     <CreativeRunGraph accessToken={accessToken} runId={runId} />
-    {run && !CREATIVE_TERMINAL_STATUSES.has(run.status) && <button type="button" disabled={busy} onClick={cancel}>停止任务</button>}
+    {run && !CREATIVE_TERMINAL_STATUSES.has(run.status) && <button className="workspace-secondary" type="button" disabled={busy} onClick={cancel}>停止任务</button>}
     <CreativeChangeSetPanel accessToken={accessToken} runId={runId} onDecided={onApplied}
       onRegenerate={CREATIVE_TERMINAL_STATUSES.has(run?.status) && !busy ? regenerate : undefined} />
     <GenerationJobsPanel accessToken={accessToken} projectId={projectId} runId={runId} />

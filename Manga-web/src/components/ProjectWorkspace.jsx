@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Clapperboard, FileText, Film, Image as ImageIcon, LoaderCircle, Plus, RefreshCw, Save, Trash2, WandSparkles } from 'lucide-react'
-import { getProjectChapter, getProjectTasks, getProjectWorkspace, importProjectChapter, importProjectScript, saveProjectChapter, deleteProjectChapter } from '../api/projectApi'
+import { getProjectChapter, getProjectWorkspace, importProjectChapter, importProjectScript, saveProjectChapter, deleteProjectChapter } from '../api/projectApi'
 import { createManualRun, getCreativeRun, streamCreativeRunEvents } from '../api/creativeRunApi'
 import { useLanguage } from '../i18n/LanguageContext'
 import './project-workspace.css'
+import MediaImage from './MediaImage'
 import ManualCreativeTaskPanel from './ManualCreativeTaskPanel'
 import ProjectCreativeTaskHistory from './ProjectCreativeTaskHistory'
 import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
@@ -16,6 +17,8 @@ const STAGES = [
 ]
 
 const TERMINAL_RUN_STATUSES = new Set(['COMPLETED', 'FAILED', 'CANCELLED'])
+/** 有剧本导入任务时，在上一轮查询结束后等待三秒再检查。 */
+const SCRIPT_TASK_POLL_MS = 3000
 const SCRIPT_ANALYSIS_STORAGE_PREFIX = 'manga.script.analysis.'
 
 /** 创建浏览器兼容的手动 Run 幂等标识。 */
@@ -40,7 +43,6 @@ function ProjectWorkspace({ accessToken, projectId, initialStage = 'OVERVIEW', i
   const [chapterTitle, setChapterTitle] = useState('')
   const [chapterText, setChapterText] = useState('')
   const [selectedChapter, setSelectedChapter] = useState(null)
-  const [tasks, setTasks] = useState([])
   const analysisKey = `${SCRIPT_ANALYSIS_STORAGE_PREFIX}${projectId}`
   const analysisRef = useRef(restoreScriptAnalysis(projectId))
   const analysisCursorRef = useRef(analysisRef.current?.lastSequence || 0)
@@ -76,17 +78,26 @@ function ProjectWorkspace({ accessToken, projectId, initialStage = 'OVERVIEW', i
     if (showLoading) setLoading(true)
     setError('')
     try {
-      const [nextWorkspace, nextTasks] = await Promise.all([getProjectWorkspace(accessToken, projectId), getProjectTasks(accessToken, projectId)])
+      const nextWorkspace = await getProjectWorkspace(accessToken, projectId)
       if (version !== workspaceReadVersion.current) return
-      setWorkspace(nextWorkspace); setTasks(nextTasks)
+      setWorkspace(nextWorkspace)
     } catch (failure) { if (version === workspaceReadVersion.current) setError(failure.message) }
     finally { if (version === workspaceReadVersion.current) setLoading(false) }
   }
-  useEffect(() => { loadWorkspace() }, [accessToken, projectId])
+  useEffect(() => {
+    void loadWorkspace()
+    return () => { workspaceReadVersion.current += 1 }
+  }, [accessToken, projectId])
   useEffect(() => {
     if (!workspace?.tasks?.some((task) => task.status === 'QUEUED' || task.status === 'RUNNING')) return undefined
-    const timer = window.setInterval(loadWorkspace, 3000)
-    return () => window.clearInterval(timer)
+    let stopped = false
+    let timer
+    const poll = async () => {
+      await loadWorkspace(false)
+      if (!stopped) timer = window.setTimeout(poll, SCRIPT_TASK_POLL_MS)
+    }
+    timer = window.setTimeout(poll, SCRIPT_TASK_POLL_MS)
+    return () => { stopped = true; window.clearTimeout(timer) }
   }, [workspace?.tasks, accessToken, projectId])
   useEffect(() => {
     if (!initialChapterId) return
@@ -283,15 +294,25 @@ function ProjectWorkspace({ accessToken, projectId, initialStage = 'OVERVIEW', i
   if (!workspace) return <div className="workspace-alert">{error || translate('projects.detailUnavailable')}</div>
   const project = workspace.project
   const chapters = workspace.script?.chapters || []
+  const tasks = workspace.tasks || []
   const stageIndex = Math.max(0, STAGES.findIndex(([value]) => value === activeStage))
 
   return <section className="workspace-module project-workspace">
     <button className="workspace-back" type="button" onClick={onBack}><ArrowLeft size={14} />{translate('projects.backToProjects')}</button>
-    <header className="project-workspace-header"><div className="project-workspace-cover">{project.coverUrl ? <img src={project.coverUrl} alt="" /> : <Clapperboard size={30} />}</div><div className="project-workspace-heading"><span className="workspace-eyebrow">{translate('projects.workspaceEyebrow')}</span><h1>{project.name}</h1><p>{project.description || translate('projects.descriptionUnset')}</p></div></header>
+    <header className="project-workspace-header">
+      <div className="project-workspace-cover">
+        <MediaImage src={project.coverPreviewUrl || project.coverUrl} fallback={<Clapperboard size={30} />} />
+      </div>
+      <div className="project-workspace-heading">
+        <span className="workspace-eyebrow">{translate('projects.workspaceEyebrow')}</span>
+        <h1>{project.name}</h1>
+        <p>{project.description || translate('projects.descriptionUnset')}</p>
+      </div>
+    </header>
     <nav className="workflow-stepper">{STAGES.map(([value, label, Icon], index) => <button key={value} type="button" className={value === activeStage ? 'workflow-step active' : index < stageIndex ? 'workflow-step completed' : 'workflow-step'} onClick={() => navigateStage(value)}><span className="workflow-step-icon">{index < stageIndex ? <CheckCircle2 size={15} /> : <Icon size={15} />}</span>{translate(label)}{index < STAGES.length - 1 && <ChevronRight size={13} />}</button>)}</nav>
     {error && <div className="workspace-alert">{error}</div>}
     {chapterConflict && <div className="workspace-alert" role="alert">章节已被更新，已保留你的未保存编辑。
-      <button type="button" onClick={() => refreshChapter(true).catch((failure) => setError(failure.message))}>重新加载最新章节（放弃当前编辑）</button>
+      <button className="workspace-secondary" type="button" onClick={() => refreshChapter(true).catch((failure) => setError(failure.message))}>重新加载最新章节（放弃当前编辑）</button>
     </div>}
     <ProjectCreativeTaskHistory accessToken={accessToken} projectId={projectId} selectedRunId={reviewRunId}
       reloadKey={runListVersion} onSelect={(id) => { setReviewRunId(id); setReviewRunStatus(null) }} onActiveChanged={setHasServerActiveRun} />
@@ -314,7 +335,7 @@ function ProjectWorkspace({ accessToken, projectId, initialStage = 'OVERVIEW', i
   </section>
 }
 
-function Overview({ workspace, onScript, onStoryboard, translate }) { return <div className="project-overview-grid"><article className="project-overview-card project-overview-card-wide"><div className="project-card-heading"><span className="project-card-icon"><BookOpen size={18} /></span><div><span className="workspace-eyebrow">{translate('workflow.script')}</span><h2>{workspace.script?.title || translate('script.emptyTitle')}</h2></div></div><p>{workspace.script ? `${workspace.script.chapterCount} ${translate('script.chapters')}` : translate('script.emptyDescription')}</p><button className="workspace-primary" type="button" onClick={onScript}><BookOpen size={15} />{translate('script.open')}</button></article><article className="project-overview-card"><div className="project-card-heading"><span className="project-card-icon cyan"><Film size={18} /></span><div><span className="workspace-eyebrow">{translate('workflow.storyboard')}</span><h2>{workspace.storyboardShotCount} {translate('script.shots')}</h2></div></div><p>{translate('workflow.storyboardReady')}</p><button className="workspace-secondary" type="button" onClick={onStoryboard}><Film size={15} />{translate('storyboards.create')}</button></article></div> }
+function Overview({ workspace, onScript, onStoryboard, translate }) { return <div className="project-overview-grid"><article className="project-overview-card"><div className="project-card-heading"><span className="project-card-icon"><BookOpen size={18} /></span><div><span className="workspace-eyebrow">{translate('workflow.script')}</span><h2>{workspace.script?.title || translate('script.emptyTitle')}</h2></div></div><p>{workspace.script ? `${workspace.script.chapterCount} ${translate('script.chapters')}` : translate('script.emptyDescription')}</p><button className="workspace-primary" type="button" onClick={onScript}><BookOpen size={15} />{translate('script.open')}</button></article><article className="project-overview-card"><div className="project-card-heading"><span className="project-card-icon"><Film size={18} /></span><div><span className="workspace-eyebrow">{translate('workflow.storyboard')}</span><h2>{workspace.storyboardShotCount} {translate('script.shots')}</h2></div></div><p>{translate('workflow.storyboardReady')}</p><button className="workspace-secondary" type="button" onClick={onStoryboard}><Film size={15} />{translate('storyboards.create')}</button></article></div> }
 
 function ScriptList({ chapters, tasks, importing, importFull, importOne, chapterTitle, setChapterTitle, chapterText, setChapterText, onChapter, onParseScript, scriptAnalysis, hasScript, translate }) { const analysisActive = scriptAnalysis?.status && !TERMINAL_RUN_STATUSES.has(scriptAnalysis.status); return <div className="script-workspace"><div className="script-workspace-heading"><div><span className="workspace-eyebrow">{translate('workflow.script')}</span><h2>{translate('script.chapterList')}</h2><p>{translate('script.chapterListDescription')}</p></div><div className="script-heading-actions"><button className="workspace-primary" type="button" disabled={!hasScript || analysisActive} onClick={onParseScript}>{analysisActive ? <LoaderCircle className="spin" size={15} /> : <WandSparkles size={15} />}{translate('script.analyze')}</button><label className="workspace-secondary script-import-button"><FileText size={15} />{translate('script.importFull')}<input type="file" accept=".txt,.md,text/plain,text/markdown" onChange={importFull} /></label></div></div>{tasks.filter((task) => task.status === 'QUEUED' || task.status === 'RUNNING').map((task) => <div className="script-task-banner" key={task.id}><LoaderCircle className="spin" size={15} /><span>{task.title} · {task.completedUnits}/{task.totalUnits || '?'} {translate('script.chapters')}</span></div>)}{scriptAnalysis && <section className="script-analysis-panel"><div className="script-panel-title"><WandSparkles size={17} /><h3>{translate('script.analysisTitle')}</h3><span className={`script-analysis-status ${String(scriptAnalysis.status || '').toLowerCase()}`}>{scriptAnalysis.status}</span></div>{scriptAnalysis.tool?.status && <small>{translate('script.analysisTool')} · {scriptAnalysis.tool.status}</small>}{scriptAnalysis.error && <small className="script-analysis-error">{scriptAnalysis.error}</small>}<pre>{scriptAnalysis.content || translate('script.analysisWaiting')}</pre></section>}<div className="script-chapter-list">{chapters.length === 0 && <div className="workspace-empty"><BookOpen size={28} /><p>{translate('script.noChapters')}</p></div>}{chapters.map((chapter) => <button className="script-chapter-card" key={chapter.id} type="button" onClick={() => onChapter(chapter)}><span className="script-chapter-number">{chapter.chapterNumber}</span><span><strong>{chapter.title}</strong><small>{chapter.sceneCount} {translate('script.scenes')} · {chapter.rawContentLength} {translate('script.characters')}</small></span><span className={`script-chapter-status ${String(chapter.parseStatus || '').toLowerCase()}`}>{chapter.parseStatus}</span><ChevronRight size={15} /></button>)}</div><section className="script-import-panel"><div className="script-panel-title"><Plus size={17} /><h3>{translate('script.importOne')}</h3></div><input className="script-inline-input" value={chapterTitle} onChange={(event) => setChapterTitle(event.target.value)} placeholder={translate('script.chapterTitle')} /><textarea className="script-raw-input" rows="6" value={chapterText} onChange={(event) => setChapterText(event.target.value)} placeholder={translate('script.rawPlaceholder')} /><div className="script-ai-actions"><span>{importing ? translate('script.processing') : translate('script.singleImportHint')}</span><button className="workspace-primary" type="button" disabled={importing} onClick={importOne}>{importing ? <LoaderCircle className="spin" size={15} /> : <Save size={15} />}{translate('script.saveChapter')}</button></div></section></div> }
 

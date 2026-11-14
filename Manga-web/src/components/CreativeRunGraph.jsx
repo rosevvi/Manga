@@ -63,7 +63,7 @@ export default function CreativeRunGraph({ accessToken, runId }) {
         {node.errorMessage && <p role="alert">{node.errorMessage}</p>}
         <details><summary>步骤信息</summary><small>{node.stepId} · {node.profileId} · v{node.profileVersion} · 代次 {node.ownerEpoch} · 尝试 {node.attemptNo}{node.sandbox ? ' · 只读测试' : ''}</small></details>
         {!CREATIVE_STEP_TERMINAL.has(node.status) && !CREATIVE_TERMINAL_STATUSES.has(graph.status) &&
-          <button type="button" disabled={stopping || node.status === 'CANCEL_REQUESTED'} onClick={() => stop(node.stepId)}>停止此步骤及整个任务</button>}
+          <button className="workspace-secondary" type="button" disabled={stopping || node.status === 'CANCEL_REQUESTED'} onClick={() => stop(node.stepId)}>停止此步骤及整个任务</button>}
       </li>)}
     </ol>
     {graph?.budget && <small>模型执行 {graph.budget.usedInvocations}/{graph.budget.maxInvocations} 次 · 最大同时执行 {graph.budget.maxParallel} 步 · 推理轮数预留 {graph.budget.reservedTurns}/{graph.budget.maxReservedTurns}</small>}

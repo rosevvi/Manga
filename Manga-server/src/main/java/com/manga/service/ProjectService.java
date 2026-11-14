@@ -36,6 +36,7 @@ public class ProjectService {
     private final ProjectMemberRepository projectMemberRepository;
     private final ProjectWorkflowService workflowService;
     private final ProjectRevisionService revisionService;
+    private final MediaStorageService mediaStorageService;
 
     /** 查询当前用户可访问的项目列表。 */
     public List<ProjectResponse> findAll() {
@@ -160,7 +161,9 @@ public class ProjectService {
                 project.getArtStyle(), preset == null ? null : preset.name(), project.getArtStyleDescription(),
                 project.getArtStyleImagePrompt(), project.getArtStyleImageUrl(),
                 project.getShotCount() == null ? 0 : project.getShotCount(),
-                project.getCreatedAt(), project.getUpdatedAt());
+                project.getCreatedAt(), project.getUpdatedAt(),
+                mediaStorageService.previewUserImage(project.getCoverUrl(), project.getOwnerUserId()),
+                mediaStorageService.previewUserImage(project.getArtStyleImageUrl(), project.getOwnerUserId()));
     }
 
     /** 将项目成员转换为响应对象。 */

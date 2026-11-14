@@ -85,7 +85,7 @@ export default function CreativeChangeSetPanel({ accessToken, conversationId, ru
   return <section className="creative-proposals" aria-label="AI 变更提案">
     {proposals.map((proposal) => <ProposalCard key={proposal.changeSetId} proposal={proposal}
       onDecide={decide} onRegenerate={onRegenerate} />)}
-    {hasMore && <button type="button" onClick={loadMore} disabled={loadingMore}>更早提案</button>}
+    {hasMore && <button className="workspace-secondary" type="button" onClick={loadMore} disabled={loadingMore}>更早提案</button>}
     {error && <p role="alert">{error}</p>}
   </section>
 }
@@ -132,10 +132,10 @@ function ProposalCard({ proposal, onDecide, onRegenerate }) {
           </dl></details>)}</div>}
     {pending && <><small>审批截止：{proposal.expiresAt?.replace('T', ' ')}（有效期由服务端校验）</small>
       <label>审批评论<textarea maxLength={2000} rows={2} value={comment} onChange={(event) => setComment(event.target.value)} disabled={busy} /></label>
-      <div className="creative-proposal-actions"><button type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.REJECT)}>拒绝</button>
-        <button type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.APPROVE)}>{busy ? '处理中…' : proposal.kind === CHANGE_SET_KIND.IMAGE_GENERATION ? '确认费用并批准生成' : '批准并保存'}</button></div></>}
+      <div className="creative-proposal-actions"><button className="workspace-secondary" type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.REJECT)}>拒绝</button>
+        <button className="workspace-primary" type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.APPROVE)}>{busy ? '处理中…' : proposal.kind === CHANGE_SET_KIND.IMAGE_GENERATION ? '确认费用并批准生成' : '批准并保存'}</button></div></>}
     {proposal.status === CHANGE_SET_STATUS.CONFLICTED && <p role="alert">项目、章节或生成配置已经变化，本提案没有应用。请基于最新内容重新生成。</p>}
-    {retryable && onRegenerate && <button type="button" onClick={() => onRegenerate(proposal)}>基于最新内容重新生成</button>}
+    {retryable && onRegenerate && <button className="workspace-secondary" type="button" onClick={() => onRegenerate(proposal)}>基于最新内容重新生成</button>}
     {proposal.comment && <p>审批评论：{proposal.comment}</p>}
     {proposal.decidedBy && <small>审批人 #{proposal.decidedBy} · {proposal.decidedAt?.replace('T', ' ')}</small>}
     <details className="creative-proposal-trace"><summary>来源记录</summary><small>Run：{proposal.runId}<br />Step：{proposal.stepId}<br />提案：{proposal.changeSetId}<br />基础项目版本：{proposal.baseProjectRevision}

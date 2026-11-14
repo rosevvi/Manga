@@ -10,6 +10,7 @@ public record StoryboardShotResponse(
         Long id,
         /** 所属项目主键。 */
         Long projectId,
+        /** 所属章节主键。 */
         Long chapterId,
         /** 分镜排序值。 */
         int sortOrder,
@@ -40,6 +41,8 @@ public record StoryboardShotResponse(
         /** 创建时间。 */
         LocalDateTime createdAt,
         /** 最后更新时间。 */
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        /** 分镜图片短期预览地址，编辑时使用稳定的 imageUrl。 */
+        String imagePreviewUrl
 ) {
 }

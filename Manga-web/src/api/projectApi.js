@@ -91,10 +91,6 @@ export function deleteProjectChapter(accessToken, projectId, chapterId) {
   return authorizedRequest(accessToken, projectScriptChapterEndpoint(projectId, chapterId), { method: 'DELETE' })
 }
 
-export function getProjectTasks(accessToken, projectId) {
-  return authorizedRequest(accessToken, `/projects/${encodeURIComponent(projectId)}/tasks`)
-}
-
 export function getActiveTasks(accessToken) {
   return authorizedRequest(accessToken, '/tasks/active')
 }

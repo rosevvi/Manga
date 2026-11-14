@@ -1,3 +1,7 @@
+/** 认证请求默认允许等待的时长，单位毫秒。 */
+const DEFAULT_AUTH_REQUEST_TIMEOUT_MS = 20_000
+const configuredAuthTimeout = Number(import.meta.env.VITE_AUTH_REQUEST_TIMEOUT_MS)
+
 /** 认证接口与浏览器会话使用的集中配置。 */
 export const AUTH_CONFIG = Object.freeze({
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1',
@@ -9,6 +13,16 @@ export const AUTH_CONFIG = Object.freeze({
   passwordMinLength: 8,
   passwordMaxLength: 128,
   minimumWechatPollIntervalMs: 1000,
+  /** 请求和响应正文读取的整体时限，避免 fetch 永久挂起。 */
+  requestTimeoutMs: Number.isFinite(configuredAuthTimeout) && configuredAuthTimeout > 0
+    ? configuredAuthTimeout : DEFAULT_AUTH_REQUEST_TIMEOUT_MS,
+})
+
+/** 认证网络错误的统一公开描述。 */
+export const AUTH_REQUEST_ERROR = Object.freeze({
+  USER_NOT_FOUND: 'USER_NOT_FOUND',
+  TIMEOUT: '登录请求超时，请检查网络后重试',
+  UNAVAILABLE: '无法连接登录服务，请稍后重试',
 })
 
 /** 外部登录会话状态。 */

@@ -17,8 +17,12 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -36,6 +40,16 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
 
     /** 对象路径片段中需要移除的不安全字符规则。 */
     private static final Pattern UNSAFE_PATH_CHARACTER_PATTERN = Pattern.compile("[^A-Za-z0-9._-]");
+    /** 上传图片路径和生成物路径只匹配应用自身生成的对象名。 */
+    private static final Pattern UPLOADED_IMAGE_KEY = Pattern.compile(
+            "[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\\.(?:jpe?g|png|webp|gif)");
+    /** 生成图片仅允许读取作业 UUID 和写入代次对应的 PNG。 */
+    private static final Pattern GENERATED_IMAGE_KEY = Pattern.compile(
+            "[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}-[1-9][0-9]*\\.png");
+    /** 预览链接每次随业务响应刷新，避免长期公开对象。 */
+    private static final Duration PREVIEW_TTL = Duration.ofHours(1);
+    /** 用户上传对象的所属路径。 */
+    private static final String USER_UPLOAD_DIRECTORY = "users";
 
     private final AliyunOssProperties properties;
     /** 延迟创建并在应用生命周期内复用的 OSS 客户端。 */
@@ -51,6 +65,53 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
     @Override
     public String storeBytes(byte[] data, String subDir, String extension) {
         return storeNamedBytes(data, subDir, extension, UUID.randomUUID().toString());
+    }
+
+    /** 将上传人写入存储路径，后续可安全识别该用户上传的私有对象。 */
+    public String storeUserImage(long userId, byte[] data, String subDir, String extension) {
+        return storeBytes(data, USER_UPLOAD_DIRECTORY + "/" + userId + "/" + subDir, extension);
+    }
+
+    /** 在调用方校验业务访问权限后，签署上传者命名空间中的图片。 */
+    public String previewUserImage(String url, long ownerId) {
+        return signImage(url, USER_UPLOAD_DIRECTORY + "/" + ownerId, UPLOADED_IMAGE_KEY);
+    }
+
+    /** 只为来自平台产物记录或已采用产物关联的图片签名。 */
+    public String previewGeneratedImage(String url) {
+        return signImage(url, StorageConstants.GENERATED_DIRECTORY, GENERATED_IMAGE_KEY);
+    }
+
+    /** 重新生成可读链接，仅接受当前 Bucket 中指定目录下的规范对象键。 */
+    private String signImage(String url, String directory, Pattern namePattern) {
+        if (Objects.isNull(url) || !properties.configured()) {
+            return url;
+        }
+        try {
+            String keyPrefix = normalizePath(properties.objectPrefix(), properties.objectPrefix())
+                    + "/" + directory;
+            String publicPrefix = resolvePublicUrl(keyPrefix) + "/";
+            String bucketPrefix = defaultPublicDomain() + "/" + encodeObjectKey(keyPrefix) + "/";
+            String matchedPrefix = url.startsWith(publicPrefix) ? publicPrefix : bucketPrefix;
+            if (!url.startsWith(matchedPrefix)) {
+                return url;
+            }
+            String name = url.substring(matchedPrefix.length());
+            if (!namePattern.matcher(name).matches()) {
+                return url;
+            }
+            String signedUrl = ossClient().generatePresignedUrl(properties.bucketName(), keyPrefix + "/" + name,
+                    Date.from(Instant.now().plus(PREVIEW_TTL))).toExternalForm();
+            String signingOrigin = defaultPublicDomain();
+            // 自定义域名直连同一个 Bucket 时，可使用同一对象签名访问。
+            if (Objects.nonNull(properties.publicDomain()) && signedUrl.startsWith(signingOrigin + "/")) {
+                return normalizeDomain(properties.publicDomain()) + signedUrl.substring(signingOrigin.length());
+            }
+            return signedUrl;
+        } catch (IllegalArgumentException | IllegalStateException | ClientException | OSSException exception) {
+            log.warn("Unable to sign media preview directory={} reason={}", directory, exception.getClass().getSimpleName());
+            return url;
+        }
     }
 
     /** 同一作业使用同一对象键，重试只覆盖原转存内容。 */

@@ -29,6 +29,7 @@ function nextRequestId() {
 export default function MangaAssistant({ accessToken, userId, projectId }) {
   const selectionKey = `${SELECTION_STORAGE_PREFIX}${userId}.${projectId || 'all'}`
   const [open, setOpen] = useState(false)
+  const [hasOpened, setHasOpened] = useState(false)
   const [instruction, setInstruction] = useState('')
   const [conversations, setConversations] = useState([])
   const [hasMoreConversations, setHasMoreConversations] = useState(false)
@@ -105,8 +106,9 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
     return snapshot
   }, [accessToken])
 
-  /** 用户或项目变化后，从服务端列表恢复最近会话，不读取临时本地正文。 */
+  /** 首次展开后恢复会话，切换项目时隔离草稿和服务端状态。 */
   useEffect(() => {
+    if (!hasOpened || !accessToken) return undefined
     const scope = ++scopeRef.current
     let savedConversationId
     try { savedConversationId = sessionStorage.getItem(selectionKey) }
@@ -115,7 +117,6 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
     setConversations([])
     setSubmitting(false)
     setInstruction('')
-    if (!accessToken) return undefined
     setLoading(true)
     refreshList().then((list) => {
       if (scope === scopeRef.current) selectConversation(savedConversationId || list[0]?.conversationId || null)
@@ -125,23 +126,23 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
       if (scope === scopeRef.current) setLoading(false)
     })
     return () => { scopeRef.current += 1 }
-  }, [accessToken, userId, projectId, refreshList, selectConversation, selectionKey])
+  }, [accessToken, hasOpened, refreshList, selectConversation, selectionKey])
 
   /** 每次选择会话都读取完整投影和活动 Run 状态。 */
   useEffect(() => {
-    if (!conversationId || !accessToken) return
+    if (!open || !conversationId || !accessToken) return
     setLoading(true)
     refreshHistory(conversationId).catch((failure) => {
       if (selectedRef.current === conversationId) setError(failure.message)
     }).finally(() => {
       if (selectedRef.current === conversationId) setLoading(false)
     })
-  }, [accessToken, conversationId, refreshHistory])
+  }, [accessToken, conversationId, open, refreshHistory])
 
   /** 按投影 cursor 续接 SSE；刷新串行合并，断线和正常提前关闭都能重连。 */
   useEffect(() => {
     const runId = activeRun?.runId
-    if (!runId || !conversationId) return undefined
+    if (!open || !runId || !conversationId) return undefined
     let stopped = false
     let controller
     let reconnectTimer
@@ -190,7 +191,7 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
       window.clearTimeout(refreshTimer)
       window.clearInterval(pollTimer)
     }
-  }, [accessToken, activeRun?.runId, conversationId, refreshHistory])
+  }, [accessToken, activeRun?.runId, conversationId, open, refreshHistory])
 
   /** 新增一轮真实 Director 对话，正文随后从服务端 Message 恢复。 */
   const submit = async (event) => {
@@ -270,7 +271,10 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
   if (!accessToken) return null
   return (
     <aside className={`manga-assistant ${open ? 'open' : ''}`}>
-      <button className="assistant-toggle" type="button" onClick={() => setOpen((value) => !value)} aria-label="AI 漫剧助手">
+      <button className="assistant-toggle" type="button" onClick={() => {
+        setHasOpened(true)
+        setOpen((value) => !value)
+      }} aria-label="AI 漫剧助手">
         {open ? <X size={20} /> : <Bot size={22} />}
       </button>
       {open && <section className="assistant-panel">

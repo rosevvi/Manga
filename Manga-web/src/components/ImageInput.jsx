@@ -2,12 +2,14 @@ import { useRef, useState } from 'react'
 import { ImagePlus, Images, Link, LoaderCircle, Upload, X } from 'lucide-react'
 import { uploadProjectImage } from '../api/projectApi'
 import { useLanguage } from '../i18n/LanguageContext'
+import MediaImage from './MediaImage'
 import './image-input.css'
 
 /** 图片输入组件，支持本地拖拽上传、点击上传、URL 手动填写和预览清除。 */
 function ImageInput({
   accessToken,
   value,
+  previewUrl,
   onChange,
   maxLength,
   uploadSubDir = 'images',
@@ -19,6 +21,7 @@ function ImageInput({
   const fileRef = useRef(null)
   const [mode, setMode] = useState('upload')
   const [uploading, setUploading] = useState(false)
+  const [uploaded, setUploaded] = useState(null)
 
   const uploadFile = async (file) => {
     if (!file.type.startsWith('image/')) {
@@ -28,6 +31,7 @@ function ImageInput({
     setUploading(true)
     try {
       const result = await uploadProjectImage(accessToken, file, uploadSubDir)
+      setUploaded(result)
       onChange(result.url)
     } catch (requestError) {
       onError?.(requestError.message)
@@ -76,7 +80,7 @@ function ImageInput({
 
       {value ? (
         <div className={`manga-image-preview ${previewClassName}`}>
-          <img src={value} alt="" />
+          <MediaImage src={(uploaded?.url === value ? uploaded.previewUrl : previewUrl) || value} showErrorText />
           <button type="button" aria-label={translate('common.clearImage')} onClick={clearImage}>
             <X size={13} />
           </button>

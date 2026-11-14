@@ -5,6 +5,7 @@ import com.manga.entity.CreativeArtifact;
 import com.manga.entity.GenerationJob;
 import com.manga.repository.GenerationJobRepository;
 import com.manga.service.ProjectService;
+import com.manga.service.MediaStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
 public class GenerationJobQueryService {
     private final GenerationJobRepository jobs;
     private final ProjectService projects;
+    private final MediaStorageService mediaStorageService;
     /** 批量查询产物，禁止大图片进入列表响应。 */
     @Transactional(readOnly = true)
     public List<GenerationJobView> list(long userId, long projectId, String runId, String conversationId, Long beforeId) {
@@ -41,7 +43,8 @@ public class GenerationJobQueryService {
         return new GenerationJobView(job.getId(), job.getJobId(), job.getRunId(), job.getStepId(), job.getChangeSetId(),
                 job.getProjectId(), job.getShotId(), job.getProvider(), job.getStatus(), job.getProgress(), Boolean.TRUE.equals(job.getCancelRequested()),
                 job.getErrorCode(), job.getErrorMessage(), Objects.isNull(artifact) ? null : artifact.getId(),
-                Objects.isNull(artifact) ? null : artifact.getUrl(), job.getCreatedAt(), job.getSubmittedAt(), job.getFinishedAt(),
+                Objects.isNull(artifact) ? null : mediaStorageService.previewGeneratedImage(artifact.getUrl()),
+                job.getCreatedAt(), job.getSubmittedAt(), job.getFinishedAt(),
                 job.getUpdatedAt(), job.getReconciliationNote(), Objects.isNull(artifact) ? null : artifact.getAdoptedAt(),
                 Objects.isNull(artifact) ? null : artifact.getAdoptedBy());
     }

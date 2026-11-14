@@ -63,7 +63,7 @@ export default function ImageGenerationPanel({ accessToken, projectId, shots }) 
       <label>输出尺寸<select value={size} onChange={(event) => setSize(event.target.value)}>{IMAGE_SIZES.map((value) => <option key={value}>{value}</option>)}</select></label>
       <label>画面提示词<textarea required rows={3} maxLength={4000} value={prompt} onChange={(event) => setPrompt(event.target.value)} /></label>
       <small>单张 PNG，中等质量。{selected?.estimatedCost != null ? `预计 ${selected.estimatedCost} ${selected.currency}，实际账单以供应商为准。` : '真实生成尚未配置预计费用，请由管理员核价。'}生成前还需预览并批准。</small>
-      <button type="submit" disabled={busy || !shotId || !prompt.trim() || selected?.estimatedCost == null}>{busy ? '创建提案中…' : '创建图片生成提案'}</button>
+      <button className="workspace-primary" type="submit" disabled={busy || !shotId || !prompt.trim() || selected?.estimatedCost == null}>{busy ? '创建提案中…' : '创建图片生成提案'}</button>
     </form>
     {error && <p role="alert">{error}</p>}
     <ProjectCreativeTaskHistory accessToken={accessToken} projectId={projectId} selectedRunId={runId} reloadKey={reloadKey}

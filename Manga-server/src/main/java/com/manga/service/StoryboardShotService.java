@@ -37,12 +37,14 @@ public class StoryboardShotService {
     private final ProjectService projectService;
     private final ProjectWorkflowService workflowService;
     private final ProjectRevisionService revisionService;
+    private final MediaStorageService mediaStorageService;
     /** 预览采用时读取同一项目版本下的当前图片，客户端不能自行指定原图。 */
     @Transactional
     public StoryboardImageSnapshot imageSnapshot(long projectId, long shotId, long userId) {
         var project = revisionService.lock(projectId, userId);
         StoryboardShot shot = requireShot(projectId, shotId);
-        return new StoryboardImageSnapshot(shotId, shot.getTitle(), project.getRevision(), shot.getImageUrl());
+        return new StoryboardImageSnapshot(shotId, shot.getTitle(), project.getRevision(),
+                previewImage(shot, project.getOwnerUserId()));
     }
     /** 只在预览版本仍有效时采用；与产物审计事务一起提交或回滚。 */
     @Transactional
@@ -62,13 +64,16 @@ public class StoryboardShotService {
 
     /** 查询项目分镜镜头列表。 */
     public List<StoryboardShotResponse> findAll(long projectId, Long chapterId) {
-        return findAllForUser(projectId, SecurityUtils.requireCurrentUserId(), chapterId);
+        var project = projectService.requireAccessibleProject(projectId, SecurityUtils.requireCurrentUserId());
+        return storyboardShotRepository.findAllByProjectId(projectId, chapterId).stream()
+                .map(shot -> toResponse(shot, previewImage(shot, project.getOwnerUserId()))).toList();
     }
 
     /** 按显式用户范围查询分镜，供异步助手工具调用。 */
     public List<StoryboardShotResponse> findAllForUser(long projectId, long userId, Long chapterId) {
         projectService.requireAccessibleProject(projectId, userId);
-        return storyboardShotRepository.findAllByProjectId(projectId, chapterId).stream().map(this::toResponse).toList();
+        return storyboardShotRepository.findAllByProjectId(projectId, chapterId).stream()
+                .map(shot -> toResponse(shot, null)).toList();
     }
 
     /** 创建项目分镜镜头。 */
@@ -101,7 +106,8 @@ public class StoryboardShotService {
         workflowService.advanceTo(projectId, ProjectWorkflowStage.ASSETS, actor);
         log.info("Storyboard shot created projectId={} shotId={} sortOrder={}",
                 projectId, shot.getId(), sortOrder);
-        return toResponse(requireShot(projectId, shot.getId()));
+        StoryboardShot saved = requireShot(projectId, shot.getId());
+        return toResponse(saved, previewImage(saved, SecurityUtils.requireCurrentUserId()));
     }
 
     /** 更新项目分镜镜头。 */
@@ -133,7 +139,8 @@ public class StoryboardShotService {
                 SecurityUtils.requireCurrentUsername());
         log.info("Storyboard shot updated projectId={} shotId={} status={}",
                 projectId, shotId, shot.getStatus());
-        return toResponse(requireShot(projectId, shotId));
+        StoryboardShot saved = requireShot(projectId, shotId);
+        return toResponse(saved, previewImage(saved, SecurityUtils.requireCurrentUserId()));
     }
 
     /** 删除项目分镜镜头并整理顺序。 */
@@ -170,7 +177,9 @@ public class StoryboardShotService {
         workflowService.advanceTo(projectId, ProjectWorkflowStage.ASSETS,
                 SecurityUtils.requireCurrentUsername());
         log.info("Storyboard order updated projectId={} shotCount={}", projectId, requestedIds.size());
-        return storyboardShotRepository.findAllByProjectId(projectId, null).stream().map(this::toResponse).toList();
+        long ownerId = SecurityUtils.requireCurrentUserId();
+        return storyboardShotRepository.findAllByProjectId(projectId, null).stream()
+                .map(shot -> toResponse(shot, previewImage(shot, ownerId))).toList();
     }
 
     /** 校验当前用户可访问目标项目。 */
@@ -213,13 +222,20 @@ public class StoryboardShotService {
                         ProjectResponseCode.STORYBOARD_SHOT_NOT_FOUND, HttpStatus.NOT_FOUND));
     }
 
-    /** 将分镜镜头转换为响应对象。 */
-    private StoryboardShotResponse toResponse(StoryboardShot shot) {
+    /** 根据采用记录区分受平台保护的生成图片和用户上传的参考图。 */
+    private String previewImage(StoryboardShot shot, long ownerId) {
+        return Objects.nonNull(shot.getImageArtifactId())
+                ? mediaStorageService.previewGeneratedImage(shot.getImageUrl())
+                : mediaStorageService.previewUserImage(shot.getImageUrl(), ownerId);
+    }
+
+    /** 将分镜镜头转换为响应对象，供浏览器预览的凭证由调用方提供。 */
+    private StoryboardShotResponse toResponse(StoryboardShot shot, String imagePreviewUrl) {
         return new StoryboardShotResponse(
                 shot.getId(), shot.getProjectId(), shot.getChapterId(), shot.getSortOrder(), shot.getShotNumber(), shot.getTitle(),
                 shot.getSceneName(), shot.getShotType(), shot.getCameraMovement(), shot.getDurationSeconds(),
                 shot.getContent(), shot.getDialogue(), shot.getSoundEffect(), shot.getImageUrl(), shot.getNotes(),
-                shot.getStatus(), shot.getCreatedAt(), shot.getUpdatedAt());
+                shot.getStatus(), shot.getCreatedAt(), shot.getUpdatedAt(), imagePreviewUrl);
     }
 
     /** 去除字符串首尾空白并处理空值。 */

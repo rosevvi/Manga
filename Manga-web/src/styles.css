@@ -2,6 +2,7 @@
   font-family: 'Inter', system-ui, sans-serif;
   color: #f7f5fb;
   background: #050507;
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -12,6 +13,15 @@
   --muted: #aaa8b1;
   --purple: #9659ff;
   --purple-bright: #b96cff;
+  --workspace-surface: #15111b;
+  --workspace-inset: #100d15;
+  --workspace-line: #342a40;
+  --workspace-radius: 10px;
+  --workspace-accent: #c4a2ff;
+  --workspace-accent-surface: #251a38;
+  --workspace-success: #83d8a5;
+  --workspace-warning: #f4c479;
+  --workspace-danger: #f5a1b5;
 }
 
 * {
@@ -61,7 +71,10 @@ body {
 }
 
 button,
-a {
+a,
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -69,8 +82,41 @@ button {
   color: inherit;
 }
 
+:where(select, textarea, input:not([type=checkbox], [type=radio], [type=file], [type=range], [type=hidden])) {
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid var(--workspace-line);
+  border-radius: 7px;
+  color: inherit;
+  background: var(--workspace-inset);
+}
+
+select option {
+  color: #f7f5fb;
+  background: var(--workspace-inset);
+}
+
+progress,
+input[type=checkbox],
+input[type=radio] {
+  accent-color: var(--purple);
+}
+
+.media-image-unavailable {
+  display: inline-grid;
+  justify-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 button:focus-visible,
-a:focus-visible {
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
   outline: 2px solid #a768ff;
   outline-offset: 3px;
 }

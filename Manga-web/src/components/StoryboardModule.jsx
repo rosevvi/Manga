@@ -23,6 +23,7 @@ import { useLanguage } from '../i18n/LanguageContext'
 import './project-module.css'
 import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
 import ImageGenerationPanel from './ImageGenerationPanel'
+import MediaImage from './MediaImage'
 
 const EMPTY_SHOT = Object.freeze({
   title: '',
@@ -231,7 +232,7 @@ function StoryboardModule({ accessToken, projects, selectedProjectId, onSelectPr
           {shots.map((shot, index) => (
             <article className="storyboard-card" key={shot.id}>
               <div className="storyboard-preview">
-                {shot.imageUrl ? <img src={shot.imageUrl} alt="" /> : <ImageOff size={29} />}
+                <MediaImage src={shot.imagePreviewUrl || shot.imageUrl} fallback={<ImageOff size={29} />} />
                 <strong>{shot.shotNumber}</strong>
                 <span><Clock3 size={13} />{translate('storyboards.seconds', { seconds: shot.durationSeconds })}</span>
               </div>

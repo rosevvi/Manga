@@ -3,6 +3,7 @@ package com.manga.service;
 import com.manga.common.constant.StorageConstants;
 import com.manga.config.properties.AliyunOssProperties;
 import com.manga.service.storage.StorageStrategy;
+import com.manga.service.storage.AliyunOssStorageStrategy;
 import com.manga.service.storage.GeneratedMediaReference;
 import java.util.Objects;
 import jakarta.annotation.PostConstruct;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 public class MediaStorageService {
 
     private final AliyunOssProperties aliyunOssProperties;
+    private final AliyunOssStorageStrategy aliyunOss;
     private final List<StorageStrategy> strategies;
     /** 按存储类型索引的策略注册表。 */
     private Map<String, StorageStrategy> strategyMap;
@@ -32,12 +34,25 @@ public class MediaStorageService {
         strategyMap = strategies.stream().collect(Collectors.toMap(StorageStrategy::getType, Function.identity()));
     }
 
-    /** 保存二进制文件并返回可访问地址。 */
-    public String storeBytes(byte[] data, String subDir, String extension) {
+    /** 保存用户图片，OSS 使用上传人目录以限定后续预览授权。 */
+    public String storeUserImage(long userId, byte[] data, String subDir, String extension) {
         StorageStrategy strategy = resolveStrategy();
-        log.info("[MediaStorageService#storeBytes] request size={} subDir={} strategy={}",
+        log.info("[MediaStorageService#storeUserImage] request size={} subDir={} strategy={}",
                 data.length, subDir, strategy.getType());
+        if (StorageConstants.ALIYUN_OSS_TYPE.equals(strategy.getType())) {
+            return aliyunOss.storeUserImage(userId, data, subDir, extension);
+        }
         return strategy.storeBytes(data, subDir, extension);
+    }
+
+    /** 为调用方已授权的用户图片生成短期链接，外链与本地路径直接返回。 */
+    public String previewUserImage(String url, long uploadOwnerId) {
+        return aliyunOss.previewUserImage(url, uploadOwnerId);
+    }
+
+    /** 为调用方从受保护产物记录取得的地址生成短期预览链接。 */
+    public String previewGeneratedImage(String url) {
+        return aliyunOss.previewGeneratedImage(url);
     }
 
     /** 先生成位置并登记，再允许执行物理写入。 */

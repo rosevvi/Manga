@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getRuntimeOperations, getRunModelUsage, settleModelCall } from '../api/runtimeOperationsApi'
+import './runtime-operations.css'
 
 /** JDBC Map 列名在不同数据库驱动中大小写可能不同，统一为展示字段。 */
 const normalize = (row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key.toLowerCase(), value]))
@@ -59,19 +60,23 @@ export default function RuntimeOperations({ accessToken }) {
     finally { setBusy(false) }
   }
 
-  return <section className="dashboard-welcome" aria-label="创作运行监测">
-    <h1>创作运行监测</h1>
-    <p>调用费用为已报告 token 的计算值；失败、取消或未知请求可能只有部分用量。媒体生成费用单独核对。</p>
-    <button type="button" disabled={busy} onClick={refresh}>刷新监测</button>
-    {error && <p role="alert">{error}</p>}
+  return <section className="workspace-module runtime-operations" aria-label="创作运行监测">
+    <header className="workspace-heading">
+      <div>
+        <h1>创作运行监测</h1>
+        <p>调用费用为已报告 token 的计算值。失败、取消或未知请求可能只有部分用量。媒体生成费用单独核对。</p>
+      </div>
+      <button className="workspace-secondary" type="button" disabled={busy} onClick={refresh}>刷新监测</button>
+    </header>
+    {error && <p className="workspace-alert" role="alert">{error}</p>}
     {snapshot && <>
       <h2>近 24 小时模型调用</h2>
       <p>最近 100 个配置中，熔断冷却：{snapshot.openCircuits}</p>
-      <table><thead><tr><th>状态</th><th>调用数</th><th>已报告输入 / 输出</th><th>可计算费用</th><th>已核对金额</th><th>费用未知调用</th></tr></thead>
+      <div className="runtime-table"><table><thead><tr><th>状态</th><th>调用数</th><th>已报告输入 / 输出</th><th>可计算费用</th><th>已核对金额</th><th>费用未知调用</th></tr></thead>
         <tbody>{snapshot.usage.map(normalize).map((row) => <tr key={row.status}>
           <td>{row.status}</td><td>{row.calls}</td><td>{row.input_tokens ?? '—'} / {row.output_tokens ?? '—'}</td>
           <td>{money(row.calculated_usd)}</td><td>{row.settled_usd == null ? '未对账' : money(row.settled_usd)}</td><td>{row.unpriced_or_unknown_calls}</td>
-        </tr>)}</tbody></table>
+        </tr>)}</tbody></table></div>
       <h2>运行状态分布</h2>
       <ul>{snapshot.backlog.map(normalize).map((row) => <li key={row.status}>{row.status}：{row.runs}</li>)}</ul>
       <h2>供应商保护</h2>
@@ -80,25 +85,29 @@ export default function RuntimeOperations({ accessToken }) {
       </li>)}</ul>
     </>}
     <h2>按 Run 追踪调用</h2>
-    <input aria-label="Run ID" value={runId} onChange={(event) => setRunId(event.target.value)} placeholder="输入 runId" />
-    <button type="button" disabled={busy || !runId.trim()} onClick={() => loadUsage()}>查询用量</button>
-    <p>{loadedRun}</p>
-    <table><thead><tr><th>调用 / 步骤</th><th>模型</th><th>状态</th><th>输入 / 输出</th><th>计算费用</th><th>账单核对</th><th>失败类型</th></tr></thead>
+    <form className="runtime-actions" onSubmit={(event) => { event.preventDefault(); void loadUsage() }}>
+      <input aria-label="Run ID" value={runId} onChange={(event) => setRunId(event.target.value)} placeholder="输入 runId" />
+      <button className="workspace-primary" type="submit" disabled={busy || !runId.trim()}>查询用量</button>
+    </form>
+    {loadedRun && <p>{loadedRun}</p>}
+    {loadedRun && <div className="runtime-table"><table><thead><tr><th>调用 / 步骤</th><th>模型</th><th>状态</th><th>输入 / 输出</th><th>计算费用</th><th>账单核对</th><th>失败类型</th></tr></thead>
       <tbody>{calls.map((call) => <tr key={call.callId}>
         <td>{call.callId}<br />{call.stepId} · epoch {call.ownerEpoch}</td><td>{call.modelName}</td><td>{call.status}</td>
         <td>{call.inputTokens ?? '—'} / {call.outputTokens ?? '—'}</td><td>{money(call.calculatedUsd)}</td>
-        <td>{call.settledUsd != null ? money(call.settledUsd) : call.status !== 'STARTED' && <button type="button" disabled={busy} onClick={() => {
+        <td>{call.settledUsd != null ? money(call.settledUsd) : call.status !== 'STARTED' && <button className="workspace-secondary" type="button" disabled={busy} onClick={() => {
           setSettlementCall(call.callId); setSettledAmount(''); setSettlementNote('')
         }}>核对账单</button>}</td><td>{call.failureType || '—'}</td>
-      </tr>)}</tbody></table>
-    {calls.length > 0 && calls.length % 100 === 0 && <button type="button" disabled={busy} onClick={() => loadUsage(true)}>加载更早调用</button>}
-    {settlementCall && <form onSubmit={confirmSettlement}>
+      </tr>)}</tbody></table></div>}
+    {calls.length > 0 && calls.length % 100 === 0 && <button className="workspace-secondary" type="button" disabled={busy} onClick={() => loadUsage(true)}>加载更早调用</button>}
+    {settlementCall && <form className="runtime-settlement" onSubmit={confirmSettlement}>
       <h3>确认账单：{settlementCall}</h3>
       <p>请先核对供应商账单。确认后不可覆盖；此操作仅记录金额，不会向供应商付款。</p>
       <label>实际核对金额（USD）<input type="number" required min="0" max="999999999999" step="0.00000001" value={settledAmount} onChange={(event) => setSettledAmount(event.target.value)} /></label>
       <label>账单编号或依据<input required maxLength={500} value={settlementNote} onChange={(event) => setSettlementNote(event.target.value)} /></label>
-      <button type="submit" disabled={busy}>确认记录账单</button>
-      <button type="button" disabled={busy} onClick={() => setSettlementCall(null)}>取消</button>
+      <div className="runtime-actions">
+        <button className="workspace-secondary" type="button" disabled={busy} onClick={() => setSettlementCall(null)}>取消</button>
+        <button className="workspace-primary" type="submit" disabled={busy}>确认记录账单</button>
+      </div>
     </form>}
   </section>
 }

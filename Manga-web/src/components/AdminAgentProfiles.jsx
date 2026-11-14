@@ -147,22 +147,22 @@ export default function AdminAgentProfiles({ accessToken, projects = [] }) {
   }, start ? '已启动只读测试；可随时停止。' : '编译校验通过，此次预览没有调用模型。')
   const diffs = compareAgentDefinitions(comparison, definition)
 
-  return <section className="agent-admin">
-    <header><div><h1>Agent 配置管理</h1><p>维护专业定义与发布版本。已发布内容不可修改，业务写入继续经过用户审批。</p></div>
-      <button type="button" disabled={busy} onClick={() => { setCreating(true); setDefinition(newAgentDefinition()); setModelNamesText(''); setNewKey(''); setError(''); setNotice('') }}>新增专业 Agent</button></header>
+  return <section className="workspace-module agent-admin">
+    <header className="workspace-heading"><div><h1>Agent 配置管理</h1><p>维护专业定义与发布版本。已发布内容不可修改，业务写入继续经过用户审批。</p></div>
+      <button className="workspace-primary" type="button" disabled={busy} onClick={() => { setCreating(true); setDefinition(newAgentDefinition()); setModelNamesText(''); setNewKey(''); setError(''); setNotice('') }}>新增专业 Agent</button></header>
     {error && <p className="agent-admin-error" role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     <div className="agent-admin-layout">
       <nav aria-label="Agent 配置列表">{items.map((item) => <button type="button" key={item.profileId} disabled={busy}
-        className={!creating && item.profileId === key ? 'selected' : ''} onClick={() => { setCreating(false); setKey(item.profileId); setError('') }}>
+        className={!creating && item.profileId === key ? 'workspace-secondary selected' : 'workspace-secondary'} onClick={() => { setCreating(false); setKey(item.profileId); setError('') }}>
         <strong>{item.profileId}</strong><small>{item.enabled ? '启用' : '禁用'} · {item.activeVersion ? `发布 v${item.activeVersion}` : '尚未发布'}</small></button>)}</nav>
       <main>
         {!creating && detail && <div className="agent-admin-toolbar"><strong>{key}</strong><span>revision {detail.profile.revision}</span>
           <select aria-label="查看定义版本" value={number || ''} disabled={busy} onChange={(event) => setNumber(Number(event.target.value))}>
             {detail.versions.map((item) => <option key={item.version} value={item.version}>v{item.version} · {item.status === AGENT_VERSION_STATUS.DRAFT ? '草稿' : '已发布'}{detail.profile.activeVersion === item.version ? ' · 当前生效' : ''}</option>)}</select>
-          <button type="button" disabled={busy || !version} onClick={() => mutate('clone')}>基于此版建草稿</button>
-          <button type="button" disabled={busy} onClick={() => mutate('enable')}>{detail.profile.enabled ? '禁用新调用' : '启用新调用'}</button>
-          <button type="button" disabled={busy} onClick={() => perform(() => reload(), '已刷新服务器版本。')}>刷新</button>
+          <button className="workspace-secondary" type="button" disabled={busy || !version} onClick={() => mutate('clone')}>基于此版建草稿</button>
+          <button className="workspace-secondary" type="button" disabled={busy} onClick={() => mutate('enable')}>{detail.profile.enabled ? '禁用新调用' : '启用新调用'}</button>
+          <button className="workspace-secondary" type="button" disabled={busy} onClick={() => perform(() => reload(), '已刷新服务器版本。')}>刷新</button>
         </div>}
         {(creating || version) && <form onSubmit={save}>
           <fieldset disabled={busy || !canEdit}>
@@ -188,14 +188,14 @@ export default function AdminAgentProfiles({ accessToken, projects = [] }) {
               <label>允许的模型名称（逗号分隔，留空不限）<input value={modelNamesText} onChange={(event) => { setModelNamesText(event.target.value); update('model', { ...definition.model, models: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) }) }} /></label>
             </section>
             <section><h3>预算上限</h3><div className="agent-admin-fields">{Object.entries(AGENT_BUDGET_LABEL).map(([field, label]) => <label key={field}>{label}<input required type="number" min={field === 'maxRepairRounds' ? 0 : 1} value={definition.budget[field]} onChange={(event) => update('budget', { ...definition.budget, [field]: Number(event.target.value) })} /></label>)}</div></section>
-            {canEdit && <button type="submit">保存草稿</button>}
+            {canEdit && <button className="workspace-primary" type="submit">保存草稿</button>}
           </fieldset>
         </form>}
         {!creating && version && <>
           <section><h3>发布与回滚</h3><label>操作说明<input maxLength={1000} value={comment} disabled={busy} onChange={(event) => setComment(event.target.value)} /></label>
             {version.status === AGENT_VERSION_STATUS.DRAFT
-              ? <button type="button" disabled={busy || compareAgentDefinitions(version.definition, definition).length > 0} onClick={() => mutate('publish')}>校验并发布 v{number}</button>
-              : <button type="button" disabled={busy || detail?.profile.activeVersion === number} onClick={() => mutate('rollback')}>回滚发布指针至 v{number}</button>}
+              ? <button className="workspace-secondary" type="button" disabled={busy || compareAgentDefinitions(version.definition, definition).length > 0} onClick={() => mutate('publish')}>校验并发布 v{number}</button>
+              : <button className="workspace-secondary" type="button" disabled={busy || detail?.profile.activeVersion === number} onClick={() => mutate('rollback')}>回滚发布指针至 v{number}</button>}
           </section>
           <section><h3>版本比较</h3><label>与此历史版本比较<select value={compareNumber} onChange={(event) => setCompareNumber(event.target.value)}><option value="">选择基准版本</option>{detail?.versions.map((item) => <option key={item.version} value={item.version}>v{item.version}</option>)}</select></label>
             {comparison && !diffs.length && <p>定义内容一致。</p>}{diffs.map((diff) => <article key={diff.key}><h4>{diff.label}</h4><div className="agent-diff"><pre aria-label="原版本">{diff.before}</pre><pre aria-label="当前版本">{diff.after}</pre></div></article>)}
@@ -204,15 +204,15 @@ export default function AdminAgentProfiles({ accessToken, projects = [] }) {
             <div className="agent-admin-fields"><label>测试项目<select value={testProject} disabled={busy} onChange={(event) => { setTestProject(event.target.value); setPreview(null) }}><option value="">不绑定项目</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
               <label>你的模型配置<select value={testModel} disabled={busy} onChange={(event) => { setTestModel(event.target.value); setPreview(null) }}><option value="">使用默认模型</option>{models.filter((model) => model.enabled).map((model) => <option key={model.id} value={model.id}>{model.name} · {model.defaultModel}</option>)}</select></label></div>
             <label>测试问题<textarea rows="3" maxLength={12000} value={testInstruction} disabled={busy} onChange={(event) => setTestInstruction(event.target.value)} /></label>
-            <button type="button" disabled={busy || !testInstruction.trim() || !detail?.profile.enabled} onClick={() => runTest(false)}>校验并预览</button>
-            <button type="button" disabled={busy || testActive || !preview || !detail?.profile.enabled} onClick={() => runTest(true)}>启动模型测试（产生费用）</button>
+            <button className="workspace-secondary" type="button" disabled={busy || !testInstruction.trim() || !detail?.profile.enabled} onClick={() => runTest(false)}>校验并预览</button>
+            <button className="workspace-secondary" type="button" disabled={busy || testActive || !preview || !detail?.profile.enabled} onClick={() => runTest(true)}>启动模型测试（产生费用）</button>
             {preview && <p>Kernel 指纹：<code>{preview.fingerprint}</code><br />模型：{preview.model} · 轮数上限：{preview.maxTurns}<br />只读工具：{preview.capabilities.join('、') || '无'}</p>}
-            {testRun && <div><p>Run：{testRun.runId}</p>{testActive && <button type="button" disabled={busy} onClick={() => perform(() => cancelCreativeRun(accessToken, testRun.runId), '已请求停止测试。')}>停止测试</button>}
+            {testRun && <div><p>Run：{testRun.runId}</p>{testActive && <button className="workspace-secondary" type="button" disabled={busy} onClick={() => perform(() => cancelCreativeRun(accessToken, testRun.runId), '已请求停止测试。')}>停止测试</button>}
               {testMessages.filter((message) => message.role === 'ASSISTANT').map((message) => <article key={message.projectionKey}><p>{message.content || '正在执行…'}</p><small>{message.status}</small></article>)}
               <CreativeRunGraph accessToken={accessToken} runId={testRun.runId} /></div>}
           </section>
           <section><h3>操作审计</h3><table><thead><tr><th>操作</th><th>版本</th><th>发布指针</th><th>操作者</th><th>时间与说明</th></tr></thead><tbody>{audits.map((audit) => <tr key={audit.id}><td>{AGENT_ACTION_LABEL[audit.action] || audit.action}</td><td>{audit.version || '—'}</td><td>{audit.previousActiveVersion || '—'} → {audit.activeVersion || '—'}</td><td>{audit.actor}</td><td>{audit.at}<br />{audit.comment}</td></tr>)}</tbody></table>
-            {moreAudits && <button type="button" disabled={busy} onClick={() => perform(async () => { const page = await getAgentAudits(accessToken, key, audits.at(-1)?.id); setAudits((current) => [...current, ...page]); setMoreAudits(page.length === AGENT_AUDIT_PAGE_SIZE) }, '已加载审计记录。')}>更早记录</button>}
+            {moreAudits && <button className="workspace-secondary" type="button" disabled={busy} onClick={() => perform(async () => { const page = await getAgentAudits(accessToken, key, audits.at(-1)?.id); setAudits((current) => [...current, ...page]); setMoreAudits(page.length === AGENT_AUDIT_PAGE_SIZE) }, '已加载审计记录。')}>更早记录</button>}
           </section>
         </>}
       </main>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, LoaderCircle, LogIn, QrCode, RefreshCw, UserRound, X } from 'lucide-react'
 import { createWechatQrLogin, getWechatQrLoginStatus, login, loginAsGuest } from '../api/authApi'
 import { AUTH_CONFIG, EXTERNAL_LOGIN_STATUS } from '../constants/auth'
@@ -18,6 +18,10 @@ function LoginModal({ onClose, onAuthenticated }) {
   const [fieldErrors, setFieldErrors] = useState({})
   const [wechatSession, setWechatSession] = useState(null)
   const [wechatStatus, setWechatStatus] = useState(null)
+  const wechatRequest = useRef(null)
+
+  /** 关闭弹窗后取消未完成的二维码请求，避免迟到响应写入旧页面。 */
+  useEffect(() => () => wechatRequest.current?.abort(), [])
 
   useEffect(() => {
     if (view !== LOGIN_VIEW.WECHAT
@@ -26,11 +30,12 @@ function LoginModal({ onClose, onAuthenticated }) {
 
     let cancelled = false
     let pollTimer
+    const pollController = new AbortController()
 
     /** 轮询扫码结果，并在微信确认后交付平台登录响应。 */
     const pollWechatStatus = async () => {
       try {
-        const result = await getWechatQrLoginStatus(wechatSession.loginToken)
+        const result = await getWechatQrLoginStatus(wechatSession.loginToken, { signal: pollController.signal })
         if (cancelled) return
         if (result.authentication) {
           onAuthenticated(result.authentication)
@@ -54,6 +59,7 @@ function LoginModal({ onClose, onAuthenticated }) {
     ))
     return () => {
       cancelled = true
+      pollController.abort()
       window.clearTimeout(pollTimer)
     }
   }, [onAuthenticated, view, wechatSession, wechatStatus])
@@ -103,24 +109,34 @@ function LoginModal({ onClose, onAuthenticated }) {
 
   /** 请求公众号二维码并进入扫码登录视图。 */
   const startWechatLogin = async () => {
+    wechatRequest.current?.abort()
+    const controller = new AbortController()
+    wechatRequest.current = controller
     setView(LOGIN_VIEW.WECHAT)
     setError('')
     setWechatSession(null)
     setWechatStatus(null)
     setLoadingMode(LOGIN_MODE.wechat)
     try {
-      const session = await createWechatQrLogin()
+      const session = await createWechatQrLogin({ signal: controller.signal })
+      if (controller.signal.aborted || wechatRequest.current !== controller) return
       setWechatSession(session)
       setWechatStatus(EXTERNAL_LOGIN_STATUS.WAITING)
     } catch (requestError) {
-      setError(requestError.message)
+      if (!controller.signal.aborted && wechatRequest.current === controller) setError(requestError.message)
     } finally {
-      setLoadingMode(null)
+      if (wechatRequest.current === controller) {
+        wechatRequest.current = null
+        setLoadingMode(null)
+      }
     }
   }
 
   /** 返回账号密码登录并停止二维码轮询。 */
   const returnToPasswordLogin = () => {
+    wechatRequest.current?.abort()
+    wechatRequest.current = null
+    setLoadingMode(null)
     setView(LOGIN_VIEW.PASSWORD)
     setWechatSession(null)
     setWechatStatus(null)

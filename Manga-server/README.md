@@ -175,11 +175,12 @@ MANGA_OSS_PUBLIC_DOMAIN=
 ```
 
 - `MANGA_OSS_ENDPOINT` 填写 Bucket 所在地域的外网 Endpoint，例如控制台“概览”页面显示的地域节点，不要包含 Bucket 名称。
-- AccessKey 建议使用 RAM 用户并仅授予 `manga-ai/mannga/*` 所需的对象上传权限，不要使用阿里云主账号 AccessKey。
-- `MANGA_OSS_PUBLIC_DOMAIN` 可留空；留空时返回 `https://manga-ai.<Endpoint>/mannga/...`。配置 CDN 或自定义域名后填写该域名即可。
-- 当前项目需要浏览器长期访问封面图和画风参考图，因此 Bucket 对象需要具备公开读取能力，或通过可公开访问的 CDN/自定义域名提供读取能力。
+- RAM 用户需要目标路径的 `oss:PutObject` 和 `oss:GetObject`。如果启用了生成物回收，还需要生成目录的 `oss:DeleteObject`。
+- `MANGA_OSS_PUBLIC_DOMAIN` 可留空。若 OSS 默认域名对图片强制下载，可使用已绑定同一个 Bucket 的 HTTPS 自定义域名。使用 CDN 时需保证签名参数能透传到 OSS。
+- 项目封面、参考图和生成物支持私有 Bucket。API 在校验业务访问权限后生成有效期一小时的预览链接，数据库保存稳定引用。
+- 旧版没有上传者路径的私有封面或参考图，需重新上传后保存，才能生成授权预览。
 
-默认对象键格式为 `mannga/images/<UUID>.<扩展名>`。切回本地存储只需将 `MANGA_OSS_ENABLED` 改为 `false`。
+新上传的默认对象键格式为 `mannga/users/<用户 ID>/images/<UUID>.<扩展名>`。切回本地存储只需将 `MANGA_OSS_ENABLED` 改为 `false`。
 
 ## AI 服务配置
 

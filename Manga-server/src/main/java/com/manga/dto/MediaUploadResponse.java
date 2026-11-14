@@ -2,13 +2,15 @@ package com.manga.dto;
 
 /** 返回已上传媒体文件的浏览器可访问地址和基础元信息。 */
 public record MediaUploadResponse(
-        /** 浏览器可访问的媒体地址。 */
+        /** 可持久化的稳定媒体引用。 */
         String url,
         /** 媒体文件存储路径。 */
         String path,
         /** 用户上传时的原始文件名。 */
         String originalFilename,
         /** 文件大小，单位为字节。 */
-        long size
+        long size,
+        /** 浏览器即时预览地址，OSS 链接可能过期。 */
+        String previewUrl
 ) {
 }

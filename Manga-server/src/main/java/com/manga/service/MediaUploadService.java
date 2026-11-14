@@ -29,8 +29,8 @@ public class MediaUploadService {
     private final MediaUploadProperties uploadProperties;
     private final MediaStorageService mediaStorageService;
 
-    /** 校验并保存图片文件，返回绝对访问 URL 与站内路径。 */
-    public MediaUploadResponse uploadImage(MultipartFile file, String subDir, HttpServletRequest request) {
+    /** 校验并保存图片文件，分别返回稳定存储引用和即时预览地址。 */
+    public MediaUploadResponse uploadImage(long userId, MultipartFile file, String subDir, HttpServletRequest request) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(CommonResponseCode.VALIDATION_ERROR, UPLOAD_IMAGE_EMPTY, HttpStatus.BAD_REQUEST);
         }
@@ -47,9 +47,10 @@ public class MediaUploadService {
 
         String extension = IMAGE_EXTENSION_BY_CONTENT_TYPE.get(contentType);
         try {
-            String path = mediaStorageService.storeBytes(file.getBytes(), normalizeSubDir(subDir), extension);
+            String path = mediaStorageService.storeUserImage(userId, file.getBytes(), normalizeSubDir(subDir), extension);
             String url = toAbsoluteUrl(path, request);
-            return new MediaUploadResponse(url, path, file.getOriginalFilename(), file.getSize());
+            return new MediaUploadResponse(url, path, file.getOriginalFilename(), file.getSize(),
+                    mediaStorageService.previewUserImage(path, userId));
         } catch (IOException | IllegalArgumentException | IllegalStateException exception) {
             throw new BusinessException(
                     CommonResponseCode.INTERNAL_ERROR, UPLOAD_IMAGE_FAILED, HttpStatus.INTERNAL_SERVER_ERROR);

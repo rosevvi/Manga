@@ -23,6 +23,7 @@ import {
 import Dashboard from './components/Dashboard'
 import LanguageSelector from './components/LanguageSelector'
 import LoginModal from './components/LoginModal'
+import { AUTH_REQUEST_ERROR } from './constants/auth'
 import { APP_ROUTE } from './constants/routes'
 import { useLanguage } from './i18n/LanguageContext'
 
@@ -120,14 +121,20 @@ function App() {
   }, [modalOpen, loginOpen])
 
   useEffect(() => {
-    if (!authSession?.accessToken) return
-
-    getCurrentUser(authSession.accessToken)
-      .then((user) => setAuthSession((current) => current && { ...current, user }))
-      .catch(() => {
+    const token = authSession?.accessToken
+    if (!token) return undefined
+    let stopped = false
+    getCurrentUser(token)
+      .then((user) => {
+        if (!stopped) setAuthSession((current) => current?.accessToken === token ? { ...current, user } : current)
+      })
+      .catch((error) => {
+        const invalidSession = error.status === 401 || error.code === AUTH_REQUEST_ERROR.USER_NOT_FOUND
+        if (stopped || !invalidSession || readAuthSession()?.accessToken !== token) return
         clearAuthSession()
         setAuthSession(null)
       })
+    return () => { stopped = true }
   }, [])
 
   /** 保存登录结果并关闭弹窗。 */

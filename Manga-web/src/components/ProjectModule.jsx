@@ -26,6 +26,7 @@ import {
 } from '../constants/project'
 import { useLanguage } from '../i18n/LanguageContext'
 import ImageInput from './ImageInput'
+import MediaImage from './MediaImage'
 import './project-module.css'
 
 const EMPTY_PROJECT = Object.freeze({
@@ -191,6 +192,9 @@ function ProjectModule({ accessToken, projects, loading, error, onProjectsChange
       <ImageInput
         accessToken={accessToken}
         value={form[field]}
+        previewUrl={form[field] === editingProject?.[field]
+          ? (field === 'coverUrl' ? editingProject?.coverPreviewUrl : editingProject?.artStyleImagePreviewUrl)
+          : undefined}
         maxLength={maxLength}
         uploadSubDir={uploadSubDir}
         onChange={(value) => updateForm(field, value)}
@@ -256,7 +260,7 @@ function ProjectModule({ accessToken, projects, loading, error, onProjectsChange
             return (
               <article className="project-module-card" key={project.id}>
                   <button className="project-module-cover" type="button" onClick={() => onOpenProject(project)}>
-                  {project.coverUrl ? <img src={project.coverUrl} alt="" /> : <ImageOff size={30} />}
+                  <MediaImage src={project.coverPreviewUrl || project.coverUrl} fallback={<ImageOff size={30} />} />
                   <span className={`workspace-status ${statusClass}`}>
                     {translate(`projectStatus.${project.status}`)}
                   </span>
@@ -400,7 +404,7 @@ function ProjectModule({ accessToken, projects, loading, error, onProjectsChange
                         onClick={() => selectPreset(preset)}
                       >
                         <span className="project-style-thumb">
-                          {preset.referenceImagePath ? <img src={preset.referenceImagePath} alt="" /> : <ImageOff size={18} />}
+                          <MediaImage src={preset.referenceImagePath} fallback={<ImageOff size={18} />} />
                         </span>
                         <strong>{preset.name}</strong>
                       </button>

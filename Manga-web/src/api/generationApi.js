@@ -1,7 +1,4 @@
 import { authorizedRequest } from './authorizedApi'
-import { AUTH_CONFIG } from '../constants/auth'
-/** 本地媒体相对路径按后端来源解析，开发环境前后端端口可以不同。 */
-export function generationMediaUrl(url) { return url ? new URL(url, new URL(AUTH_CONFIG.apiBaseUrl, window.location.origin)).href : '' }
 /** 作业 API 的客户端根路径。 */
 const ENDPOINT = '/generation-jobs'
 /** 每次采用前读取最新图片与项目版本，不沿用生成时的旧 revision。 */

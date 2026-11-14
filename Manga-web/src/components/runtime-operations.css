@@ -1,0 +1,80 @@
+.runtime-operations {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.runtime-operations .workspace-heading {
+  flex-wrap: wrap;
+  margin: 0 0 6px;
+}
+
+.runtime-operations :is(h2, h3, p, ul) {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.runtime-operations h2 {
+  font-size: 16px;
+}
+
+.runtime-operations p,
+.runtime-operations li {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.runtime-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.runtime-actions > input {
+  flex: 1 1 240px;
+}
+
+.runtime-table,
+.runtime-settlement {
+  min-width: 0;
+  border: 1px solid var(--workspace-line);
+  border-radius: var(--workspace-radius);
+  background: var(--workspace-surface);
+}
+
+.runtime-table {
+  overflow-x: auto;
+}
+
+.runtime-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.runtime-table :is(th, td) {
+  padding: 12px;
+  border-bottom: 1px solid var(--workspace-line);
+  text-align: left;
+}
+
+.runtime-table th {
+  color: var(--workspace-accent);
+  white-space: nowrap;
+}
+
+.runtime-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.runtime-settlement,
+.runtime-settlement label {
+  display: grid;
+  gap: 8px;
+}
+
+.runtime-settlement {
+  padding: 16px;
+}

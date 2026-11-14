@@ -1,19 +1,43 @@
-import { AUTH_CONFIG, AUTH_ENDPOINTS, wechatQrLoginStatusEndpoint } from '../constants/auth'
+import { AUTH_CONFIG, AUTH_ENDPOINTS, AUTH_REQUEST_ERROR, wechatQrLoginStatusEndpoint } from '../constants/auth'
+
+/** 会话恢复共享同一个进行中的身份查询。 */
+const pendingCurrentUsers = new Map()
 
 /** 调用认证接口并将统一错误响应转换为可展示异常。 */
 async function request(path, options = {}) {
-  const response = await fetch(`${AUTH_CONFIG.apiBaseUrl}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  })
-  const payload = await response.json().catch(() => null)
-  if (!response.ok || !payload?.success) {
-    throw new Error(payload?.message ?? 'Unable to connect to Manga server')
+  const controller = new AbortController()
+  let timedOut = false
+  const cancel = () => controller.abort(options.signal?.reason)
+  if (options.signal?.aborted) cancel()
+  else options.signal?.addEventListener('abort', cancel, { once: true })
+  const timeout = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, AUTH_CONFIG.requestTimeoutMs)
+  try {
+    const response = await fetch(`${AUTH_CONFIG.apiBaseUrl}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok || !payload?.success) {
+      const error = new Error(payload?.message ?? AUTH_REQUEST_ERROR.UNAVAILABLE)
+      error.status = response.status
+      error.code = payload?.code
+      throw error
+    }
+    return payload.data
+  } catch (error) {
+    if (timedOut) throw new Error(AUTH_REQUEST_ERROR.TIMEOUT)
+    throw error
+  } finally {
+    clearTimeout(timeout)
+    options.signal?.removeEventListener('abort', cancel)
   }
-  return payload.data
 }
 
 /** 使用数据库账号和密码登录。 */
@@ -30,22 +54,26 @@ export function loginAsGuest() {
 }
 
 /** 创建微信公众号扫码登录二维码。 */
-export function createWechatQrLogin() {
-  return request(AUTH_ENDPOINTS.wechatQrLogin, { method: 'POST' })
+export function createWechatQrLogin(options = {}) {
+  return request(AUTH_ENDPOINTS.wechatQrLogin, { ...options, method: 'POST' })
 }
 
 /** 查询微信公众号扫码登录会话状态。 */
-export function getWechatQrLoginStatus(loginToken) {
-  return request(wechatQrLoginStatusEndpoint(loginToken))
+export function getWechatQrLoginStatus(loginToken, options = {}) {
+  return request(wechatQrLoginStatusEndpoint(loginToken), options)
 }
 
 /** 使用访问令牌重新获取当前身份。 */
 export function getCurrentUser(accessToken) {
-  return request(AUTH_ENDPOINTS.currentUser, {
+  const pending = pendingCurrentUsers.get(accessToken)
+  if (pending) return pending
+  const read = request(AUTH_ENDPOINTS.currentUser, {
     headers: {
       Authorization: `${AUTH_CONFIG.bearerType} ${accessToken}`,
     },
-  })
+  }).finally(() => pendingCurrentUsers.delete(accessToken))
+  pendingCurrentUsers.set(accessToken, read)
+  return read
 }
 
 /** 更新当前数据库用户的基础资料。 */

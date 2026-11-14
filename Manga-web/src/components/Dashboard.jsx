@@ -37,6 +37,7 @@ import StoryboardModule from './StoryboardModule'
 import AiProviderSettings from './AiProviderSettings'
 import AdminAgentProfiles from './AdminAgentProfiles'
 import RuntimeOperations from './RuntimeOperations'
+import MediaImage from './MediaImage'
 import { OPERATIONS_NAV } from '../api/runtimeOperationsApi'
 import { AGENT_ADMIN_ROLE, AGENT_PROFILE_NAV } from '../constants/agentProfile'
 import ProjectWorkspace from './ProjectWorkspace'
@@ -126,6 +127,9 @@ const CREATION_FILTERS = [
   { id: 'drafts', labelKey: 'dashboard.filter.drafts' },
 ]
 const DEFAULT_USER_NAME = 'Sakura'
+/** 通知有活动任务时快速刷新，空闲时减少后台请求。 */
+const ACTIVE_TASK_POLL_MS = 5000
+const IDLE_TASK_POLL_MS = 30000
 
 function projectRoute(pathname = window.location.pathname) {
   const match = pathname.match(/^\/console\/projects\/(\d+)(?:\/(script\/chapters\/(\d+)|storyboards|script|assets|generation|export))?$/)
@@ -156,6 +160,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   const accessToken = authSession?.accessToken
   const isGuest = Boolean(authSession?.user?.guest)
   const isAdmin = Boolean(authSession?.user?.roles?.includes(AGENT_ADMIN_ROLE))
+  const needsProjectList = activeNav !== 'project' && activeNav !== 'ai-settings' && activeNav !== OPERATIONS_NAV
 
   /** 刷新当前用户项目，游客保持只读控制台体验。 */
   const loadProjects = useCallback(async () => {
@@ -176,23 +181,46 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   }, [accessToken, isGuest, translate])
 
   useEffect(() => {
-    loadProjects()
-  }, [loadProjects])
+    if (needsProjectList) void loadProjects()
+  }, [loadProjects, needsProjectList])
 
   /** 审批改变章节或镜头数量时同步更新项目列表。 */
   useEffect(() => {
+    if (!needsProjectList) return undefined
     window.addEventListener(CREATIVE_PROJECT_CHANGED, loadProjects)
     return () => window.removeEventListener(CREATIVE_PROJECT_CHANGED, loadProjects)
-  }, [loadProjects])
+  }, [loadProjects, needsProjectList])
 
   useEffect(() => {
     if (!accessToken || isGuest) return undefined
     let cancelled = false
-    const loadTasks = () => getActiveTasks(accessToken).then((tasks) => { if (!cancelled) setActiveTasks(tasks) }).catch(() => {})
-    loadTasks()
-    const timer = window.setInterval(loadTasks, 5000)
-    return () => { cancelled = true; window.clearInterval(timer) }
-  }, [accessToken, isGuest])
+    let busy = false
+    let timer
+    let hasTasks = false
+    const loadTasks = async () => {
+      if (cancelled || busy || document.hidden) return
+      window.clearTimeout(timer)
+      busy = true
+      try {
+        const tasks = await getActiveTasks(accessToken)
+        if (cancelled) return
+        hasTasks = tasks.length > 0
+        setActiveTasks(tasks)
+      } catch {
+        // 保留上次成功快照，下一轮重试。
+      } finally {
+        busy = false
+        if (!cancelled) timer = window.setTimeout(loadTasks, hasTasks || taskPanelOpen ? ACTIVE_TASK_POLL_MS : IDLE_TASK_POLL_MS)
+      }
+    }
+    void loadTasks()
+    document.addEventListener('visibilitychange', loadTasks)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', loadTasks)
+    }
+  }, [accessToken, isGuest, taskPanelOpen])
 
   useEffect(() => {
     const handleHistoryChange = () => {
@@ -242,8 +270,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   }
 
   const navigateProjectStage = (stage) => {
-    const project = projects.find((item) => item.id === selectedProjectId)
-    if (project) navigateProject(project, stage)
+    if (selectedProjectId) navigateProject({ id: selectedProjectId }, stage)
   }
 
   return (
@@ -386,7 +413,8 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
             {projects.slice(0, 4).map((project) => (
               <button className="recent-project-card" type="button" key={project.id} onClick={() => openProject(project)}>
                 <div className="project-image-wrap">
-                  {project.coverUrl ? <img src={project.coverUrl} alt="" /> : <span className="project-cover-placeholder"><ImageIcon size={28} /></span>}
+                  <MediaImage src={project.coverPreviewUrl || project.coverUrl}
+                    fallback={<span className="project-cover-placeholder"><ImageIcon size={28} /></span>} />
                   <MoreVertical size={17} />
                 </div>
                 <div className="project-card-meta">

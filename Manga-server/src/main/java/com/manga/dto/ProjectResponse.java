@@ -41,6 +41,10 @@ public record ProjectResponse(
         /** 创建时间。 */
         LocalDateTime createdAt,
         /** 最后更新时间。 */
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        /** 封面即时预览地址，OSS 链接可能过期。 */
+        String coverPreviewUrl,
+        /** 画风参考图即时预览地址，OSS 链接可能过期。 */
+        String artStyleImagePreviewUrl
 ) {
 }
