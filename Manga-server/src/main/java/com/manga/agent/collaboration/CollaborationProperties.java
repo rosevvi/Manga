@@ -15,7 +15,7 @@ public record CollaborationProperties(
         /** 每个 Run 同时持有执行租约的最大 Step 数。 */ @DefaultValue("3") @Min(1) @Max(8) int maxParallel,
         /** 首次计划之外允许的修订计划轮数。 */ @DefaultValue("2") @Min(0) @Max(8) int maxRepairRounds,
         /** 包含故障重试的模型执行次数上限。 */ @DefaultValue("24") @Min(1) int maxInvocations,
-        /** 按每次 Blueprint 最大轮数预留的推理轮次总额，并非实际 token 或美元。 */ @DefaultValue("256") @Min(1) int maxReservedTurns,
+        /** 按每次 Blueprint 最大轮数预留的推理轮次总额。 */ @DefaultValue("256") @Min(1) int maxReservedTurns,
         /** 单次委派允许的 Worker 节点数。 */ @DefaultValue("8") @Min(1) @Max(16) int maxBatchSize,
         /** Worker 结果正文和候选草稿的序列化字符上限。 */ @DefaultValue("24000") @Min(2048) @Max(100000) int maxResultCharacters,
         /** 内置协作 Worker 的提示词语义版本。 */ @DefaultValue("1") @Min(1) long workerProfileVersion,

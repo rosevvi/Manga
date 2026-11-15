@@ -18,8 +18,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -30,7 +28,7 @@ import java.time.Duration;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
-/** 请求发出前持久化受理；关闭时以 callId CAS 幂等结算，失联调用绝不自动重发。 */
+/** 请求发出前持久化受理；按 callId 幂等关闭调用记录，失联调用绝不自动重发。 */
 @Service
 @RequiredArgsConstructor
 public class ModelUsageService {
@@ -40,7 +38,7 @@ public class ModelUsageService {
     private final RuntimeOperationsProperties properties;
     private final MeterRegistry metrics;
 
-    /** Run → 配置门禁按固定顺序加锁，限制跨实例并发、分钟速率和每日规划预留。 */
+    /** Run → 配置门禁按固定顺序加锁，限制跨实例并发和分钟速率。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ModelCallLedger begin(AgentBlueprint blueprint, AgentRuntimeContext context) {
         if (!context.deadline().isAfter(Instant.now()))
@@ -51,11 +49,9 @@ public class ModelUsageService {
         String actor = SystemActor.CREATIVE_RUNTIME.code();
         var gate = repository.lockGate(blueprint.model().configId(), actor);
         boolean probe = gate.getConsecutiveFailures() >= properties.failureThreshold();
+        int active = repository.active(gate.getConfigId(), now);
         if ((Objects.nonNull(gate.getOpenUntil()) && gate.getOpenUntil().isAfter(now))
-                || (probe && repository.active(gate.getConfigId(), now) > 0)
-                || repository.active(gate.getConfigId(), now) >= properties.maxConcurrent()
-                || repository.reserved(gate.getConfigId(), now.toLocalDate().atStartOfDay())
-                    .add(properties.reservedUsdPerCall()).compareTo(properties.dailyReservedUsd()) > 0) reject();
+                || (probe && active > 0) || active >= properties.maxConcurrent()) reject();
         LocalDateTime minute = now.truncatedTo(ChronoUnit.MINUTES);
         if (!gate.getWindowStartedAt().equals(minute)) {
             gate.setWindowStartedAt(minute); gate.setWindowRequests(0);
@@ -69,20 +65,15 @@ public class ModelUsageService {
         call.setOwnerEpoch(context.ownerEpoch()); call.setConfigId(blueprint.model().configId());
         call.setModelName(blueprint.model().modelName()); call.setBlueprintFingerprint(blueprint.fingerprint());
         call.setStatus(ModelCallStatus.STARTED); call.setUsageReported(false);
-        call.setReservedUsd(properties.reservedUsdPerCall());
         call.setStartedAt(now);
         Instant timeout = Instant.now().plus(run.getOperationType() == CreativeOperationType.GENERATE_CHAPTER_STORYBOARD
                 ? properties.storyboardCallTimeout() : properties.callTimeout());
         call.setExpiresAt(LocalDateTime.ofInstant(timeout.isBefore(context.deadline()) ? timeout : context.deadline(), ZoneOffset.UTC));
-        var price = properties.prices().get(call.getModelName());
-        if (Objects.nonNull(price)) {
-            call.setInputPrice(price.input()); call.setCachedInputPrice(price.cachedInput()); call.setOutputPrice(price.output());
-        }
         call.setCreatedBy(actor); call.setUpdatedBy(actor); repository.create(call);
         return call;
     }
 
-    /** 完成、异常、取消均关闭账本；缺失 usage 或未定价时 calculatedUsd 保持空。 */
+    /** 完成、异常和取消均关闭调用记录，保留供应商已报告的用量。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void finish(ModelCallLedger call, ModelCallStatus status, Throwable failure) {
         var gate = repository.lockGate(call.getConfigId(), SystemActor.CREATIVE_RUNTIME.code());
@@ -90,15 +81,6 @@ public class ModelUsageService {
         synchronized (call) {
             call.setStatus(status); call.setFinishedAt(LocalDateTime.now(ZoneOffset.UTC));
             if (Objects.nonNull(failure)) call.setFailureType(failure.getClass().getSimpleName());
-            if (Boolean.TRUE.equals(call.getUsageReported()) && Objects.nonNull(call.getInputPrice())
-                    && Objects.requireNonNullElse(call.getCacheCreationTokens(), 0L) == 0
-                    && Objects.requireNonNullElse(call.getToolUsePromptTokens(), 0L) == 0) {
-                long cached = Math.min(call.getInputTokens(), call.getCachedTokens());
-                call.setCalculatedUsd(call.getInputPrice().multiply(BigDecimal.valueOf(call.getInputTokens() - cached))
-                        .add(call.getCachedInputPrice().multiply(BigDecimal.valueOf(cached)))
-                        .add(call.getOutputPrice().multiply(BigDecimal.valueOf(call.getOutputTokens())))
-                        .divide(BigDecimal.valueOf(1000000), 8, RoundingMode.HALF_UP));
-            }
         }
         if (!repository.finish(call, SystemActor.CREATIVE_RUNTIME.code())) return;
         if (status == ModelCallStatus.SUCCEEDED) {
@@ -142,7 +124,7 @@ public class ModelUsageService {
     }
     /** 无 usage 时保持未知，已知计数不接受供应商负值。 */
     private static long max(Long current, int value) { return Math.max(Objects.requireNonNullElse(current, 0L), Math.max(0, value)); }
-    /** 拒绝保护边界，不自动切换模型或重试付费请求。 */
+    /** 拒绝保护边界，不自动切换模型或重发模型请求。 */
     private void reject() {
         metrics.counter(RuntimeOperationsConstants.REJECTIONS_METRIC).increment();
         throw new AgentRuntimeException(CreativeErrorCode.MODEL_INVOCATION_FAILED, RuntimeOperationsConstants.REJECTED);

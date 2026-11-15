@@ -4,9 +4,9 @@ import com.manga.agent.generation.GenerationConstants;
 import com.manga.agent.generation.GenerationJobQueryService;
 import com.manga.agent.generation.GenerationJobService;
 import com.manga.agent.generation.GenerationJobView;
-import com.manga.agent.generation.VideoGenerationQuoteService;
+import com.manga.agent.generation.VideoGenerationConfigService;
 import com.manga.agent.generation.ImageGenerationOption;
-import com.manga.agent.generation.ImageGenerationQuoteService;
+import com.manga.agent.generation.ImageGenerationConfigService;
 import com.manga.agent.generation.ArtifactApplicationService;
 import com.manga.agent.generation.ArtifactAdoptionPreview;
 import com.manga.agent.generation.ArtifactAdoptionResult;
@@ -36,7 +36,7 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.CacheControl;
 
-/** 图片作业监测与人工核对接口，付费提交只能通过 ChangeSet 审批创建。 */
+/** 媒体作业监测与状态核对接口；提交意图由 ChangeSet 审批创建。 */
 @RestController
 @RequestMapping(GenerationConstants.API)
 @RequiredArgsConstructor
@@ -47,8 +47,8 @@ import org.springframework.http.CacheControl;
 public class GenerationJobController {
     private final GenerationJobQueryService query;
     private final GenerationJobService lifecycle;
-    private final ImageGenerationQuoteService quotes;
-    private final VideoGenerationQuoteService videoQuotes;
+    private final ImageGenerationConfigService imageConfigs;
+    private final VideoGenerationConfigService videoConfigs;
     private final ArtifactApplicationService artifacts;
 
     /** 获取经过所有权校验的新下载链接，禁止代理缓存签名。 */
@@ -79,9 +79,9 @@ public class GenerationJobController {
     public record AdoptionRequest(/** 预览响应中的项目版本。 */ @Positive long expectedProjectRevision) { }
     /** 图片选项只返回最小摘要，不复用含密钥的配置管理响应。 */
     @GetMapping("/options")
-    @Operation(summary = "查询可选图片模型配置", description = "返回当前用户的图片配置、模型、可用尺寸和预计费用；费用为空表示尚未核价。")
+    @Operation(summary = "查询可选图片模型配置", description = "返回当前用户可用于生成图片的配置、模型和尺寸。")
     public ApiResponse<List<ImageGenerationOption>> options() {
-        long userId = SecurityUtils.requireCurrentUserId(); List<ImageGenerationOption> result = quotes.options(userId);
+        long userId = SecurityUtils.requireCurrentUserId(); List<ImageGenerationOption> result = imageConfigs.options(userId);
         log.debug("Generation options userId={} count={}", userId, result.size());
         return ApiResponse.success(result);
     }
@@ -89,7 +89,7 @@ public class GenerationJobController {
     @GetMapping("/video-options")
     @Operation(summary = "查询可选视频模型配置", description = "仅返回启用且已保存凭据的 Agnes 视频配置和 720P 每秒预估价格。")
     public ApiResponse<List<ImageGenerationOption>> videoOptions() {
-        return ApiResponse.success(videoQuotes.options(SecurityUtils.requireCurrentUserId()));
+        return ApiResponse.success(videoConfigs.options(SecurityUtils.requireCurrentUserId()));
     }
     /** 从数据库恢复项目或指定运行下的生成卡片。 */
     @GetMapping
@@ -113,15 +113,15 @@ public class GenerationJobController {
         log.debug("Generation snapshot userId={} jobId={} status={}", userId, jobId, result.status());
         return ApiResponse.success(result);
     }
-    /** 取消仅撤销采用权，同步供应商可能仍继续执行和计费。 */
+    /** 取消仅撤销采用权，同步供应商可能仍继续执行。 */
     @PostMapping("/{jobId}/cancel")
-    @Operation(summary = "取消图片结果采用", description = "未提交则不调用供应商；已提交不承诺供应商停止计费，晚到结果不得发布。")
+    @Operation(summary = "取消图片结果采用", description = "未提交则不调用供应商；已提交供应商可能继续执行，晚到结果不得发布。")
     public ApiResponse<GenerationJobView> cancel(@PathVariable @Size(max = 36) String jobId) {
         long userId = SecurityUtils.requireCurrentUserId(); lifecycle.cancel(jobId, userId);
         log.info("Generation cancel userId={} jobId={}", userId, jobId);
         return ApiResponse.success(query.find(userId, jobId));
     }
-    /** 关闭未知提交之前要求用户明确核对供应商账单和结果。 */
+    /** 关闭未知提交之前要求用户明确核对供应商结果。 */
     @PostMapping("/{jobId}/acknowledge-unknown")
     @Operation(summary = "确认已核对未知提交", description = "只结束平台等待并释放风险容量，不重提生成，不表示远程取消或退款。")
     public ApiResponse<GenerationJobView> acknowledge(@PathVariable @Size(max = 36) String jobId, @Valid @RequestBody ReconciliationRequest request) {

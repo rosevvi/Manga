@@ -200,12 +200,12 @@ export default function AdminAgentProfiles({ accessToken, projects = [] }) {
           <section><h3>版本比较</h3><label>与此历史版本比较<select value={compareNumber} onChange={(event) => setCompareNumber(event.target.value)}><option value="">选择基准版本</option>{detail?.versions.map((item) => <option key={item.version} value={item.version}>v{item.version}</option>)}</select></label>
             {comparison && !diffs.length && <p>定义内容一致。</p>}{diffs.map((diff) => <article key={diff.key}><h4>{diff.label}</h4><div className="agent-diff"><pre aria-label="原版本">{diff.before}</pre><pre aria-label="当前版本">{diff.after}</pre></div></article>)}
           </section>
-          <section><h3>只读测试</h3><p>预览只编译，不调用模型。“启动模型测试”会使用你的模型产生调用费用，推理轮数受版本和平台测试预算限制；不开放提案、委派或媒体生成。</p>
+          <section><h3>只读测试</h3><p>预览只编译，不调用模型。“启动模型测试”会调用你已配置的模型，推理轮数受版本和平台测试预算限制；不开放提案、委派或媒体生成。</p>
             <div className="agent-admin-fields"><label>测试项目<select value={testProject} disabled={busy} onChange={(event) => { setTestProject(event.target.value); setPreview(null) }}><option value="">不绑定项目</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
               <label>你的文本模型配置<select value={testModel} disabled={busy} onChange={(event) => { setTestModel(event.target.value); setPreview(null) }}><option value="">使用默认文本模型</option>{models.filter((model) => model.enabled && model.modelType === 'TEXT').map((model) => <option key={model.id} value={model.id}>{model.name} · {model.defaultModel}</option>)}</select></label></div>
             <label>测试问题<textarea rows="3" maxLength={12000} value={testInstruction} disabled={busy} onChange={(event) => setTestInstruction(event.target.value)} /></label>
             <button className="workspace-secondary" type="button" disabled={busy || !testInstruction.trim() || !detail?.profile.enabled} onClick={() => runTest(false)}>校验并预览</button>
-            <button className="workspace-secondary" type="button" disabled={busy || testActive || !preview || !detail?.profile.enabled} onClick={() => runTest(true)}>启动模型测试（产生费用）</button>
+            <button className="workspace-secondary" type="button" disabled={busy || testActive || !preview || !detail?.profile.enabled} onClick={() => runTest(true)}>启动模型测试</button>
             {preview && <p>Kernel 指纹：<code>{preview.fingerprint}</code><br />模型：{preview.model} · 轮数上限：{preview.maxTurns}<br />只读工具：{preview.capabilities.join('、') || '无'}</p>}
             {testRun && <div><p>Run：{testRun.runId}</p>{testActive && <button className="workspace-secondary" type="button" disabled={busy} onClick={() => perform(() => cancelCreativeRun(accessToken, testRun.runId), '已请求停止测试。')}>停止测试</button>}
               {testMessages.filter((message) => message.role === 'ASSISTANT').map((message) => <article key={message.projectionKey}><p>{message.content || '正在执行…'}</p><small>{message.status}</small></article>)}

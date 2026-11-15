@@ -7,6 +7,7 @@ import com.manga.agent.application.CreativeRuntime;
 import com.manga.agent.application.StartCreativeRunCommand;
 import com.manga.agent.blueprint.AgentBlueprintCompiler;
 import com.manga.agent.domain.CreativeRunStatus;
+import com.manga.agent.domain.CreativeRunTriggerSource;
 import com.manga.agent.domain.CreativeOperationType;
 import com.manga.agent.domain.CreativeResourceType;
 import com.manga.agent.domain.CreativeResourceReference;
@@ -14,6 +15,7 @@ import com.manga.agent.domain.AgentPermissionPolicy;
 import com.manga.agent.changeset.ChangeSetApprovalService;
 import com.manga.agent.changeset.ChangeSetProposalService;
 import com.manga.agent.changeset.ChangeSetKind;
+import com.manga.agent.changeset.ChangeSetConstants;
 import com.manga.agent.capability.AgentRuntimeContext;
 import com.manga.agent.changeset.ApprovalDecision;
 import com.manga.agent.changeset.ApprovalStatus;
@@ -44,6 +46,8 @@ import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.core.state.VersionedState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -102,8 +106,9 @@ class MangaApplicationTests {
     private ChangeSetProposalService proposals;
 
     /** 模型边界模拟提案工具，真实验证文本与工具落库、等待审批、幂等应用和原规格恢复。 */
-    @Test
-    void storyboardExecutionPausesBeforeWritingAndApprovalAppliesOnlyOnce() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void storyboardApprovalAppliesOnlyOnce(boolean autoApply) throws Exception {
         long userId = jdbcTemplate.queryForObject("SELECT MIN(id) FROM manga_user", Long.class);
         String name = "storyboard-flow-" + UUID.randomUUID();
         jdbcTemplate.update("INSERT INTO manga_project (owner_user_id, name, created_by, updated_by) VALUES (?, ?, 'test', 'test')", userId, name);
@@ -112,6 +117,16 @@ class MangaApplicationTests {
         long scriptId = jdbcTemplate.queryForObject("SELECT id FROM manga_project_script WHERE project_id = ?", Long.class, projectId);
         jdbcTemplate.update("INSERT INTO manga_project_script_chapter (script_id, title, raw_content, sort_order, created_by, updated_by) VALUES (?, '第一章', '测试章节正文', 1, 'test', 'test')", scriptId);
         long chapterId = jdbcTemplate.queryForObject("SELECT id FROM manga_project_script_chapter WHERE script_id = ?", Long.class, scriptId);
+        if (!autoApply) {
+            jdbcTemplate.update("""
+                    INSERT INTO manga_project_script_scene (chapter_id, scene_number, sort_order, created_by, updated_by)
+                    VALUES (?, 1, 1, 'test', 'test'), (?, 2, 2, 'test', 'test')
+                    """, chapterId, chapterId);
+            String token = tokenService.issue(userId, "admin", "Admin", Set.of(UserRole.ADMIN), null, false).accessToken();
+            mockMvc.perform(get("/api/v1/projects/" + projectId + "/workspace").header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.scriptSceneCount").value(2))
+                    .andExpect(jsonPath("$.data.script.chapters[0].sceneCount").value(2));
+        }
         var candidate = objectMapper.readTree("""
                 {"chapterId":%d,"shots":[{"title":"开场镜头","sceneName":"庭院","shotType":"全景",
                   "cameraMovement":"缓慢推进","durationSeconds":5,"content":"角色走入庭院"}]}
@@ -129,20 +144,67 @@ class MangaApplicationTests {
                         }));
             });
         });
-        var started = creativeRuntime.start(StartCreativeRunCommand.manual(userId, UUID.randomUUID().toString(), projectId,
+        String requestId = UUID.randomUUID().toString();
+        var started = creativeRuntime.start(autoApply
+                ? new StartCreativeRunCommand(userId, requestId, CreativeRunTriggerSource.CONVERSATION,
+                        CreativeOperationType.ASSISTANT_CHAT, null, projectId, null, AgentPermissionPolicy.PROPOSE_CHANGES,
+                        "生成本章分镜", null, true)
+                : StartCreativeRunCommand.manual(userId, requestId, projectId,
                 CreativeOperationType.GENERATE_CHAPTER_STORYBOARD, new CreativeResourceReference(CreativeResourceType.CHAPTER, chapterId),
                 AgentPermissionPolicy.PROPOSE_CHANGES, "生成本章分镜"));
-        awaitRunStatus(started.runId(), CreativeRunStatus.WAITING);
-        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM manga_storyboard_shot WHERE project_id = ?", Integer.class, projectId)).isZero();
-        assertThat(jdbcTemplate.queryForObject("SELECT lease_until FROM manga_creative_step WHERE run_id = ?", LocalDateTime.class, started.runId())).isNull();
+        awaitRunStatus(started.runId(), autoApply ? CreativeRunStatus.COMPLETED : CreativeRunStatus.WAITING);
+        if (!autoApply) {
+            assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM manga_storyboard_shot WHERE project_id = ?", Integer.class, projectId)).isZero();
+            assertThat(jdbcTemplate.queryForObject("SELECT lease_until FROM manga_creative_step WHERE run_id = ?", LocalDateTime.class, started.runId())).isNull();
+        }
         String originalBlueprint = jdbcTemplate.queryForObject("SELECT blueprint_snapshot_json FROM manga_creative_step WHERE run_id = ?", String.class, started.runId());
         String changeSet = jdbcTemplate.queryForObject("SELECT change_set_id FROM manga_creative_change_set WHERE run_id = ?", String.class, started.runId());
-        changeSetApprovals.decide(changeSet, userId, ApprovalDecision.APPROVE, "采用这版分镜");
+        if (autoApply) {
+            assertThat(jdbcTemplate.queryForObject("SELECT comment FROM manga_creative_approval WHERE change_set_id = ?", String.class, changeSet))
+                    .isEqualTo(ChangeSetConstants.AUTO_APPLIED_COMMENT);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM manga_creative_event WHERE run_id = ? AND event_type = 'APPROVAL_REQUIRED'",
+                    Integer.class, started.runId())).isZero();
+        } else changeSetApprovals.decide(changeSet, userId, ApprovalDecision.APPROVE, "采用这版分镜");
         changeSetApprovals.decide(changeSet, userId, ApprovalDecision.APPROVE, "重复点击");
         awaitRunStatus(started.runId(), CreativeRunStatus.COMPLETED);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM manga_storyboard_shot WHERE chapter_id = ?", Integer.class, chapterId)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("SELECT blueprint_snapshot_json FROM manga_creative_step WHERE run_id = ?", String.class, started.runId())).isEqualTo(originalBlueprint);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM manga_creative_event WHERE run_id = ? AND event_type = 'TOOL_COMPLETED'", Integer.class, started.runId())).isEqualTo(1);
+    }
+
+    /** 同一媒体提案在辅助档等待审批，在完全访问档可创建生成作业。 */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void riskyMediaOnlyAutoApprovesWithFullAccess(boolean fullAccess) throws Exception {
+        long userId = jdbcTemplate.queryForObject("SELECT MIN(id) FROM manga_user", Long.class);
+        String name = "image-policy-" + UUID.randomUUID();
+        jdbcTemplate.update("INSERT INTO manga_project (owner_user_id, name, created_by, updated_by) VALUES (?, ?, 'test', 'test')", userId, name);
+        long projectId = jdbcTemplate.queryForObject("SELECT id FROM manga_project WHERE name = ?", Long.class, name);
+        jdbcTemplate.update("""
+                INSERT INTO manga_storyboard_shot (project_id, sort_order, shot_number, title, created_by, updated_by)
+                VALUES (?, 1, '001', '测试镜头', 'test', 'test')
+                """, projectId);
+        long shotId = jdbcTemplate.queryForObject("SELECT id FROM manga_storyboard_shot WHERE project_id = ?", Long.class, projectId);
+        var input = objectMapper.readTree("""
+                {"shotId":%d,"provider":"FAKE","model":"fake-image","prompt":"A forest","width":1024,"height":1024}
+                """.formatted(shotId));
+        when(invoker.invokeUntil(any(), any(), any(), any())).thenAnswer(invocation -> {
+            AgentRuntimeContext context = invocation.getArgument(1);
+            return Flux.just((AgentEvent) new ToolResultStartEvent("reply", "image-tool", "propose_image_generation"))
+                    .concatWith(Flux.defer(() -> {
+                        proposals.propose(ChangeSetKind.IMAGE_GENERATION, input, context);
+                        return Flux.just((AgentEvent) new ToolResultEndEvent("reply", "image-tool", "propose_image_generation", ToolResultState.SUCCESS));
+                    }));
+        });
+        var run = creativeRuntime.start(new StartCreativeRunCommand(userId, UUID.randomUUID().toString(),
+                CreativeRunTriggerSource.CONVERSATION, CreativeOperationType.ASSISTANT_CHAT, null, projectId, null,
+                AgentPermissionPolicy.PROPOSE_CHANGES, "为镜头生成参考图", null, true, fullAccess));
+        awaitRunStatus(run.runId(), CreativeRunStatus.WAITING);
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM manga_creative_change_set WHERE run_id = ?", String.class, run.runId()))
+                .isEqualTo(fullAccess ? "APPLIED" : "PENDING");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM manga_generation_job WHERE run_id = ?", Integer.class, run.runId()))
+                .isEqualTo(fullAccess ? 1 : 0);
     }
 
     /** 验证密钥必须显式查看、响应不缓存，查看后普通保存不会把遮罩写入密文。 */
@@ -328,7 +390,8 @@ class MangaApplicationTests {
         var image = objectMapper.readTree(images).path("data").valueStream()
                 .filter(option -> name.equals(option.path("name").asText())).findFirst().orElseThrow();
         assertThat(image.path("provider").asText()).isEqualTo("AGNES");
-        assertThat(image.path("estimatedCost").decimalValue().signum()).isPositive();
+        assertThat(image.has("estimatedCost")).isFalse();
+        assertThat(image.has("currency")).isFalse();
         assertThat(image.path("sizes").valueStream().map(size -> size.asText()))
                 .containsExactly("1024x1024", "1248x832", "832x1248");
         String videos = mockMvc.perform(get(optionsPath + "video-options").header("Authorization", authorization))
@@ -392,6 +455,8 @@ class MangaApplicationTests {
                 String.class, approved.runId())).isNull();
         var videos = generationQueries.list(userId, projectId, null, null, null, shotId, AiModelType.VIDEO);
         assertThat(videos).hasSize(1);
+        assertThat(videos.getFirst().artifactId()).isNotNull();
+        assertThat(videos.getFirst().artifactUrl()).endsWith(".mp4");
         assertThat(generationQueries.list(userId, projectId, null, null, null, shotId, AiModelType.IMAGE)).isEmpty();
         assertThat(generationQueries.list(userId, projectId, null, null, null, shotId + 1000, AiModelType.VIDEO)).isEmpty();
         String token = tokenService.issue(userId, "admin", "Admin", Set.of(UserRole.ADMIN), null, false).accessToken();

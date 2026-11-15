@@ -14,7 +14,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
 
-/** 无费用、可重启恢复的异步供应商模拟器，图片明确标识 FAKE。 */
+/** 可重启恢复的异步供应商模拟器，图片明确标识 FAKE。 */
 @Component
 @RequiredArgsConstructor
 public class FakeImageProvider implements GenerationProvider {

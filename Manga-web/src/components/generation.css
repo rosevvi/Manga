@@ -4,16 +4,22 @@
 .generation-card, .image-generation-panel { border: 1px solid var(--workspace-line); border-radius: var(--workspace-radius); background: var(--workspace-surface); padding: 16px; }
 .generation-card { display: grid; gap: 10px; overflow-wrap: anywhere; }
 .generation-card header, .generation-actions { display: flex; gap: 12px; justify-content: space-between; flex-wrap: wrap; }
-.generation-jobs h3, .image-generation-panel h3 { margin: 0; font-size: 15px; }
+.generation-jobs h3 { margin: 0; font-size: 15px; }
+.image-generation-panel { font-size: 12px; }
+.image-generation-panel h3, .image-generation-panel [role="alert"] { margin: 0; font-size: inherit; }
 .generation-jobs [role="alert"], .image-generation-panel [role="alert"] { color: var(--workspace-danger); }
-.generation-card > a { display: grid; justify-items: start; gap: 6px; color: var(--workspace-accent); }
 .generation-card > button, .image-generation-form > button, .generation-reconcile > button { justify-self: start; }
 .generation-card :is(img, video) { display: block; max-width: 100%; max-height: 320px; object-fit: contain; margin-bottom: 8px; }
 .generation-card progress { width: 100%; }
 .generation-card small { opacity: .75; }
 .generation-reconcile, .image-generation-form { display: grid; gap: 10px; }
-.generation-reconcile textarea, .image-generation-form textarea, .image-generation-form select { width: 100%; box-sizing: border-box; }
-.image-generation-form label { display: grid; gap: 5px; }
+.generation-reconcile textarea, .image-generation-form :is(textarea, input) { width: 100%; box-sizing: border-box; }
+.image-generation-field { display: grid; grid-template-columns: 3em minmax(0, 1fr); align-items: center; gap: 8px; }
+.image-generation-duration { display: flex; align-items: center; gap: 6px; }
+.image-generation-prompt { display: grid; gap: 5px; }
+.image-generation-field > span:first-child, .image-generation-duration > span, .image-generation-prompt > span, .image-generation-form > small { color: var(--creative-muted); }
+.image-generation-form > small { font-size: inherit; line-height: 1.5; }
+.image-generation-form .workbench-select-trigger > svg { flex-shrink: 0; }
 .image-generation-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* 采用前并排对比原图和新图，窄屏自动换行。 */
 .generation-adoption { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--workspace-line); border-radius: 8px; }
@@ -22,3 +28,12 @@
 .task-image-result .generation-adoption-images img { margin: 5px 0 0; border-radius: 7px; }
 .task-image-result .generation-actions { justify-content: flex-start; }
 .generation-regenerate, .generation-regenerate label { display: grid; gap: 8px; min-width: 0; }
+.generated-media { display: grid; gap: 8px; justify-items: start; min-width: 0; }
+.generated-media video { width: min(100%, 580px); background: #000; border-radius: 8px; }
+.generated-image-open { display: block; max-width: 100%; padding: 0; border: 0; border-radius: 8px; background: transparent; cursor: zoom-in; }
+.generated-image-open img { border-radius: 8px; margin-bottom: 0; }
+.generated-image-dialog { max-width: min(94vw, 1100px); max-height: 94vh; border: 1px solid var(--workspace-line); border-radius: 12px; padding: 14px; background: var(--workspace-surface); color: inherit; }
+.generated-image-dialog::backdrop { background: rgb(0 0 0 / 82%); }
+.generated-image-dialog > div { display: grid; justify-items: start; gap: 10px; }
+.generated-image-dialog > div > button:first-child { justify-self: end; }
+.generated-image-dialog :is(img, video) { max-width: 100%; width: auto; max-height: 72vh; object-fit: contain; }

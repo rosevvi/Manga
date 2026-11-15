@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.manga.mapper.GenerationJobMapper">
+    <resultMap id="jobListing" type="com.manga.entity.GenerationJob" autoMapping="true">
+        <id property="id" column="id"/>
+        <association property="listingArtifact" javaType="com.manga.entity.CreativeArtifact" notNullColumn="artifact_id" autoMapping="false">
+            <id property="id" column="artifact_id"/>
+            <result property="url" column="artifact_url"/>
+            <result property="adoptedAt" column="artifact_adopted_at"/>
+            <result property="adoptedBy" column="artifact_adopted_by"/>
+        </association>
+    </resultMap>
     <select id="find" resultType="com.manga.entity.GenerationJob">
         SELECT id, job_id, run_id, step_id, change_set_id, user_id,
                (SELECT s.kind FROM manga_creative_change_set s
@@ -28,28 +37,25 @@
           AND next_action_at &lt;= #{now} AND (lease_until IS NULL OR lease_until &lt;= #{now})
         ORDER BY next_action_at, id LIMIT #{limit}
     </select>
-    <select id="findVisible" resultType="com.manga.entity.GenerationJob">
-        SELECT id, job_id, run_id, step_id, change_set_id, user_id,
-               (SELECT s.kind FROM manga_creative_change_set s
-                WHERE s.change_set_id = manga_generation_job.change_set_id) AS media_kind,
-               project_id, shot_id, provider, config_id, status, provider_job_id,
-               progress, cancel_requested, error_code, error_message, owner_instance_id, owner_epoch,
-               lease_until, attempts, next_action_at, submitted_at, finished_at, reconciled_by,
-               reconciled_at, reconciliation_note, created_at, updated_at, created_by, updated_by
-        FROM manga_generation_job
-        WHERE user_id = #{userId} AND project_id = #{projectId}
-        <if test="runId != null">AND run_id = #{runId}</if>
-        <if test="shotId != null">AND shot_id = #{shotId}</if>
-        <if test="mediaKind != null">
-            AND EXISTS (SELECT 1 FROM manga_creative_change_set s
-                        WHERE s.change_set_id = manga_generation_job.change_set_id AND s.kind = #{mediaKind})
-        </if>
+    <select id="findVisible" resultMap="jobListing">
+        SELECT j.id, j.job_id, j.run_id, j.step_id, j.change_set_id, j.user_id, s.kind AS media_kind,
+               j.project_id, j.shot_id, j.provider, j.status, j.progress, j.cancel_requested,
+               j.error_code, j.error_message, j.submitted_at, j.finished_at, j.reconciliation_note,
+               j.created_at, j.updated_at,
+               a.id AS artifact_id, a.url AS artifact_url, a.adopted_at AS artifact_adopted_at, a.adopted_by AS artifact_adopted_by
+        FROM manga_generation_job j
+        LEFT JOIN manga_creative_change_set s ON s.change_set_id = j.change_set_id
+        LEFT JOIN manga_creative_artifact a ON a.job_id = j.job_id
+        WHERE j.user_id = #{userId} AND j.project_id = #{projectId}
+        <if test="runId != null">AND j.run_id = #{runId}</if>
+        <if test="shotId != null">AND j.shot_id = #{shotId}</if>
+        <if test="mediaKind != null">AND s.kind = #{mediaKind}</if>
         <if test="conversationId != null">
-            AND EXISTS (SELECT 1 FROM manga_creative_run r WHERE r.run_id = manga_generation_job.run_id
+            AND EXISTS (SELECT 1 FROM manga_creative_run r WHERE r.run_id = j.run_id
                         AND r.conversation_id = #{conversationId})
         </if>
-        <if test="beforeId != null">AND id &lt; #{beforeId}</if>
-        ORDER BY id DESC LIMIT #{limit}
+        <if test="beforeId != null">AND j.id &lt; #{beforeId}</if>
+        ORDER BY j.id DESC LIMIT #{limit}
     </select>
     <select id="findByRun" resultType="string">
         SELECT job_id FROM manga_generation_job WHERE run_id = #{runId}

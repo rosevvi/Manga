@@ -33,7 +33,8 @@ public class ChangeSetCodec {
                 throw new ToolInputValidationException(List.of(
                         new ToolInputValidationException.FieldIssue("$", "必须提供对象")));
             }
-            T result = mapper.readerFor(type).with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            T result = mapper.readerFor(type).with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
+                            DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES)
                     .without(DeserializationFeature.ACCEPT_FLOAT_AS_INT).readValue(value);
             var violations = validator.validate(result);
             if (!violations.isEmpty()) {
@@ -55,7 +56,8 @@ public class ChangeSetCodec {
     public <T> T validate(JsonNode value, Class<T> type) {
         if (Objects.isNull(value) || value.isNull()) throw new BusinessException(ChangeSetResponseCode.INVALID);
         try {
-            T result = mapper.readerFor(type).with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            T result = mapper.readerFor(type).with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
+                            DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES)
                     .without(DeserializationFeature.ACCEPT_FLOAT_AS_INT).readValue(value);
             if (Objects.isNull(result) || !validator.validate(result).isEmpty()) {
                 throw new BusinessException(ChangeSetResponseCode.INVALID);

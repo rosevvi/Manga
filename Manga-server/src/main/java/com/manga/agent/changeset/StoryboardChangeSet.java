@@ -18,7 +18,7 @@ import static com.manga.common.constant.ValidationConstants.SHOT_DURATION_MAX_SE
 import static com.manga.common.constant.ValidationConstants.SHOT_SOUND_EFFECT_MAX_LENGTH;
 import static com.manga.common.constant.ValidationConstants.SHOT_TYPE_MAX_LENGTH;
 
-/** Schema v1：向一个明确章节追加有限数量的分镜草稿，不生成付费媒体。 */
+/** Schema v1：向一个明确章节追加有限数量的分镜草稿，不提交媒体生成作业。 */
 public record StoryboardChangeSet(
         /** 必须属于当前项目的章节主键。 */ @NotNull @Positive Long chapterId,
         /** 本次原子追加的草稿镜头。 */ @NotEmpty @Size(max = 100) List<@NotNull @Valid Shot> shots

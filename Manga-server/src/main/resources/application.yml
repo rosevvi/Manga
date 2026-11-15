@@ -153,7 +153,7 @@ manga:
       display-name: Manga Administrator
   # 可恢复创作运行、Agent 执行与调度补偿。
   creative:
-    # 图片生成作业独立于 Agent Harness；配置预计费用后才允许真实付费提案。
+    # 媒体生成作业独立于 Agent Harness。
     generation:
       # 独立媒体 worker 数，范围 1 到 32；不会占满 Agent 通用线程池。
       worker-threads: 4
@@ -171,7 +171,7 @@ manga:
       lease: 20m
       # 异步供应商正常查询间隔；OpenAI Images API 不支持作业查询。
       poll-interval: 10s
-      # 查询或转存故障的最大退避时间，不重提付费生成。
+      # 查询或转存故障的最大退避时间，不重复提交生成请求。
       max-backoff: 5m
       # 最长监测时间，超时进入 UNKNOWN，不能假定供应商已停止。
       max-age: 24h
@@ -181,13 +181,6 @@ manga:
       max-media-bytes: 20971520
       # 生成请求的完整等待超时，独立于连接检测的短超时。
       http-timeout: 5m
-      # 各模型单张预计费用，单位 USD。实际账单以供应商为准。
-      image-prices:
-        # 用户核定的单张预计费用，单位 USD；不是供应商扣费硬上限。
-        gpt-image-2: 1
-        # Agnes 1K 文生图按官方公开标价估算，活动价以账户账单为准。
-        "[agnes-image-2.5-flash]": ${MANGA_AGNES_IMAGE_1K_ESTIMATED_USD:0.010}
-        "[agnes-image-2.1-flash]": ${MANGA_AGNES_IMAGE_1K_ESTIMATED_USD:0.010}
       # 平台异步中继 HMAC 密钥，至少 32 字符；空时关闭，当前仅供 Fake 验证。
       callback-secret: ${MANGA_GENERATION_CALLBACK_SECRET:}
       # 签名回调允许的时间偏移，单位分钟；防止长期重放。
@@ -206,7 +199,6 @@ manga:
         retry-delay: 1h
         # 已删除墓碑仍周期复查，清除极晚到旧 worker 的重新写入。
         tombstone-interval: 24h
-      # 配置示例：image-prices: { gpt-image-2: 0.10 }；示例数字不是官方报价。
     # AI 提案审批：等待期间释放 Harness 和 Kernel，业务写入只在批准事务发生。
     approval:
       # 从开放审批开始计算的有效期，必须大于零。
@@ -257,23 +249,19 @@ manga:
         kernel-acquire-timeout: ${MANGA_CREATIVE_AGENT_KERNEL_ACQUIRE_TIMEOUT:5s}
         # 应用关闭时等待活跃 KernelHandle 和 HarnessLease 释放的最长时间。
         shutdown-drain-timeout: ${MANGA_CREATIVE_AGENT_SHUTDOWN_DRAIN_TIMEOUT:30s}
-    # 运行时临时 Worker 的规划边界；实际 token 结算属于用量账本。
+    # 运行时临时 Worker 的执行资源限制。
     dynamic-agent:
       # 含修订的临时节点总数。
       max-agents: 6
       # 单 Run 不同临时执行规格的上限，全局仍受 Kernel 池约束。
       max-kernels: 4
-      # 累计最大推理轮数预留，故障不退款。
+      # 累计最大推理轮数预留，包含失败的执行。
       max-reserved-turns: 64
       # 临时 Worker 每次最大推理轮数。
       max-turns: 8
       # 累计临时提示词字符数。
       max-prompt-characters: 18000
-      # 规划费用额度，单位 USD，并非供应商实际扣费保证。
-      max-estimated-usd: 1
-      # 运维提供每轮规划估值，单位 USD；留空时禁止新建临时 Agent。
-      estimated-usd-per-turn: ${MANGA_DYNAMIC_AGENT_ESTIMATED_USD_PER_TURN:}
-    # 模型调用治理；每日金额是规划预留额度，供应商实际费用由账本和对账结果说明。
+    # 模型调用容量、限流和故障治理。
     operations:
       # 每个模型配置跨实例的并发上限。
       max-concurrent: ${MANGA_MODEL_MAX_CONCURRENT:4}
@@ -289,25 +277,12 @@ manga:
       storyboard-call-timeout: ${MANGA_STORYBOARD_MODEL_TIMEOUT:5m}
       # 按供应商数据重置，数据库写入耗时不算供应商静默。
       idle-timeout: ${MANGA_MODEL_IDLE_TIMEOUT:2m}
-      # 每个实际模型请求规划预留 USD，失败、未知及取消均不退款。
-      reserved-usd-per-call: ${MANGA_MODEL_RESERVED_USD_PER_CALL:0.05}
-      # 每配置 UTC 当日规划预留上限 USD，跨进程共享。
-      daily-reserved-usd: ${MANGA_MODEL_DAILY_RESERVED_USD:10}
       # 恢复扫描间隔；不会重新发送已失联的供应商请求。
       scan-interval: 30s
       # 终态且投影完成的 Run 超过此时长创建无损审计归档，不删除在线来源。
       archive-after: 30d
       # 每类归档数据最大行数，超限拒绝，转离线数据库备份。
       archive-max-rows: 10000
-      # USD/百万 token；此处为官方标准 token 费率参考，代理供应商需覆盖，未配置模型显示未定价。
-      prices:
-        "[gpt-5.4]":
-          # 非缓存输入单价。
-          input: 2.50
-          # 缓存命中输入单价，缓存 token 是输入的子集。
-          cached-input: 0.25
-          # 输出单价；推理 token 已包含在输出中，不重复相加。
-          output: 15.00
     # 管理员专业 Agent 配置、版本与只读测试边界。
     profile-management:
       # 平台配置身份总数上限，包含内置定义。
@@ -362,7 +337,7 @@ manga:
       max-repair-rounds: 2
       # 含故障重试的模型执行次数总额。
       max-invocations: 24
-      # 按每次 Blueprint.maxTurns + 1 保守预留，不是实际 token 或美元计费。
+      # 按每次 Blueprint.maxTurns + 1 保守预留推理轮数。
       max-reserved-turns: 256
       # 一次委派最多创建的 Worker 数量。
       max-batch-size: 8

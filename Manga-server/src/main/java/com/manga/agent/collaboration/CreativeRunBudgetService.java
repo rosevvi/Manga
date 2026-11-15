@@ -14,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
-import java.math.BigDecimal;
 import com.manga.agent.changeset.ChangeSetCodec;
 
 /** 在 Run 锁内冻结和消耗预算；重试和进程重启均不能重置已经预留的额度。 */
@@ -79,8 +78,7 @@ public class CreativeRunBudgetService {
         int turns = blueprint.maxTurns() + 1;
         if (blueprint.profileId().startsWith(DynamicAgentBlueprintFactory.ID_PREFIX)) {
             var dynamic = codec.read(run.getBudgetJson(), DynamicAgentRunBudget.class);
-            if (Objects.isNull(dynamic.estimatedUsdPerTurn()) || (long) dynamic.reservedTurns() + turns > dynamic.maxReservedTurns()
-                    || dynamic.estimatedUsdPerTurn().multiply(BigDecimal.valueOf((long) dynamic.reservedTurns() + turns)).compareTo(dynamic.maxEstimatedUsd()) > 0) {
+            if ((long) dynamic.reservedTurns() + turns > dynamic.maxReservedTurns()) {
                 throw new AgentRuntimeException(CreativeErrorCode.BUDGET_EXCEEDED, DynamicAgentMessages.EXHAUSTED);
             }
             run.setBudgetJson(codec.write(dynamic.reserve(turns))); runs.update(run);

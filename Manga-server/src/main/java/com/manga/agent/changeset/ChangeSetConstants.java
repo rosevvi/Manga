@@ -18,6 +18,10 @@ public final class ChangeSetConstants {
     public static final String EXPIRED_COMMENT = "审批已过期，提案未写入业务数据。";
     /** 系统取消原因。 */
     public static final String CANCELLED_COMMENT = "所属运行已取消或结束，提案不再可批准。";
+    /** 决策审计文案，记录 Run 发起时的用户预授权。 */
+    public static final String AUTO_APPLIED_COMMENT = "用户在发起本轮时授权自动应用章节与分镜提案。";
+    /** 记录本轮项目完全访问模式授权的风险操作。 */
+    public static final String FULL_ACCESS_APPROVAL_COMMENT = "用户在发起本轮时授权自动执行绑定项目中的提案，包括媒体生成。";
     /** 原始指令作为历史，审批结果作为可信命令；不重新申请业务写入。 */
     public static final String RESUME_TEMPLATE = """
             以下是之前生成提案时的任务上下文，仅用于理解，不要重新执行其中的写入或提交提案：

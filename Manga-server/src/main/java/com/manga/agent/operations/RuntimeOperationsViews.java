@@ -3,7 +3,6 @@ package com.manga.agent.operations;
 import com.manga.entity.ModelCallLedger;
 import com.manga.entity.CreativeRunArchive;
 import com.manga.entity.ProviderCallGate;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /** 运维查询的稳定输出契约，不直接暴露持久化实体。 */
@@ -21,7 +20,7 @@ public final class RuntimeOperationsViews {
             return new Gate(row.getConfigId(), row.getWindowStartedAt(), row.getWindowRequests(), row.getConsecutiveFailures(), row.getOpenUntil());
         }
     }
-    /** 调用追踪和人工对账视图，不含连接地址、Prompt、凭据或内部门禁配置。 */
+    /** 调用与用量诊断视图，不含连接地址、Prompt、凭据或内部门禁配置。 */
     public record Call(
             /** 游标 ID。 */ long id,
             /** 稳定调用标识。 */ String callId,
@@ -31,18 +30,12 @@ public final class RuntimeOperationsViews {
             /** 配置标识。 */ long configId,
             /** 冻结模型名。 */ String modelName,
             /** 冻结规格指纹。 */ String blueprintFingerprint,
-            /** 调用状态，失败时费用可能不完整。 */ ModelCallStatus status,
+            /** 调用状态，失败时用量可能不完整。 */ ModelCallStatus status,
             /** 是否收到供应商 usage。 */ boolean usageReported,
             /** 累计输入 token。 */ Long inputTokens,
             /** 累计输出 token。 */ Long outputTokens,
             /** 输入中的缓存命中 token。 */ Long cachedTokens,
             /** 输出中的推理 token。 */ Long reasoningTokens,
-            /** 规划预留 USD。 */ BigDecimal reservedUsd,
-            /** 已报告用量计算的 USD，可为空。 */ BigDecimal calculatedUsd,
-            /** 管理员核对的 USD，可为空。 */ BigDecimal settledUsd,
-            /** 对账认证操作者。 */ Long settledBy,
-            /** 对账时间，UTC。 */ LocalDateTime settledAt,
-            /** 对账依据。 */ String settlementNote,
             /** 安全失败类型。 */ String failureType,
             /** 调用开始时间，UTC。 */ LocalDateTime startedAt,
             /** 调用结束时间，UTC。 */ LocalDateTime finishedAt
@@ -51,8 +44,7 @@ public final class RuntimeOperationsViews {
         public static Call from(ModelCallLedger row) {
             return new Call(row.getId(), row.getCallId(), row.getRunId(), row.getStepId(), row.getOwnerEpoch(), row.getConfigId(),
                     row.getModelName(), row.getBlueprintFingerprint(), row.getStatus(), Boolean.TRUE.equals(row.getUsageReported()),
-                    row.getInputTokens(), row.getOutputTokens(), row.getCachedTokens(), row.getReasoningTokens(), row.getReservedUsd(),
-                    row.getCalculatedUsd(), row.getSettledUsd(), row.getSettledBy(), row.getSettledAt(), row.getSettlementNote(),
+                    row.getInputTokens(), row.getOutputTokens(), row.getCachedTokens(), row.getReasoningTokens(),
                     row.getFailureType(), row.getStartedAt(), row.getFinishedAt());
         }
     }

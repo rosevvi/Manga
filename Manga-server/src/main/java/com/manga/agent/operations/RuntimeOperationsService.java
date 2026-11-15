@@ -10,14 +10,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.math.BigDecimal;
-import com.manga.common.exception.BusinessException;
-import org.springframework.http.HttpStatus;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 
 /** 运维与用户账本查询边界；任何普通用户查询先检查 Run 所有权。 */
 @Service
@@ -47,30 +39,9 @@ public class RuntimeOperationsService {
         return repository.byRun(runId, beforeId).stream().map(RuntimeOperationsViews.Call::from).toList();
     }
 
-    /** 账单确认只执行一次；重复相同金额与依据幂等，不允许覆盖原始对账记录。 */
-    @Transactional
-    public void settle(String callId, long userId, Settlement request) {
-        var call = repository.lockCall(callId);
-        if (Objects.isNull(call) || call.getStatus() == ModelCallStatus.STARTED)
-            throw new BusinessException(RuntimeOperationsError.SETTLEMENT_CONFLICT, HttpStatus.CONFLICT);
-        if (Objects.nonNull(call.getSettledUsd())) {
-            if (call.getSettledUsd().compareTo(request.amountUsd()) != 0 || !Objects.equals(call.getSettlementNote(), request.note()))
-                throw new BusinessException(RuntimeOperationsError.SETTLEMENT_CONFLICT, HttpStatus.CONFLICT);
-            return;
-        }
-        if (!repository.settle(callId, request.amountUsd(), userId, request.note(), LocalDateTime.now(ZoneOffset.UTC)))
-            throw new BusinessException(RuntimeOperationsError.SETTLEMENT_CONFLICT, HttpStatus.CONFLICT);
-    }
-
-    /** 管理员对账输入，金额为零也须明确提供账单依据。 */
-    public record Settlement(
-            /** 供应商核对后的 USD。 */ @NotNull @DecimalMin("0") @Digits(integer = 12, fraction = 8) BigDecimal amountUsd,
-            /** 账单编号或对账依据，禁止包含凭据。 */ @NotBlank @Size(max = 500) String note
-    ) { }
-
-    /** 监测快照；费用聚合包含部分用量，须结合 unpriced_or_unknown_calls 解读。 */
+    /** 监测快照；失败或取消的调用可能仅报告部分用量。 */
     public record Snapshot(
-            /** 近 24 小时调用状态、token 和可计算费用。 */ List<Map<String,Object>> usage,
+            /** 近 24 小时调用状态和已报告的 token。 */ List<Map<String,Object>> usage,
             /** Run 状态分布及最老记录时间。 */ List<Map<String,Object>> backlog,
             /** 最近 100 个模型配置门禁。 */ List<RuntimeOperationsViews.Gate> providerGates,
             /** 上述有界门禁中仍在冷却的数量。 */ long openCircuits

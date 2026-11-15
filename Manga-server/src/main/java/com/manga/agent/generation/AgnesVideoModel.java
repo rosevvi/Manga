@@ -1,10 +1,9 @@
 package com.manga.agent.generation;
 
-import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Optional;
 
-/** Agnes Video 2.5 系列支持的模型标识及 720P 公开每秒标价。 */
+/** Agnes Video 2.5 系列支持的模型标识及输出分辨率。 */
 public enum AgnesVideoModel {
     /** 通用视频模型。 */
     STANDARD("agnes-video-2.5"),
@@ -13,8 +12,6 @@ public enum AgnesVideoModel {
 
     /** 首版提供两个模型均支持的分辨率。 */
     public static final String SIZE = "720P";
-    /** 官方 720P 公布标价，实际费用以供应商账单为准。 */
-    public static final BigDecimal USD_PER_SECOND = new BigDecimal("0.025");
 
     private final String id;
 

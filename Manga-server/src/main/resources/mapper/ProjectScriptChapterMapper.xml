@@ -11,6 +11,7 @@
         <result property="synopsis" column="synopsis"/>
         <result property="rawContent" column="raw_content"/>
         <result property="rawContentLength" column="raw_content_length"/>
+        <result property="sceneCount" column="scene_count"/>
         <result property="structureJson" column="structure_json"/>
         <result property="sourceType" column="source_type"/>
         <result property="parseStatus" column="parse_status" javaType="com.manga.common.enums.ScriptChapterParseStatus"/>
@@ -26,6 +27,9 @@
     <select id="findSummaries" resultMap="chapterResultMap">
         SELECT c.id, c.script_id, c.revision, c.title, c.synopsis, NULL AS raw_content, NULL AS structure_json,
                CHAR_LENGTH(c.raw_content) AS raw_content_length,
+               <if test="includeSceneCount">
+                   (SELECT COUNT(*) FROM manga_project_script_scene s WHERE s.chapter_id = c.id) AS scene_count,
+               </if>
                c.source_type, c.parse_status, c.structure_version, c.last_error,
                c.sort_order, c.created_at, c.updated_at, c.created_by, c.updated_by
         FROM manga_project_script_chapter c

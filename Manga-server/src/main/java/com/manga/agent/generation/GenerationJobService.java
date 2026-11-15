@@ -60,14 +60,14 @@ public class GenerationJobService {
     private final CreativeRuntimeProperties runtime;
     private final GenerationProperties properties;
     private final GenerationProviderRegistry providers;
-    private final ImageGenerationQuoteService quotes;
-    private final VideoGenerationQuoteService videoQuotes;
+    private final ImageGenerationConfigService imageConfigs;
+    private final VideoGenerationConfigService videoConfigs;
     private final ChangeSetCodec codec;
     private final ApplicationEventPublisher publisher;
     private final GenerationMediaObjectRepository media;
     private final GenerationCleanupProperties cleanupProperties;
 
-    /** 批准事务内创建单次提交意图；价格或端点变化要求重新生成预览。 */
+    /** 批准事务内创建单次提交意图；模型或连接配置变化要求重新生成预览。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean enqueue(CreativeChangeSet proposal, long userId, String actor) {
         Long shotId;
@@ -78,7 +78,7 @@ public class GenerationJobService {
         try {
             if (proposal.getKind() == ChangeSetKind.VIDEO_GENERATION) {
                 var video = codec.read(proposal.getPayloadJson(), VideoGenerationChange.class);
-                if (!video.equals(videoQuotes.canonicalize(video, userId))) return false;
+                if (!video.equals(videoConfigs.canonicalize(video, userId))) return false;
                 shotId = video.shotId();
                 configId = video.configId();
                 provider = GenerationProviderKey.AGNES;
@@ -86,7 +86,7 @@ public class GenerationJobService {
                 approved = video;
             } else {
                 var image = codec.read(proposal.getPayloadJson(), ImageGenerationChange.class);
-                if (!image.equals(quotes.canonicalize(image, userId))) return false;
+                if (!image.equals(imageConfigs.canonicalize(image, userId))) return false;
                 shotId = image.shotId();
                 configId = image.configId();
                 provider = image.provider();
@@ -94,7 +94,7 @@ public class GenerationJobService {
                 approved = image;
             }
         } catch (BusinessException exception) {
-            // 禁用、删除或更换端点均要求重新预览，不能沿用旧的费用批准。
+            // 禁用、删除或更换端点均要求重新预览，不能沿用旧的生成提案。
             return false;
         }
         String config = snapshot == null ? null : codec.write(snapshot);
@@ -115,7 +115,7 @@ public class GenerationJobService {
         publisher.publishEvent(new GenerationJobSignal(job.getJobId()));
     }
 
-    /** 领取到期作业；非幂等提交租约过期时进入 UNKNOWN，绝不重复付费 POST。 */
+    /** 领取到期作业；非幂等提交租约过期时进入 UNKNOWN，绝不重复提交生成请求。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public GenerationJob claim(String id) {
         GenerationJob candidate = jobs.find(id).orElse(null);
@@ -214,7 +214,7 @@ public class GenerationJobService {
                 .createdBy(actor()).updatedBy(actor()).build());
     }
 
-    /** 提交失败按确定性分类；查询/转存故障只退避当前阶段，不回到付费提交。 */
+    /** 提交失败按确定性分类；查询/转存故障只退避当前阶段，不回到生成提交。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void failed(GenerationJob claim, GenerationError error) {
         runs.lockByRunId(claim.getRunId());

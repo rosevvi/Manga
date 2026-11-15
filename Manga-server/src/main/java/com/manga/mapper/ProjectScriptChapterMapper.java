@@ -9,7 +9,9 @@ import java.util.List;
 /** 定义剧本章节的数据访问契约。 */
 public interface ProjectScriptChapterMapper extends BaseMapper<ProjectScriptChapter> {
 
-    List<ProjectScriptChapter> findSummaries(@Param("scriptId") long scriptId);
+    /** 需要显示场景摘要时，在同一查询中计算场景数量。 */
+    List<ProjectScriptChapter> findSummaries(@Param("scriptId") long scriptId,
+            @Param("includeSceneCount") boolean includeSceneCount);
 
     ProjectScriptChapter findByIdAndScript(@Param("chapterId") long chapterId, @Param("scriptId") long scriptId);
 

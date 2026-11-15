@@ -37,25 +37,44 @@ public record CreateCreativeRunRequest(
         /** 用户自然语言指令或手动操作的补充说明。 */
         @NotBlank @Size(max = 12000) String instruction,
         /** 可选已发布根专业 Agent，仅支持会话入口。 */ @Pattern(regexp = AgentProfileContracts.KEY_PATTERN) String agentProfileId,
-        /** 可选用户自己的模型配置。 */ @Positive Long modelConfigId
+        /** 可选用户自己的模型配置。 */ @Positive Long modelConfigId,
+        /** 本轮常规内容变更的自动应用授权。 */ boolean autoApplyChanges,
+        /** 本轮覆盖章节及媒体生成的自动执行授权。 */ boolean autoApproveRiskyChanges
 ) {
 
     /** 默认使用业务操作绑定的内置 Agent。 */
     public CreateCreativeRunRequest(String requestId, CreativeRunTriggerSource triggerSource, CreativeOperationType operationType,
             String conversationId, Long projectId, CreativeTargetRequest target, AgentPermissionPolicy permissionPolicy, String instruction) {
-        this(requestId, triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, null, null);
+        this(requestId, triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, null, null, false, false);
+    }
+
+    /** 兼容未传本轮授权的调用。 */
+    public CreateCreativeRunRequest(String requestId, CreativeRunTriggerSource triggerSource, CreativeOperationType operationType,
+            String conversationId, Long projectId, CreativeTargetRequest target, AgentPermissionPolicy permissionPolicy,
+            String instruction, String agentProfileId, Long modelConfigId) {
+        this(requestId, triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, agentProfileId, modelConfigId, false, false);
+    }
+
+    /** 兼容只授权常规内容变更的请求。 */
+    public CreateCreativeRunRequest(String requestId, CreativeRunTriggerSource triggerSource, CreativeOperationType operationType,
+            String conversationId, Long projectId, CreativeTargetRequest target, AgentPermissionPolicy permissionPolicy,
+            String instruction, String agentProfileId, Long modelConfigId, boolean autoApplyChanges) {
+        this(requestId, triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, agentProfileId, modelConfigId, autoApplyChanges, false);
     }
 
     /** 校验会话入口与手动入口不能混用的字段组合。 */
     @AssertTrue(message = CreativeRuntimeMessages.REQUEST_SCOPE_INVALID)
     public boolean isScopeValid() {
+        if (autoApproveRiskyChanges && !autoApplyChanges) return false;
         if (Objects.isNull(triggerSource) || Objects.isNull(operationType)) {
             return true;
         }
         if (triggerSource == CreativeRunTriggerSource.CONVERSATION) {
-            return operationType == CreativeOperationType.ASSISTANT_CHAT && Objects.isNull(target);
+            return operationType == CreativeOperationType.ASSISTANT_CHAT && Objects.isNull(target)
+                    && (!autoApplyChanges || Objects.nonNull(projectId) && Objects.nonNull(permissionPolicy)
+                    && permissionPolicy.allows(AgentPermissionPolicy.PROPOSE_CHANGES));
         }
-        return Objects.isNull(agentProfileId) && Objects.isNull(modelConfigId)
+        return !autoApplyChanges && Objects.isNull(agentProfileId) && Objects.isNull(modelConfigId)
                 && operationType != CreativeOperationType.ASSISTANT_CHAT
                 && !StringUtils.hasText(conversationId)
                 && Objects.nonNull(projectId)

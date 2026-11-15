@@ -61,13 +61,13 @@ public class ProjectScriptService {
         projectService.requireAccessibleProject(projectId, userId);
         ProjectScript script = scriptRepository.findByProjectId(projectId).orElse(null);
         if (script == null) return null;
-        List<ProjectScriptChapter> chapters = chapterRepository.findSummaries(script.getId());
+        List<ProjectScriptChapter> chapters = chapterRepository.findSummariesWithSceneCount(script.getId());
         List<ProjectScriptChapterSummaryResponse> summaries = new ArrayList<>();
         for (int index = 0; index < chapters.size(); index++) {
             ProjectScriptChapter chapter = chapters.get(index);
             summaries.add(new ProjectScriptChapterSummaryResponse(chapter.getId(), index + 1, chapter.getTitle(),
                     chapter.getSynopsis(), chapter.getParseStatus(), chapter.getRawContentLength() == null ? 0 : chapter.getRawContentLength(),
-                    sceneMapper.findByChapterId(chapter.getId()).size(), chapter.getSortOrder(), chapter.getUpdatedAt()));
+                    chapter.getSceneCount(), chapter.getSortOrder(), chapter.getUpdatedAt()));
         }
         return new ProjectScriptResponse(script.getId(), script.getProjectId(), script.getTitle(), script.getSynopsis(),
                 script.getSourceType(), script.getParseStatus(), script.getStructureVersion(), summaries.size(), summaries,

@@ -23,7 +23,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/** Agnes 视频协议适配。付费提交只发一次，状态查询及结果下载可以重试。 */
+/** Agnes 视频协议适配。生成提交只发一次，状态查询及结果下载可以重试。 */
 @Component
 @RequiredArgsConstructor
 public class AgnesVideoProvider implements GenerationProvider {
@@ -36,7 +36,7 @@ public class AgnesVideoProvider implements GenerationProvider {
     private static final Set<String> RESULT_HOSTS = Set.of("platform-outputs.agnes-ai.space", "apihub.agnes-ai.com");
     private static final int MP4_FILE_TYPE_BOX = 0x66747970;
 
-    private final VideoGenerationQuoteService quotes;
+    private final VideoGenerationConfigService videoConfigs;
     private final ExternalHttpClientFactory clients;
     private final GenerationProperties properties;
     private final ChangeSetCodec codec;
@@ -141,7 +141,7 @@ public class AgnesVideoProvider implements GenerationProvider {
     /** 校验供应商端点未变，凭据允许正常轮换。 */
     private ResolvedAiProviderConfig resolve(GenerationJob job) {
         try {
-            var resolved = quotes.resolve(job.getConfigId(), job.getUserId());
+            var resolved = videoConfigs.resolve(job.getConfigId(), job.getUserId());
             if (GenerationConfigSnapshot.from(resolved).equals(codec.read(job.getConfigSnapshotJson(),
                     GenerationConfigSnapshot.class))) return resolved;
         } catch (RuntimeException exception) {

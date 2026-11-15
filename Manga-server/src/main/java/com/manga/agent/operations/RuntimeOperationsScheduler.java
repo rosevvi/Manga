@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import jakarta.annotation.PostConstruct;
 
-/** 故障对账、无损冷归档和有限标签告警；不自动重发任何供应商请求。 */
+/** 标记失联调用、归档冷 Run 并报告供应商熔断状态。 */
 @Component
 @RequiredArgsConstructor
 @Slf4j

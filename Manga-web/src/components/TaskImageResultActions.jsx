@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { adoptGeneratedArtifact, previewArtifactAdoption } from '../api/generationApi'
 import { getCreativeChangeSet } from '../api/creativeChangeSetApi'
-import { resolveMediaUrl } from '../api/mediaUrl'
 import { REVISION_CONFLICT_CODE } from '../constants/changeSet'
 import { IMAGE_PROMPT_MAX_LENGTH } from '../constants/generation'
 import { notifyCreativeProjectChanged } from './creativeProjectEvents'
 import MediaImage from './MediaImage'
+import GeneratedMediaPreview from './GeneratedMediaPreview'
 
 /** 在任务结果中展示采用前的参考图及重生成表单，写入时使用已展示的项目版本。 */
 export default function TaskImageResultActions({ accessToken, job, onAdopted, onRegenerate, canRegenerate }) {
@@ -63,9 +63,7 @@ export default function TaskImageResultActions({ accessToken, job, onAdopted, on
     {hasImage && <div className="generation-adoption-images">
       {!isCurrent && target?.imageUrl && <div><small>当前参考图</small><MediaImage src={target.imageUrl} alt="当前分镜参考图" showErrorText /></div>}
       <div><small>{isCurrent ? '当前参考图' : '新生成的图片'}</small>
-        <a href={resolveMediaUrl(preview?.artifactUrl || job.artifactUrl) || undefined} target="_blank" rel="noreferrer">
-          <MediaImage src={preview?.artifactUrl || job.artifactUrl} alt={`镜头 ${job.shotId} 的生成图片`} showErrorText />
-        </a></div>
+        <GeneratedMediaPreview accessToken={accessToken} job={job} src={preview?.artifactUrl || job.artifactUrl} /></div>
     </div>}
     {conflicted && <p role="alert">分镜或项目已有更新。刷新参考图后再确认。</p>}
     {previewError && <p role="alert">{previewError}</p>}

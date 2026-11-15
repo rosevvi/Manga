@@ -10,19 +10,17 @@ import com.manga.service.AiProviderConfigService;
 import com.manga.repository.AiProviderConfigRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import java.math.BigDecimal;
 import java.net.URI;
 import java.util.Objects;
 import java.util.Set;
 import java.util.List;
 import java.util.ArrayList;
 
-/** 生成前解析用户配置、允许模型和预计费用，禁止模型伪造价格或端点。 */
+/** 生成前解析用户配置、支持的模型和供应商端点。 */
 @Service
 @RequiredArgsConstructor
-public class ImageGenerationQuoteService {
+public class ImageGenerationConfigService {
     private final AiProviderConfigService configs;
-    private final GenerationProperties properties;
     private final AiProviderConfigRepository repository;
     /** 支持官方 OpenAI 与明确配置的兼容网关。 */
     private static final Set<AiProviderType> COMPATIBLE_TYPES = Set.of(AiProviderType.OPENAI, AiProviderType.OPENAI_COMPATIBLE, AiProviderType.NEWAPI);
@@ -36,19 +34,17 @@ public class ImageGenerationQuoteService {
             GenerationProviderKey provider = route(config.getProviderType(), config.getDefaultModel(), config.getBaseUrl());
             if (Objects.nonNull(provider)) {
                 result.add(new ImageGenerationOption(provider, config.getId(), config.getName(), config.getDefaultModel(),
-                        properties.imagePrices().get(config.getDefaultModel()), GenerationConstants.CURRENCY,
                         ImageGenerationSize.options(provider)));
             }
         }
-        result.add(new ImageGenerationOption(GenerationProviderKey.FAKE, null, "免费流程验证（FAKE）", GenerationConstants.FAKE_MODEL,
-                BigDecimal.ZERO, GenerationConstants.CURRENCY, ImageGenerationSize.options(GenerationProviderKey.FAKE)));
+        result.add(new ImageGenerationOption(GenerationProviderKey.FAKE, null, "流程验证（FAKE）", GenerationConstants.FAKE_MODEL,
+                ImageGenerationSize.options(GenerationProviderKey.FAKE)));
         return List.copyOf(result);
     }
 
-    /** 校验供应商的原生尺寸，服务端按用户指定配置冻结模型、端点和费用。 */
+    /** 校验供应商的原生尺寸，服务端按用户指定配置冻结模型和端点。 */
     public ImageGenerationChange canonicalize(ImageGenerationChange input, long userId) {
         ImageGenerationSize.require(input.provider(), input.width(), input.height());
-        BigDecimal price = BigDecimal.ZERO;
         GenerationConfigSnapshot snapshot = null;
         if (input.provider() == GenerationProviderKey.FAKE) {
             if (!GenerationConstants.FAKE_MODEL.equals(input.model())) throw new BusinessException(GenerationError.INVALID);
@@ -56,12 +52,10 @@ public class ImageGenerationQuoteService {
             ResolvedAiProviderConfig config = resolve(input.provider(), input.configId(), userId);
             if (!Objects.equals(config.defaultModel(), input.model())) throw new BusinessException(GenerationError.INVALID);
             snapshot = GenerationConfigSnapshot.from(config);
-            price = properties.imagePrices().get(input.model());
-            if (Objects.isNull(price) || price.signum() <= 0) throw new BusinessException(GenerationError.INVALID);
         }
         return new ImageGenerationChange(input.shotId(), input.provider(),
                 input.provider() == GenerationProviderKey.FAKE ? null : input.configId(), input.model(), input.prompt().trim(),
-                input.width(), input.height(), price, GenerationConstants.CURRENCY, snapshot);
+                input.width(), input.height(), snapshot);
     }
 
     /** 校验配置归属、启用、供应商和模型，拒绝使用错误的凭据或端点。 */

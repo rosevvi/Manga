@@ -28,7 +28,7 @@ export default function ImageGenerationPanel({ accessToken, projectId, shots = [
     const listOptions = video ? listVideoGenerationOptions : listImageGenerationOptions
     listOptions(accessToken).then((items) => {
       if (scope.current !== expected) return
-      const preferred = items.findIndex((item) => item.configId && item.estimatedCost != null)
+      const preferred = items.findIndex((item) => item.configId != null)
       setOptions(items); setOptionKey(items.length ? String(Math.max(0, preferred)) : '')
     }).catch((failure) => { if (scope.current === expected) setError(failure.message) })
     return () => { scope.current += 1 }
@@ -40,7 +40,7 @@ export default function ImageGenerationPanel({ accessToken, projectId, shots = [
   /** 视频直接使用已选参数创建提案；图片保留 Director 提案流程。 */
   const submit = async (event) => {
     event.preventDefault()
-    if (busy || !selected || !shotId || !prompt.trim() || selected.estimatedCost == null) return
+    if (busy || !selected || !shotId || !prompt.trim()) return
     const expected = scope.current
     setBusy(true); setError('')
     try {
@@ -62,24 +62,43 @@ export default function ImageGenerationPanel({ accessToken, projectId, shots = [
   return <section className="image-generation-panel">
     <h3>{video ? '视频生成' : '图片生成'}</h3>
     <form className="image-generation-form" onSubmit={submit}>
-      {!selectedShot && <label>目标镜头<WorkspaceSelect label="目标镜头" value={shotId} onChange={(id) => {
+      {!selectedShot && <div className="image-generation-field"><span>镜头：</span><WorkspaceSelect label="目标镜头" value={shotId} onChange={(id) => {
         setShotId(id)
         const shot = shots.find((item) => String(item.id) === String(id))
         setPrompt(shot?.content || shot?.title || '')
-      }} options={shots.map((shot) => ({ value: String(shot.id), label: `${shot.shotNumber} · ${shot.title}` }))} /></label>}
-      <label>使用的{video ? '视频' : '图片'}模型<WorkspaceSelect label="媒体模型配置" value={optionKey} onChange={setOptionKey}
-        options={options.map((option, index) => ({ value: String(index), label: `${option.name} · ${option.model}` }))} /></label>
+      }} options={shots.map((shot) => ({ value: String(shot.id), label: `${shot.shotNumber} · ${shot.title}` }))} /></div>}
+      <div className="image-generation-field">
+        <span>模型：</span>
+        <WorkspaceSelect label="模型" value={optionKey} onChange={setOptionKey}
+          options={options.map((option, index) => ({ value: String(index), label: `${option.name} · ${option.model}` }))} />
+      </div>
       {video ? <>
-        <label>画幅<WorkspaceSelect label="视频画幅" value={aspectRatio} onChange={setAspectRatio}
-          options={['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'].map((ratio) => ({ value: ratio, label: ratio }))} /></label>
-        <label>时长（秒）<input type="number" required min={4} max={12} value={seconds}
-          onChange={(event) => setSeconds(Number(event.target.value))} /></label>
-      </> : <label>输出尺寸<WorkspaceSelect label="图片尺寸" value={selectedSize} onChange={setSize} options={imageSizes.map((value) => ({ value, label: value }))} /></label>}
-      <label>画面提示词<textarea required rows={3} maxLength={IMAGE_PROMPT_MAX_LENGTH} value={prompt} onChange={(event) => setPrompt(event.target.value)} /></label>
-      <small>{video ? '单个 720P MP4。' : '单张 PNG。'}{selected?.estimatedCost != null
-        ? `预计 ${video ? (selected.estimatedCost * seconds).toFixed(3) : selected.estimatedCost} ${selected.currency}，批准后才会提交。`
+        <div className="image-generation-field">
+          <span>画幅：</span>
+          <WorkspaceSelect label="画幅" value={aspectRatio} onChange={setAspectRatio}
+            options={['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'].map((ratio) => ({ value: ratio, label: ratio }))} />
+        </div>
+        <label className="image-generation-field">
+          <span>时长：</span>
+          <span className="image-generation-duration">
+            <input type="number" aria-label="时长（秒）" required min={4} max={12} value={seconds}
+              onChange={(event) => setSeconds(Number(event.target.value))} />
+            <span>秒</span>
+          </span>
+        </label>
+      </> : <div className="image-generation-field">
+        <span>尺寸：</span>
+        <WorkspaceSelect label="尺寸" value={selectedSize} onChange={setSize}
+          options={imageSizes.map((value) => ({ value, label: value }))} />
+      </div>}
+      <label className="image-generation-prompt">
+        <span>提示词：</span>
+        <textarea required rows={3} maxLength={IMAGE_PROMPT_MAX_LENGTH} value={prompt} onChange={(event) => setPrompt(event.target.value)} />
+      </label>
+      <small>{selected
+        ? (video ? '生成单个 720P MP4。' : '生成单张 PNG。')
         : '请在 AI 配置页启用对应类型的模型。'}</small>
-      <button className="workspace-primary" type="submit" disabled={busy || !shotId || !prompt.trim() || selected?.estimatedCost == null}>
+      <button className="workspace-primary" type="submit" disabled={busy || !shotId || !prompt.trim() || !selected}>
         {busy ? '创建提案中…' : video ? '创建视频生成提案' : '创建图片生成提案'}
       </button>
     </form>

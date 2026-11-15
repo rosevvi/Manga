@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 /** 生成链路公开错误及安全描述。 */
 @RequiredArgsConstructor
 public enum GenerationError implements ResponseCode {
-    /** 非法生成参数或未配置价格。 */ INVALID("GENERATION_INVALID", "生成参数不合法，或供应商/模型/费用尚未配置"),
+    /** 非法生成参数或缺少模型配置。 */ INVALID("GENERATION_INVALID", "生成参数不合法，或供应商和模型尚未配置"),
     /** 无权限访问。 */ NOT_FOUND("GENERATION_NOT_FOUND", "生成作业不存在或无权访问"),
     /** 状态竞争。 */ STATE("GENERATION_STATE_CONFLICT", "作业状态已变化，请刷新后重试"),
     /** 供应商明确拒绝。 */ REJECTED("GENERATION_REJECTED", "供应商拒绝生成请求，请检查模型、权限和参数"),

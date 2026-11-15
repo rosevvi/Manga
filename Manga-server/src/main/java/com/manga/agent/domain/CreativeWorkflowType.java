@@ -15,7 +15,7 @@ public enum CreativeWorkflowType {
     CHAPTER_STORYBOARD,
     /** 生成章节提案并等待人工批准。 */
     SCRIPT_CHAPTER,
-    /** 图片提案、费用确认、外部作业与产物转存。 */
+    /** 图片提案、生成审批、外部作业与产物转存。 */
     SHOT_IMAGE,
     /** 镜头视频审批及外部生成。 */
     SHOT_VIDEO;

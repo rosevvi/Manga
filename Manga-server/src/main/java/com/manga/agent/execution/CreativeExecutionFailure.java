@@ -15,8 +15,8 @@ public final class CreativeExecutionFailure {
     public static final String TIMEOUT = "模型调用已达到总时限，请缩小章节内容或重新生成；本次调用不会自动重发";
     /** 供应商数据流停止后的提示。 */
     public static final String IDLE = "模型超过无响应时限，请检查供应商连接后重新生成";
-    /** 失联后禁止隐式重发，以免产生重复费用。 */
-    public static final String UNCERTAIN = "执行租约已失联，本步骤曾调用模型；为避免重复计费，已停止自动恢复，请核对后重新生成";
+    /** 失联后禁止隐式重发，以免重复执行。 */
+    public static final String UNCERTAIN = "执行租约已失联，本步骤曾调用模型。为避免重复执行，已停止自动恢复，请核对后重新生成";
     /** 事件持久化跟不上供应商输出。 */
     public static final String BACKPRESSURE = "事件写入队列已满，已停止生成；请检查数据库连接和写入延迟后重新生成";
     /** 供应商认证失败后的处理提示。 */

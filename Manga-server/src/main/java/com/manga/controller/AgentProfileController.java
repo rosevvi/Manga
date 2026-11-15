@@ -34,4 +34,14 @@ public class AgentProfileController {
         log.debug("Agent catalog userId={} count={}", userId, items.size());
         return ApiResponse.success(items);
     }
+
+    /** 读取当前登录用户的对话模型选项。 */
+    @GetMapping("/model-options")
+    @Operation(summary = "查询可选对话模型", description = "仅返回当前用户启用且受支持的文本模型配置摘要。")
+    public ApiResponse<List<AgentProfileCatalogService.ModelOption>> modelOptions() {
+        long userId = SecurityUtils.requireCurrentUserId();
+        var items = catalog.modelOptions(userId);
+        log.debug("Agent model options userId={} count={}", userId, items.size());
+        return ApiResponse.success(items);
+    }
 }

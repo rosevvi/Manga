@@ -45,8 +45,8 @@ public class DynamicAgentBlueprintFactory {
                 || UNSAFE.matcher(request.systemPrompt() + "\n" + request.reason()).find()) {
             throw new AgentRuntimeException(CreativeErrorCode.PERMISSION_DENIED, DynamicAgentMessages.REJECTED);
         }
-        if (Objects.isNull(budget) || Objects.isNull(budget.estimatedUsdPerTurn())) {
-            throw new AgentRuntimeException(CreativeErrorCode.RUN_CONFIG_UNAVAILABLE, DynamicAgentMessages.PRICE_REQUIRED);
+        if (Objects.isNull(budget)) {
+            throw new AgentRuntimeException(CreativeErrorCode.RUN_CONFIG_UNAVAILABLE, DynamicAgentMessages.EXHAUSTED);
         }
         int turns = Math.min(request.maxTurns(), Math.min(parent.maxTurns(), budget.maxTurns()));
         String id = ID_PREFIX + CapabilityContractSupport.sha256(write(request)).substring(0, 24);

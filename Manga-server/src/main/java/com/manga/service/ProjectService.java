@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 /** 提供当前用户项目的查询和生命周期管理。 */
 @Service
@@ -48,7 +49,9 @@ public class ProjectService {
     public ProjectResponse findById(long projectId) {
         long userId = SecurityUtils.requireCurrentUserId();
         MangaProject project = requireAccessibleProject(projectId, userId);
-        project.setWorkflowStage(workflowService.getOrCreate(projectId, SecurityUtils.requireCurrentUsername()).getCurrentStage());
+        if (Objects.isNull(project.getWorkflowStage())) {
+            project.setWorkflowStage(workflowService.getOrCreate(projectId, SecurityUtils.requireCurrentUsername()).getCurrentStage());
+        }
         return toResponse(project);
     }
 

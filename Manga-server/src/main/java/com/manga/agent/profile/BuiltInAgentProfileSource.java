@@ -31,7 +31,7 @@ public class BuiltInAgentProfileSource implements AgentProfileSource {
         AgentProfile director = new AgentProfile(
                 AgentProfileKey.MANGA_DIRECTOR,
                 properties.directorProfileVersion(),
-                "漫剧创作导演",
+                "项目管理助手",
                 "读取项目内容、提出章节和分镜变更，等待用户审批后继续。",
                 readPrompt(resourceLoader, properties.directorPromptResource()),
                 CapabilityName.directorCapabilities(),

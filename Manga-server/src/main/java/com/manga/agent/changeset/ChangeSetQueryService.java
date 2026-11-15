@@ -1,5 +1,8 @@
 package com.manga.agent.changeset;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.manga.agent.generation.ImageGenerationChange;
+import com.manga.agent.generation.VideoGenerationChange;
 import com.manga.common.exception.BusinessException;
 import com.manga.entity.CreativeApproval;
 import com.manga.entity.CreativeChangeSet;
@@ -57,9 +60,19 @@ public class ChangeSetQueryService {
     private ChangeSetView view(CreativeChangeSet proposal, CreativeApproval approval) {
         return new ChangeSetView(proposal.getId(), proposal.getChangeSetId(), proposal.getRunId(), proposal.getStepId(),
                 proposal.getProjectId(), proposal.getChapterId(), proposal.getKind(), proposal.getSchemaVersion(), proposal.getInstruction(), proposal.getStatus(),
-                proposal.getBaseProjectRevision(), proposal.getBaseChapterRevision(), codec.tree(proposal.getBeforeJson()), codec.tree(proposal.getPayloadJson()),
+                proposal.getBaseProjectRevision(), proposal.getBaseChapterRevision(), codec.tree(proposal.getBeforeJson()), proposedView(proposal),
                 Objects.isNull(approval) ? null : approval.getStatus(), Objects.isNull(approval) ? null : approval.getExpiresAt(),
                 Objects.isNull(approval) ? null : approval.getDecidedBy(), Objects.isNull(approval) ? null : approval.getDecidedAt(),
                 Objects.isNull(approval) ? null : approval.getComment());
+    }
+
+    /** 媒体提案以当前 Schema 输出，兼容数据库中已冻结的旧载荷。 */
+    private JsonNode proposedView(CreativeChangeSet proposal) {
+        String payload = proposal.getPayloadJson();
+        return switch (proposal.getKind()) {
+            case IMAGE_GENERATION -> codec.tree(codec.write(codec.read(payload, ImageGenerationChange.class)));
+            case VIDEO_GENERATION -> codec.tree(codec.write(codec.read(payload, VideoGenerationChange.class)));
+            default -> codec.tree(payload);
+        };
     }
 }

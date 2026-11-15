@@ -1,6 +1,7 @@
 package com.manga.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.manga.common.enums.ScriptChapterParseStatus;
@@ -34,6 +35,9 @@ public class ProjectScriptChapter {
     private String rawContent;
     /** 原文长度摘要，不加载原文时使用。 */
     private Integer rawContentLength;
+    /** 章节摘要中查询得到的场景记录数。 */
+    @TableField(exist = false)
+    private int sceneCount;
     /** 章节结构 JSON。 */
     private String structureJson;
     /** 内容来源。 */

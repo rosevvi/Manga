@@ -9,6 +9,7 @@ export default function WorkspaceSelect({ value, options, onChange, label, disab
   const root = useRef(null)
   const id = useId()
   const selected = options.find((option) => String(option.value) === String(value))
+  const SelectedIcon = selected?.icon
   useEffect(() => {
     if (!open) return undefined
     const close = (event) => { if (!root.current?.contains(event.target)) setOpen(false) }
@@ -17,7 +18,7 @@ export default function WorkspaceSelect({ value, options, onChange, label, disab
   }, [open])
   const choose = (option) => { onChange(option.value); setOpen(false); root.current?.querySelector('button')?.focus() }
   return <div className="workbench-select" ref={root} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }}>
-    <button type="button" className="workbench-select-trigger" role="combobox" aria-label={label} aria-controls={id}
+    <button type="button" className="workbench-select-trigger" data-danger={selected?.danger || undefined} role="combobox" aria-label={label} aria-controls={id}
       aria-expanded={open} aria-haspopup="listbox" disabled={disabled} onClick={() => {
         setFocused(Math.max(0, options.findIndex((option) => String(option.value) === String(value)))); setOpen((current) => !current)
       }} onKeyDown={(event) => {
@@ -30,13 +31,15 @@ export default function WorkspaceSelect({ value, options, onChange, label, disab
         if (event.key === 'Home' || event.key === 'End') { event.preventDefault(); setOpen(true); setFocused(event.key === 'Home' ? 0 : options.length - 1) }
         if (event.key === 'Enter' && open && options[focused]) { event.preventDefault(); choose(options[focused]) }
       }} aria-activedescendant={open ? `${id}-${focused}` : undefined}>
-      <span>{selected?.label || placeholder}</span><ChevronDown size={14} />
+      <span className="workbench-select-value">{SelectedIcon && <SelectedIcon size={14} aria-hidden="true" />}{selected?.label || placeholder}</span><ChevronDown size={14} />
     </button>
     {open && <div id={id} role="listbox" aria-label={label} className="workbench-select-options">
       {options.length === 0 && <small>暂无可用选项</small>}
       {options.map((option, index) => <button id={`${id}-${index}`} key={option.value} type="button" role="option" tabIndex={-1}
-        aria-selected={String(option.value) === String(value)} className={focused === index ? 'focused' : ''}
-        onPointerMove={() => setFocused(index)} onClick={() => choose(option)}><span>{option.label}</span>
+        aria-selected={String(option.value) === String(value)} className={focused === index ? 'focused' : ''} data-danger={option.danger || undefined}
+        onPointerMove={() => setFocused(index)} onClick={() => choose(option)}>
+        <span className="workbench-option-content">{option.icon && <option.icon size={16} aria-hidden="true" />}
+          <span>{option.label}{option.description && <small className="workbench-option-description">{option.description}</small>}</span></span>
         {String(option.value) === String(value) && <Check size={13} />}</button>)}
     </div>}
   </div>

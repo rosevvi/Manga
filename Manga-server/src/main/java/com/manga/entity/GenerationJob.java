@@ -35,6 +35,10 @@ public class GenerationJob {
     /** 查询时从批准提案读取的媒体类型，供 worker 和作业视图使用。 */
     @TableField(exist = false)
     private ChangeSetKind mediaKind;
+    /** 随列表快照读取的产物元数据，等待或失败的作业可以为空。 */
+    @TableField(exist = false)
+    @ToString.Exclude
+    private CreativeArtifact listingArtifact;
     /** 作业归属用户。 */
     private Long userId;
     /** 归属项目。 */
@@ -57,7 +61,7 @@ public class GenerationJob {
     private String providerJobId;
     /** 真实百分比，未知时为空。 */
     private Integer progress;
-    /** 已撤销结果采用权；不承诺同步供应商停止计费。 */
+    /** 已撤销结果采用权；已提交的供应商作业可能继续执行。 */
     private Boolean cancelRequested;
     /** 已生成 PNG 暂存数据；转存后清除。 */
     @ToString.Exclude

@@ -142,7 +142,8 @@ public class CreativeRunController {
                 request.permissionPolicy(),
                 request.instruction(),
                 Objects.isNull(request.agentProfileId()) && Objects.isNull(request.modelConfigId()) ? null
-                        : new AgentProfileSelection(request.agentProfileId(), null, request.modelConfigId(), false)
+                        : new AgentProfileSelection(request.agentProfileId(), null, request.modelConfigId(), false),
+                request.autoApplyChanges(), request.autoApproveRiskyChanges()
         );
     }
 

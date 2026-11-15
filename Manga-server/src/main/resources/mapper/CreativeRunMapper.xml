@@ -13,6 +13,8 @@
         <result property="workflowType" column="workflow_type" javaType="com.manga.agent.domain.CreativeWorkflowType"/>
         <result property="workflowVersion" column="workflow_version"/>
         <result property="permissionPolicy" column="permission_policy" javaType="com.manga.agent.domain.AgentPermissionPolicy"/>
+        <result property="autoApplyChanges" column="auto_apply_changes"/>
+        <result property="autoApproveRiskyChanges" column="auto_approve_risky_changes"/>
         <result property="budgetJson" column="budget_json"/>
         <result property="triggerSource" column="trigger_source" javaType="com.manga.agent.domain.CreativeRunTriggerSource"/>
         <result property="operationType" column="operation_type" javaType="com.manga.agent.domain.CreativeOperationType"/>
@@ -41,7 +43,7 @@
 
     <select id="findByRunId" resultMap="creativeRunResultMap">
         SELECT id, run_id, request_id, request_fingerprint, conversation_id, user_id, project_id,
-               engine_version, workflow_type, workflow_version, permission_policy, budget_json,
+               engine_version, workflow_type, workflow_version, permission_policy, auto_apply_changes, auto_approve_risky_changes, budget_json,
                trigger_source, operation_type, target_type, target_id, status, active_conversation_id,
                owner_instance_id, owner_epoch, lease_until, deadline_at, next_sequence, terminal_sequence,
                projected_through_sequence, state_generation,
@@ -53,7 +55,7 @@
 
     <select id="findOwned" resultMap="creativeRunResultMap">
         SELECT id, run_id, request_id, request_fingerprint, conversation_id, user_id, project_id,
-               engine_version, workflow_type, workflow_version, permission_policy, budget_json,
+               engine_version, workflow_type, workflow_version, permission_policy, auto_apply_changes, auto_approve_risky_changes, budget_json,
                trigger_source, operation_type, target_type, target_id, status, active_conversation_id,
                owner_instance_id, owner_epoch, lease_until, deadline_at, next_sequence, terminal_sequence,
                projected_through_sequence, state_generation,
@@ -66,7 +68,7 @@
 
     <select id="findByRequestId" resultMap="creativeRunResultMap">
         SELECT id, run_id, request_id, request_fingerprint, conversation_id, user_id, project_id,
-               engine_version, workflow_type, workflow_version, permission_policy, budget_json,
+               engine_version, workflow_type, workflow_version, permission_policy, auto_apply_changes, auto_approve_risky_changes, budget_json,
                trigger_source, operation_type, target_type, target_id, status, active_conversation_id,
                owner_instance_id, owner_epoch, lease_until, deadline_at, next_sequence, terminal_sequence,
                projected_through_sequence, state_generation,
@@ -79,7 +81,7 @@
 
     <select id="lockOwned" resultMap="creativeRunResultMap">
         SELECT id, run_id, request_id, request_fingerprint, conversation_id, user_id, project_id,
-               engine_version, workflow_type, workflow_version, permission_policy, budget_json,
+               engine_version, workflow_type, workflow_version, permission_policy, auto_apply_changes, auto_approve_risky_changes, budget_json,
                trigger_source, operation_type, target_type, target_id, status, active_conversation_id,
                owner_instance_id, owner_epoch, lease_until, deadline_at, next_sequence, terminal_sequence,
                projected_through_sequence, state_generation,
@@ -93,7 +95,7 @@
 
     <select id="lockByRunId" resultMap="creativeRunResultMap">
         SELECT id, run_id, request_id, request_fingerprint, conversation_id, user_id, project_id,
-               engine_version, workflow_type, workflow_version, permission_policy, budget_json,
+               engine_version, workflow_type, workflow_version, permission_policy, auto_apply_changes, auto_approve_risky_changes, budget_json,
                trigger_source, operation_type, target_type, target_id, status, active_conversation_id,
                owner_instance_id, owner_epoch, lease_until, deadline_at, next_sequence, terminal_sequence,
                projected_through_sequence, state_generation,

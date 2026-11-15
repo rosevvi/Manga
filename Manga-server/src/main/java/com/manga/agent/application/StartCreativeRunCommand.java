@@ -33,14 +33,30 @@ public record StartCreativeRunCommand(
         AgentPermissionPolicy permissionPolicy,
         /** 用户本次提交的自然语言指令或操作补充说明。 */
         String instruction,
-        /** 可选专业 Agent 选择；管理员精确版本测试由服务端构造。 */ AgentProfileSelection agentSelection
+        /** 可选专业 Agent 选择；管理员精确版本测试由服务端构造。 */ AgentProfileSelection agentSelection,
+        /** 用户对本轮低风险内容提案的预授权。 */ boolean autoApplyChanges,
+        /** 用户对本轮覆盖章节及媒体生成的预授权。 */ boolean autoApproveRiskyChanges
 ) {
 
     /** 默认按业务操作绑定内置 Agent。 */
     public StartCreativeRunCommand(long userId, String requestId, CreativeRunTriggerSource triggerSource,
             CreativeOperationType operationType, String conversationId, Long projectId,
             CreativeResourceReference target, AgentPermissionPolicy permissionPolicy, String instruction) {
-        this(userId, requestId, triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, null);
+        this(userId, requestId, triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, null, false, false);
+    }
+
+    /** 已有调用默认逐次确认。 */
+    public StartCreativeRunCommand(long userId, String requestId, CreativeRunTriggerSource triggerSource,
+            CreativeOperationType operationType, String conversationId, Long projectId, CreativeResourceReference target,
+            AgentPermissionPolicy permissionPolicy, String instruction, AgentProfileSelection agentSelection) {
+        this(userId, requestId, triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, agentSelection, false, false);
+    }
+
+    /** 兼容只授权常规内容变更的调用。 */
+    public StartCreativeRunCommand(long userId, String requestId, CreativeRunTriggerSource triggerSource,
+            CreativeOperationType operationType, String conversationId, Long projectId, CreativeResourceReference target,
+            AgentPermissionPolicy permissionPolicy, String instruction, AgentProfileSelection agentSelection, boolean autoApplyChanges) {
+        this(userId, requestId, triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, agentSelection, autoApplyChanges, false);
     }
 
     public StartCreativeRunCommand {
@@ -60,6 +76,11 @@ public record StartCreativeRunCommand(
             throw new IllegalArgumentException(CreativeRuntimeMessages.PROJECT_ID_MUST_BE_POSITIVE);
         }
         validateScope(triggerSource, operationType, conversationId, projectId, target);
+        if (autoApproveRiskyChanges && !autoApplyChanges
+                || autoApplyChanges && (triggerSource != CreativeRunTriggerSource.CONVERSATION || Objects.isNull(projectId)
+                || !permissionPolicy.allows(AgentPermissionPolicy.PROPOSE_CHANGES))) {
+            throw new IllegalArgumentException(CreativeRuntimeMessages.REQUEST_SCOPE_INVALID);
+        }
     }
 
     /** 创建由助手会话消息触发的运行命令。 */

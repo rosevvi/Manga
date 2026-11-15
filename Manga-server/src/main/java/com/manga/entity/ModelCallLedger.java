@@ -5,10 +5,9 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import java.time.LocalDateTime;
-import java.math.BigDecimal;
 import com.manga.agent.operations.ModelCallStatus;
 
-/** 模型调用和已报告 token 的不可重复结算记录。 */
+/** 模型调用和已报告 token 的持久化诊断记录。 */
 @Data
 @TableName("manga_model_call_ledger")
 public class ModelCallLedger {
@@ -39,30 +38,12 @@ public class ModelCallLedger {
     private Long outputTokens;
     /** 最近累计缓存命中 token。 */
     private Long cachedTokens;
-    /** 推理 token 诊断量，不重复加到输出费用。 */
+    /** 推理 token 诊断量。 */
     private Long reasoningTokens;
-    /** 额外缓存创建 token，当前费率契约不覆盖时保持费用未定。 */
+    /** 额外缓存创建 token。 */
     private Long cacheCreationTokens;
-    /** 额外工具 Prompt token，当前费率契约不覆盖时保持费用未定。 */
+    /** 额外工具 Prompt token。 */
     private Long toolUsePromptTokens;
-    /** 冻结的标准输入单价，USD/百万 token；空为未定价。 */
-    private BigDecimal inputPrice;
-    /** 冻结的缓存输入单价，USD/百万 token。 */
-    private BigDecimal cachedInputPrice;
-    /** 冻结的输出单价，USD/百万 token。 */
-    private BigDecimal outputPrice;
-    /** 规划预留 USD，受理即消耗不退还。 */
-    private BigDecimal reservedUsd;
-    /** 按已报告 token 计算的 USD，非供应商账单；空为未知或未定价。 */
-    private BigDecimal calculatedUsd;
-    /** 人工核对供应商账单后确认的 USD，空表示尚未对账。 */
-    private BigDecimal settledUsd;
-    /** 认证对账管理员主键。 */
-    private Long settledBy;
-    /** 对账时间，UTC。 */
-    private LocalDateTime settledAt;
-    /** 对账依据或账单编号，不填写凭据。 */
-    private String settlementNote;
     /** 失败类型编码，仅保存类名，不保存异常消息。 */
     private String failureType;
     /** 调用持久化受理时间，UTC。 */

@@ -18,41 +18,30 @@
     <select id="activeCalls" resultType="int">
         SELECT COUNT(*) FROM manga_model_call_ledger WHERE config_id = #{configId} AND status = 'STARTED' AND expires_at &gt; #{now}
     </select>
-    <select id="dailyReserved" resultType="java.math.BigDecimal">
-        SELECT COALESCE(SUM(reserved_usd), 0) FROM manga_model_call_ledger WHERE config_id = #{configId} AND started_at &gt;= #{start}
-    </select>
     <update id="finish">
         UPDATE manga_model_call_ledger SET status = #{call.status}, usage_reported = #{call.usageReported},
         input_tokens = #{call.inputTokens}, output_tokens = #{call.outputTokens}, cached_tokens = #{call.cachedTokens},
         reasoning_tokens = #{call.reasoningTokens}, cache_creation_tokens = #{call.cacheCreationTokens},
-        tool_use_prompt_tokens = #{call.toolUsePromptTokens}, calculated_usd = #{call.calculatedUsd}, failure_type = #{call.failureType},
+        tool_use_prompt_tokens = #{call.toolUsePromptTokens}, failure_type = #{call.failureType},
         finished_at = #{call.finishedAt}, updated_at = CURRENT_TIMESTAMP, updated_by = #{actor}
         WHERE call_id = #{call.callId} AND status = 'STARTED'
     </update>
-    <select id="lockCall" resultType="com.manga.entity.ModelCallLedger">
-        SELECT id, call_id, run_id, step_id, owner_epoch, config_id, model_name, blueprint_fingerprint, status, usage_reported,
-        input_tokens, output_tokens, cached_tokens, reasoning_tokens, cache_creation_tokens, tool_use_prompt_tokens,
-        input_price, cached_input_price, output_price, reserved_usd, calculated_usd, settled_usd, settled_by, settled_at,
-        settlement_note, failure_type, started_at, expires_at, finished_at, created_at, updated_at, created_by, updated_by
-        FROM manga_model_call_ledger WHERE call_id = #{callId} FOR UPDATE
-    </select>
-    <update id="settle">
-        UPDATE manga_model_call_ledger SET settled_usd = #{amount}, settled_by = #{userId}, settled_at = #{now},
-        settlement_note = #{note}, updated_at = CURRENT_TIMESTAMP, updated_by = #{userId}
-        WHERE call_id = #{callId} AND status != 'STARTED' AND settled_usd IS NULL
-    </update>
     <select id="stale" resultType="com.manga.entity.ModelCallLedger">
-        SELECT id, call_id, run_id, step_id, owner_epoch, config_id, model_name, blueprint_fingerprint, status, usage_reported, input_tokens, output_tokens, cached_tokens, reasoning_tokens, cache_creation_tokens, tool_use_prompt_tokens, input_price, cached_input_price, output_price, reserved_usd, calculated_usd, settled_usd, settled_by, settled_at, settlement_note, failure_type, started_at, expires_at, finished_at, created_at, updated_at, created_by, updated_by FROM manga_model_call_ledger WHERE status = 'STARTED' AND expires_at &lt;= #{now} ORDER BY id LIMIT 100
+        SELECT id, call_id, run_id, step_id, owner_epoch, config_id, model_name, blueprint_fingerprint, status, usage_reported,
+               input_tokens, output_tokens, cached_tokens, reasoning_tokens, cache_creation_tokens, tool_use_prompt_tokens,
+               failure_type, started_at, expires_at, finished_at, created_at, updated_at, created_by, updated_by
+        FROM manga_model_call_ledger WHERE status = 'STARTED' AND expires_at &lt;= #{now} ORDER BY id LIMIT 100
     </select>
     <select id="byRun" resultType="com.manga.entity.ModelCallLedger">
-        SELECT id, call_id, run_id, step_id, owner_epoch, config_id, model_name, blueprint_fingerprint, status, usage_reported, input_tokens, output_tokens, cached_tokens, reasoning_tokens, cache_creation_tokens, tool_use_prompt_tokens, input_price, cached_input_price, output_price, reserved_usd, calculated_usd, settled_usd, settled_by, settled_at, settlement_note, failure_type, started_at, expires_at, finished_at, created_at, updated_at, created_by, updated_by FROM manga_model_call_ledger WHERE run_id = #{runId}
+        SELECT id, call_id, run_id, step_id, owner_epoch, config_id, model_name, blueprint_fingerprint, status, usage_reported,
+               input_tokens, output_tokens, cached_tokens, reasoning_tokens, cache_creation_tokens, tool_use_prompt_tokens,
+               failure_type, started_at, expires_at, finished_at, created_at, updated_at, created_by, updated_by
+        FROM manga_model_call_ledger WHERE run_id = #{runId}
         <if test="beforeId != null">AND id &lt; #{beforeId}</if>
         ORDER BY id DESC LIMIT 100
     </select>
     <select id="overview" resultType="map">
         SELECT status, COUNT(*) AS calls, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
-        SUM(calculated_usd) AS calculated_usd, SUM(settled_usd) AS settled_usd,
-        SUM(CASE WHEN calculated_usd IS NULL THEN 1 ELSE 0 END) AS unpriced_or_unknown_calls,
         SUM(CASE WHEN status != 'SUCCEEDED' THEN 1 ELSE 0 END) AS possibly_partial_calls
         FROM manga_model_call_ledger WHERE started_at &gt;= #{since}
         GROUP BY status

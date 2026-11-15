@@ -88,7 +88,7 @@ public class ChangeSetApprovalService {
         if (!valid) throw new AgentRuntimeException(CreativeErrorCode.PROPOSAL_REQUIRED, ChangeSetConstants.PROPOSAL_REQUIRED);
     }
 
-    /** 执行资源关闭后调用；原子释放 owner、撤销旧状态许可并开放审批，不保留 Reactor 调用栈。 */
+    /** 释放执行资源后进入审批；显式预授权的内容提案复用同一应用和审计事务。 */
     @Transactional
     public boolean suspendIfProposed(ClaimedCreativeStep claim) {
         CreativeRun run = runs.lockByRunId(claim.runId());
@@ -104,18 +104,33 @@ public class ChangeSetApprovalService {
         proposal.setStatus(ChangeSetStatus.PENDING);
         proposal.setUpdatedBy(SystemActor.CREATIVE_RUNTIME.code());
         proposals.update(proposal);
-        approvals.create(CreativeApproval.builder().changeSetId(proposal.getChangeSetId()).status(ApprovalStatus.PENDING)
-                .expiresAt(now.plus(properties.ttl())).createdBy(proposal.getCreatedBy()).updatedBy(proposal.getUpdatedBy()).build());
+        CreativeApproval approval = CreativeApproval.builder().changeSetId(proposal.getChangeSetId()).status(ApprovalStatus.PENDING)
+                .expiresAt(now.plus(properties.ttl())).createdBy(proposal.getCreatedBy()).updatedBy(proposal.getUpdatedBy()).build();
+        approvals.create(approval);
         run.setStatus(CreativeRunStatus.WAITING);
         run.setLeaseUntil(null);
         runs.update(run);
         sessions.retireSession(claim.stateSessionId());
         events.append(run.getRunId(), claim.stepId(), CreativeEventType.CHANGESET_PROPOSED,
                 CreativeEventSources.RUNTIME, proposal.getChangeSetId(), new ProposalEvent(proposal.getChangeSetId(), proposal.getKind()));
+        boolean fullAccess = Boolean.TRUE.equals(run.getAutoApproveRiskyChanges());
+        if (Boolean.TRUE.equals(run.getAutoApplyChanges()) && (fullAccess || isLowRisk(proposal))) {
+            long userId = run.getUserId();
+            String comment = fullAccess ? ChangeSetConstants.FULL_ACCESS_APPROVAL_COMMENT : ChangeSetConstants.AUTO_APPLIED_COMMENT;
+            ApprovalResult result = application.apply(proposal, userId, CreativeActor.user(userId), comment);
+            finish(proposal, approval, run, result.status(), comment, userId, result.resourceIds(), true);
+            return true;
+        }
         events.append(run.getRunId(), claim.stepId(), CreativeEventType.APPROVAL_REQUIRED,
                 CreativeEventSources.RUNTIME, proposal.getChangeSetId(), new ProposalEvent(proposal.getChangeSetId(), proposal.getKind()));
         log.info("Creative Step awaiting approval runId={} stepId={} changeSetId={}", run.getRunId(), claim.stepId(), proposal.getChangeSetId());
         return true;
+    }
+
+    /** 新增章节和追加分镜不会覆盖已保存内容，也不会提交外部生成。 */
+    private boolean isLowRisk(CreativeChangeSet proposal) {
+        return proposal.getKind() == ChangeSetKind.STORYBOARD
+                || proposal.getKind() == ChangeSetKind.SCRIPT && Objects.isNull(proposal.getChapterId());
     }
 
     /** 同一决定可幂等重放；批准、领域写入、审批人、结果和恢复 Outbox 在同一事务提交。 */

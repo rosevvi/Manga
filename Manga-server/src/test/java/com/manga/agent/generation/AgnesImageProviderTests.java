@@ -1,6 +1,7 @@
 package com.manga.agent.generation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.manga.agent.changeset.ChangeSetCodec;
 import com.manga.agent.changeset.ChangeSetKind;
 import com.manga.common.enums.AiModelType;
@@ -22,10 +23,8 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,46 +35,63 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/** 覆盖 Agnes 图片报价、冻结配置及其同步提交协议，不请求真实供应商。 */
+/** 覆盖 Agnes 图片配置冻结、历史提案和同步提交协议。 */
 class AgnesImageProviderTests {
     private static final long USER_ID = 8L;
     private static final long CONFIG_ID = 12L;
     private static final String MODEL = AgnesImageModel.FLASH_2_5.id();
-    private static final BigDecimal ESTIMATE = new BigDecimal("0.010");
 
     @Test
-    void quotesOwnedImageConfigAndValidatesModelAndNativeDimensions() {
+    void resolvesOwnedImageConfigAndValidatesModelAndNativeDimensions() {
         var configs = mock(AiProviderConfigService.class);
         var repository = mock(AiProviderConfigRepository.class);
-        var quote = new ImageGenerationQuoteService(configs, properties(), repository);
+        var imageConfigs = new ImageGenerationConfigService(configs, repository);
         var saved = AiProviderConfig.builder().id(CONFIG_ID).name("Agnes 图片").providerType(AiProviderType.AGNES)
                 .modelType(AiModelType.IMAGE).enabled(true).baseUrl(AgnesEndpoint.BASE_URL)
                 .defaultModel(MODEL).apiKeyCiphertext("test-only").build();
         when(repository.findAllOwnedBy(USER_ID)).thenReturn(List.of(saved));
-        var choice = quote.options(USER_ID).getFirst();
+        var choice = imageConfigs.options(USER_ID).getFirst();
         assertThat(choice.provider()).isEqualTo(GenerationProviderKey.AGNES);
         assertThat(choice.sizes()).containsExactly("1024x1024", "1248x832", "832x1248");
 
         var resolved = config(AgnesEndpoint.BASE_URL, MODEL);
         when(configs.resolveOwned(USER_ID, CONFIG_ID, AiModelType.IMAGE)).thenReturn(Optional.of(resolved));
-        var approved = quote.canonicalize(input(MODEL, 832, 1248), USER_ID);
-        assertThat(approved.estimatedCost()).isEqualByComparingTo(ESTIMATE);
+        var approved = imageConfigs.canonicalize(input(MODEL, 832, 1248), USER_ID);
+        assertThat(approved.model()).isEqualTo(MODEL);
         assertThat(approved.configSnapshot()).isEqualTo(GenerationConfigSnapshot.from(resolved));
-        assertThatThrownBy(() -> quote.canonicalize(input(MODEL, 1024, 1536), USER_ID)).isInstanceOf(BusinessException.class);
-        assertThatThrownBy(() -> quote.canonicalize(input(AgnesImageModel.FLASH_2_1.id(), 832, 1248), USER_ID))
+        assertThatThrownBy(() -> imageConfigs.canonicalize(input(MODEL, 1024, 1536), USER_ID)).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> imageConfigs.canonicalize(input(AgnesImageModel.FLASH_2_1.id(), 832, 1248), USER_ID))
                 .isInstanceOf(BusinessException.class);
 
         when(configs.resolveOwned(USER_ID, CONFIG_ID, AiModelType.IMAGE))
                 .thenReturn(Optional.of(config("https://untrusted.example/v1", MODEL)));
-        assertThatThrownBy(() -> quote.canonicalize(input(MODEL, 832, 1248), USER_ID)).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> imageConfigs.canonicalize(input(MODEL, 832, 1248), USER_ID)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void restoresStoredMediaProposalWithoutExposingLegacyPricing() {
+        try (var factory = Validation.buildDefaultValidatorFactory()) {
+            var codec = new ChangeSetCodec(new ObjectMapper(), factory.getValidator());
+            var input = input(MODEL, 1248, 832);
+            var payload = (ObjectNode) codec.tree(codec.write(input));
+            payload.put("estimatedCost", 0.01);
+            payload.put("currency", "USD");
+
+            var restored = codec.read(payload.toString(), ImageGenerationChange.class);
+            assertThat(restored).isEqualTo(input);
+            var preview = codec.tree(codec.write(restored));
+            assertThat(preview.has("estimatedCost") || preview.has("currency")).isFalse();
+            assertThatThrownBy(() -> codec.validate(payload, ImageGenerationChange.class))
+                    .isInstanceOf(BusinessException.class);
+        }
     }
 
     @Test
     void submitsDocumentedBase64RequestAndKeepsVideoRoutingSeparate() throws Exception {
-        var quotes = mock(ImageGenerationQuoteService.class);
+        var imageConfigs = mock(ImageGenerationConfigService.class);
         var clients = mock(ExternalHttpClientFactory.class);
         var resolved = config(AgnesEndpoint.BASE_URL, MODEL);
-        when(quotes.resolve(GenerationProviderKey.AGNES, CONFIG_ID, USER_ID)).thenReturn(resolved);
+        when(imageConfigs.resolve(GenerationProviderKey.AGNES, CONFIG_ID, USER_ID)).thenReturn(resolved);
         var client = WebClient.builder().baseUrl(AgnesEndpoint.VERSIONED_URL).exchangeFunction(request -> {
             assertThat(request.url().toString()).isEqualTo(AgnesEndpoint.VERSIONED_URL + "/images/generations");
             assertThat(request.headers().getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer test-only");
@@ -86,7 +102,7 @@ class AgnesImageProviderTests {
         try (var factory = Validation.buildDefaultValidatorFactory()) {
             var mapper = new ObjectMapper();
             var codec = new ChangeSetCodec(mapper, factory.getValidator());
-            var image = new AgnesImageProvider(quotes, clients, properties(), codec, mapper);
+            var image = new AgnesImageProvider(imageConfigs, clients, properties(), codec, mapper);
             var video = new AgnesVideoProvider(null, clients, properties(), codec);
             var registry = new GenerationProviderRegistry(List.of(image, video));
             var input = input(MODEL, 1248, 832);
@@ -111,7 +127,7 @@ class AgnesImageProviderTests {
     private GenerationProperties properties() {
         return new GenerationProperties(4, 40, 20, 4, 2, Duration.ofMinutes(20), Duration.ofSeconds(10),
                 Duration.ofMinutes(5), Duration.ofHours(24), Duration.ofSeconds(15), 1024 * 1024,
-                Duration.ofMinutes(5), Map.of(MODEL, ESTIMATE), "", Duration.ofMinutes(5));
+                Duration.ofMinutes(5), "", Duration.ofMinutes(5));
     }
 
     private ResolvedAiProviderConfig config(String address, String model) {
@@ -120,7 +136,6 @@ class AgnesImageProviderTests {
     }
 
     private ImageGenerationChange input(String model, int width, int height) {
-        return new ImageGenerationChange(2L, GenerationProviderKey.AGNES, CONFIG_ID, model, "A coastal town", width, height,
-                BigDecimal.ZERO, null, null);
+        return new ImageGenerationChange(2L, GenerationProviderKey.AGNES, CONFIG_ID, model, "A coastal town", width, height, null);
     }
 }

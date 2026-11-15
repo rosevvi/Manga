@@ -1,363 +1,310 @@
-import { Bot, Plus, Send, X, MessageSquare, ListTodo } from 'lucide-react'
+import { Bot, ChevronDown, ChevronRight, Folder, Hand, MessageSquare, Plus, Send, ShieldAlert, ShieldCheck, Square, SquarePen, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createConversationRun, listProjectCreativeRuns } from '../api/creativeRunApi'
+import { cancelCreativeRun, createConversationRun } from '../api/creativeRunApi'
 import { getCreativeConversationHistory, listCreativeConversations } from '../api/creativeConversationApi'
-import { CREATIVE_MESSAGE_ROLE, CREATIVE_MESSAGE_STATUS } from '../constants/creative'
-import './manga-assistant.css'
-import './creative-workbench.css'
+import { listAssistantModels } from '../api/agentProfileApi'
+import { CREATIVE_MESSAGE_ROLE, CREATIVE_PERMISSION } from '../constants/creative'
+import { CREATIVE_TERMINAL_STATUSES } from '../constants/changeSet'
+import { OPEN_CREATIVE_TASK } from './creativeTaskEvents'
+import AssistantMarkdown, { AssistantThinking } from './AssistantMarkdown'
 import CreativeRunDetails from './CreativeRunDetails'
 import WorkspaceSelect from './WorkspaceSelect'
-import { OPEN_CREATIVE_TASK, RUN_STATUS_LABEL, creativeTaskName } from './creativeTaskEvents'
-import { listAgentCatalog } from '../api/agentProfileApi'
-import { CREATIVE_PERMISSION } from '../constants/creative'
+import './manga-assistant.css'
+import './creative-workbench.css'
 
-/** 仅保存当前会话选择，不保存正文和密钥。 */
 const SELECTION_STORAGE_PREFIX = 'manga.creative.conversation.'
+const APPROVAL_MODE = Object.freeze({ ASK: 'ASK', ASSISTED: 'ASSISTED', FULL: 'FULL' })
+const APPROVAL_OPTIONS = [
+  { value: APPROVAL_MODE.ASK, label: '请求批准', icon: Hand, description: '保存章节、分镜或提交生成前始终询问' },
+  { value: APPROVAL_MODE.ASSISTED, label: '帮我批准', icon: ShieldCheck, description: '新增内容自动应用，覆盖章节或媒体生成时询问' },
+  { value: APPROVAL_MODE.FULL, label: '完全访问权限', icon: ShieldAlert, danger: true, description: '本轮自动执行当前项目的变更及媒体生成，保留修订确认' },
+]
 
-/** 生成启动请求幂等标识。 */
-function nextRequestId() {
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-/** 历史读取消息投影，当前创作在同一时间线依序展示正文、工具和操作。 */
-export default function MangaAssistant({ accessToken, userId, projectId }) {
+/** 项目管理助手按项目组织会话，执行详情、审批与产物都在同一对话框里。 */
+export default function MangaAssistant({ accessToken, userId, projectId, projects = [], onOpened }) {
   const [open, setOpen] = useState(false)
-  const [hasOpened, setHasOpened] = useState(false)
   const [instruction, setInstruction] = useState('')
   const [conversations, setConversations] = useState([])
-  const [hasMoreConversations, setHasMoreConversations] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
   const [conversationId, setConversationId] = useState(null)
+  const [workspace, setWorkspace] = useState(undefined)
+  const [lastRunId, setLastRunId] = useState(null)
+  const [linkedRunId, setLinkedRunId] = useState(null)
+  const [linkedSnapshot, setLinkedSnapshot] = useState(null)
   const [messages, setMessages] = useState([])
   const [nextBeforeId, setNextBeforeId] = useState(null)
   const [activeRun, setActiveRun] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [agentCatalog, setAgentCatalog] = useState([])
-  const [selectedAgent, setSelectedAgent] = useState('')
-  const [tab, setTab] = useState('conversations')
-  const [projectOnly, setProjectOnly] = useState(true)
-  const [tasks, setTasks] = useState([])
-  const [taskCursor, setTaskCursor] = useState(null)
-  const [selectedTask, setSelectedTask] = useState(null)
-  const [taskListVersion, setTaskListVersion] = useState(0)
-  const [taskMoreLoading, setTaskMoreLoading] = useState(false)
-  const taskSelectRef = useRef(null)
-  const taskListScope = useRef(0)
-  const taskHistoryLoaded = useRef(false)
+  const [modelOptions, setModelOptions] = useState([])
+  const [selectedModel, setSelectedModel] = useState('')
+  const [approvalMode, setApprovalMode] = useState(APPROVAL_MODE.ASK)
+  const [stopRequested, setStopRequested] = useState(null)
   const selectedRef = useRef(null)
-  const activeRef = useRef(null)
+  const pagingMessages = useRef(false)
   const scopeRef = useRef(0)
-  const historyVersionRef = useRef(0)
-  const busy = submitting || Boolean(activeRun)
-  const conversationProjectId = conversations.find((item) => item.conversationId === conversationId)?.projectId || projectId
-  const filterProject = projectOnly ? projectId : null
-  const selectionKey = `${SELECTION_STORAGE_PREFIX}${userId}.${filterProject || 'all'}`
+  const historyVersion = useRef(0)
+  const dialogRef = useRef(null)
+  const selectionKey = SELECTION_STORAGE_PREFIX + userId
+  const conversation = conversations.find((item) => item.conversationId === conversationId)
+  const linkedRun = linkedSnapshot?.runId === linkedRunId ? linkedSnapshot : null
+  const workspaceId = linkedRun ? linkedRun.projectId
+    : conversation ? conversation.projectId : workspace === undefined ? projectId : workspace
+  const focusedRun = linkedRunId ? linkedRun : activeRun
+  const executing = focusedRun && !CREATIVE_TERMINAL_STATUSES.has(focusedRun.status)
+  const busy = submitting || Boolean(executing) || Boolean(linkedRunId && !linkedRun)
 
-  /** 页面发起任务后定位到同一个任务中心；跨项目任务也可按已授权 Run ID 查询。 */
-  useEffect(() => {
-    const show = (event) => {
-      const id = event.detail?.runId
-      setHasOpened(true); setOpen(true); setTab('tasks')
-      try { sessionStorage.setItem(`${selectionKey}.tab`, 'tasks') } catch { /* 仅保存选择。 */ }
-      if (id) {
-        taskSelectRef.current = id; setSelectedTask(id)
-        try { sessionStorage.setItem(`${selectionKey}.run`, id) } catch { /* 仅保存选择。 */ }
-      }
-      setTaskListVersion((current) => current + 1)
-    }
-    window.addEventListener(OPEN_CREATIVE_TASK, show)
+  /** 选择会话或新草稿，丢弃上一会话的在途查询。 */
+  const selectConversation = useCallback((id, boundProject) => {
+    selectedRef.current = id
+    pagingMessages.current = false
+    historyVersion.current += 1
+    setConversationId(id)
+    if (boundProject !== undefined) setWorkspace(boundProject)
+    setLinkedRunId(null)
+    setLastRunId(null)
+    setMessages([])
+    setActiveRun(null)
+    setNextBeforeId(null)
+    setApprovalMode(APPROVAL_MODE.ASK)
+    setError('')
     try {
-      const id = sessionStorage.getItem(`${selectionKey}.run`); taskSelectRef.current = id; setSelectedTask(id)
-      setTab(sessionStorage.getItem(`${selectionKey}.tab`) === 'tasks' ? 'tasks' : 'conversations')
-    }
-    catch { /* 服务端列表仍可恢复。 */ }
-    return () => window.removeEventListener(OPEN_CREATIVE_TASK, show)
+      sessionStorage.removeItem(`${selectionKey}.operation`)
+      if (id) sessionStorage.setItem(selectionKey, id)
+      else sessionStorage.removeItem(selectionKey)
+    } catch { /* 浏览器禁用会话存储时仍可打开历史。 */ }
   }, [selectionKey])
 
-  /** 任务目录使用主键游标；只有打开中心时轮询目录，查询串行执行。 */
+  /** 保存页面操作的执行引用，刷新后可以恢复同一个审批或结果。 */
+  const showOperation = useCallback((id) => {
+    setLinkedRunId(id)
+    try { sessionStorage.setItem(`${selectionKey}.operation`, id) } catch { /* 仅保存执行引用。 */ }
+  }, [selectionKey])
+
+  /** 页面上的生成和历史入口在助手内打开指定执行，不创建额外会话。 */
   useEffect(() => {
-    if (!open || !accessToken) return undefined
-    const expected = ++taskListScope.current
-    let stopped = false
-    let timer
-    setTasks([]); setTaskCursor(null); setTaskMoreLoading(false); taskHistoryLoaded.current = false
-    const refresh = async () => {
-      try {
-        const page = await listProjectCreativeRuns(accessToken, filterProject)
-        if (stopped) return
-        const incoming = page.activeRun ? [page.activeRun, ...page.items] : page.items
-        setTasks((previous) => [...new Map([...previous, ...incoming].map((item) => [item.runId, item])).values()].sort((a, b) => b.id - a.id))
-        if (!taskHistoryLoaded.current) setTaskCursor(page.nextBeforeId)
-        if (!taskSelectRef.current) { taskSelectRef.current = page.activeRun?.runId || page.items[0]?.runId; setSelectedTask(taskSelectRef.current) }
-        timer = window.setTimeout(refresh, page.activeRun ? 5000 : 30000)
-      } catch (failure) {
-        if (!stopped) { setError(failure.message); timer = window.setTimeout(refresh, 5000) }
-      }
+    const show = ({ detail }) => {
+      selectConversation(null, detail?.projectId ?? undefined)
+      if (detail?.runId) showOperation(detail.runId)
+      setOpen(true)
     }
-    void refresh()
-    return () => { stopped = true; if (taskListScope.current === expected) taskListScope.current += 1; window.clearTimeout(timer) }
-  }, [accessToken, filterProject, open, taskListVersion])
+    window.addEventListener(OPEN_CREATIVE_TASK, show)
+    return () => window.removeEventListener(OPEN_CREATIVE_TASK, show)
+  }, [selectConversation, showOperation])
 
-  const selectTask = (id) => {
-    taskSelectRef.current = id; setSelectedTask(id); setTab('tasks')
-    try { sessionStorage.setItem(`${selectionKey}.run`, id); sessionStorage.setItem(`${selectionKey}.tab`, 'tasks') } catch { /* 仅保存选择。 */ }
-  }
+  const refreshList = useCallback(async (beforeId) => {
+    const scope = scopeRef.current
+    const page = await listCreativeConversations(accessToken, null, beforeId)
+    if (scope !== scopeRef.current) return
+    setConversations((current) => [...new Map([...current, ...page].map((item) => [item.conversationId, item])).values()]
+      .sort((left, right) => right.id - left.id))
+    setHasMore(page.length > 0)
+  }, [accessToken])
 
-  const chooseTab = (next) => {
-    setTab(next)
-    try { sessionStorage.setItem(`${selectionKey}.tab`, next) } catch { /* 服务端状态仍可恢复。 */ }
-  }
-
-  const moreTasks = async () => {
-    if (!taskCursor || taskMoreLoading) return
-    const expected = taskListScope.current
-    setTaskMoreLoading(true)
-    try {
-      const page = await listProjectCreativeRuns(accessToken, filterProject, taskCursor)
-      if (taskListScope.current !== expected) return
-      taskHistoryLoaded.current = true
-      setTasks((current) => [...new Map([...current, ...page.items].map((item) => [item.runId, item])).values()].sort((a, b) => b.id - a.id))
-      setTaskCursor(page.nextBeforeId)
-    } catch (failure) { if (taskListScope.current === expected) setError(failure.message) }
-    finally { if (taskListScope.current === expected) setTaskMoreLoading(false) }
-  }
-
-  /** 弹层约束焦点并支持 Escape，关闭后释放所有执行详情订阅。 */
-  const dialogRef = useRef(null)
   useEffect(() => {
-    if (!open) return undefined
+    if (!open || !accessToken) return
+    const scope = ++scopeRef.current
+    void onOpened?.()
+    void refreshList().catch((failure) => { if (scope === scopeRef.current) setError(failure.message) })
+    void listAssistantModels(accessToken).then((items) => {
+      if (scope !== scopeRef.current) return
+      setModelOptions(items)
+      setSelectedModel((value) => items.some((model) => String(model.configId) === value) ? value : '')
+    }).catch((failure) => { if (scope === scopeRef.current) setError(failure.message) })
+    return () => { scopeRef.current += 1 }
+  }, [accessToken, onOpened, open, refreshList])
+
+  const toggle = () => {
+    if (!open && !selectedRef.current && !linkedRunId && workspace === undefined) {
+      try {
+        const operation = sessionStorage.getItem(`${selectionKey}.operation`)
+        const saved = sessionStorage.getItem(selectionKey)
+        if (saved) selectConversation(saved)
+        if (operation) showOperation(operation)
+      } catch { /* 会话仍可从侧边栏选择。 */ }
+    }
+    setOpen(!open)
+  }
+
+  /** 限定焦点范围，关闭后交还给原入口。 */
+  useEffect(() => {
+    if (!open) return
     const previous = document.activeElement
-    dialogRef.current?.focus()
+    const dialog = dialogRef.current
+    dialog.focus()
     const keydown = (event) => {
       if (event.key === 'Escape') setOpen(false)
       if (event.key !== 'Tab') return
-      const elements = [...dialogRef.current.querySelectorAll('button:not(:disabled),textarea,input,[tabindex="0"]')]
-      const first = elements[0]; const last = elements.at(-1)
+      const targets = [...dialog.querySelectorAll('button:not(:disabled):not([tabindex="-1"]),textarea:not(:disabled),a[href],summary')]
+        .filter((item) => item.getClientRects().length)
+      const first = targets[0]; const last = targets.at(-1)
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
     }
     document.addEventListener('keydown', keydown)
-    const oldOverflow = document.body.style.overflow
+    const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { document.removeEventListener('keydown', keydown); document.body.style.overflow = oldOverflow; previous?.focus() }
+    return () => { document.removeEventListener('keydown', keydown); document.body.style.overflow = overflow; previous?.focus() }
   }, [open])
 
-  /** 打开会话时重新读取发布目录，管理员启停和发布不依赖前端本地缓存。 */
-  useEffect(() => {
-    if (!open || !accessToken) return undefined
-    let stopped = false
-    listAgentCatalog(accessToken).then((items) => { if (!stopped) setAgentCatalog(items.filter((item) => item.rootSelectable)) })
-      .catch((failure) => { if (!stopped) setError(failure.message) })
-    return () => { stopped = true }
-  }, [accessToken, open])
-
-  /** 切换会话时隔离旧异步响应、消息和 SSE cursor。 */
-  const selectConversation = useCallback((id) => {
-    selectedRef.current = id
-    activeRef.current = null
-    historyVersionRef.current += 1
-    setConversationId(id)
-    setMessages([])
-    setActiveRun(null)
-    setNextBeforeId(null)
-    setError('')
-    try {
-      if (id) sessionStorage.setItem(selectionKey, id)
-      else sessionStorage.removeItem(selectionKey)
-    } catch { /* 存储不可用时仍可直接查询服务端历史。 */ }
-  }, [selectionKey])
-
-  /** 查询会话列表，丢弃旧登录用户或项目的晚到响应。 */
-  const refreshList = useCallback(async () => {
-    const scope = scopeRef.current
-    const list = await listCreativeConversations(accessToken, filterProject)
-    if (scope !== scopeRef.current) return []
-    setConversations((current) => [...new Map([...current, ...list]
-      .map((conversation) => [conversation.conversationId, conversation])).values()]
-      .sort((left, right) => right.id - left.id))
-    setHasMoreConversations(list.length > 0)
-    return list
-  }, [accessToken, filterProject])
-
-  /** 用消息快照替换当前正文；稳定投影键用于合并已加载的更早历史。 */
-  const refreshHistory = useCallback(async (id) => {
-    const version = ++historyVersionRef.current
-    const snapshot = await getCreativeConversationHistory(accessToken, id)
-    if (selectedRef.current !== id || version !== historyVersionRef.current) return null
-    setMessages((previous) => {
-      const firstId = snapshot.messages[0]?.id
-      const earlier = firstId ? previous.filter((message) => message.id < firstId) : []
-      const byKey = new Map([...earlier, ...snapshot.messages].map((message) => [message.projectionKey, message]))
-      return [...byKey.values()].sort((left, right) => left.id - right.id)
-    })
-    setNextBeforeId((previous) => previous || snapshot.nextBeforeId)
-    activeRef.current = snapshot.activeRun
-    setActiveRun(snapshot.activeRun)
-    setError('')
-    setConversations((current) => current.some((conversation) => conversation.conversationId === id)
-      ? current : [snapshot.conversation, ...current])
-    return snapshot
+  /** 消息历史与实时执行分别恢复，按投影键合并分页记录。 */
+  const refreshHistory = useCallback(async (id, beforeId) => {
+    const version = historyVersion.current
+    const snapshot = await getCreativeConversationHistory(accessToken, id, beforeId)
+    if (selectedRef.current !== id || version !== historyVersion.current) return
+    setMessages((current) => [...new Map([...current, ...snapshot.messages].map((item) => [item.projectionKey, item])).values()]
+      .sort((left, right) => left.id - right.id))
+    if (beforeId) {
+      pagingMessages.current = true
+      setNextBeforeId(snapshot.nextBeforeId)
+    }
+    else {
+      if (!pagingMessages.current) setNextBeforeId(snapshot.nextBeforeId)
+      setActiveRun(snapshot.activeRun)
+      setConversations((current) => [snapshot.conversation, ...current.filter((item) => item.conversationId !== id)])
+    }
   }, [accessToken])
 
-  /** 首次展开后恢复会话，切换项目时隔离草稿和服务端状态。 */
   useEffect(() => {
-    if (!hasOpened || !accessToken) return undefined
-    const scope = ++scopeRef.current
-    let savedConversationId
-    try { savedConversationId = sessionStorage.getItem(selectionKey) }
-    catch { savedConversationId = null }
-    selectConversation(null)
-    setConversations([])
-    setSubmitting(false)
+    if (!open || !conversationId) return
+    setLoading(true)
+    refreshHistory(conversationId).catch((failure) => { if (selectedRef.current === conversationId) setError(failure.message) })
+      .finally(() => { if (selectedRef.current === conversationId) setLoading(false) })
+  }, [conversationId, open, refreshHistory])
+
+  const newConversation = (boundProject) => {
+    selectConversation(null, boundProject)
     setInstruction('')
-    setLoading(true)
-    refreshList().then((list) => {
-      if (scope === scopeRef.current) selectConversation(savedConversationId || list[0]?.conversationId || null)
-    }).catch((failure) => {
-      if (scope === scopeRef.current) setError(failure.message)
-    }).finally(() => {
-      if (scope === scopeRef.current) setLoading(false)
-    })
-    return () => { scopeRef.current += 1 }
-  }, [accessToken, hasOpened, refreshList, selectConversation, selectionKey])
+    setLoading(false)
+  }
+  const chooseWorkspace = (value) => {
+    if (String(workspaceId ?? '') === value) return
+    newConversation(value ? Number(value) : null)
+  }
 
-  /** 每次选择会话都读取完整投影和活动 Run 状态。 */
-  useEffect(() => {
-    if (!open || tab !== 'conversations' || !conversationId || !accessToken) return
-    setLoading(true)
-    refreshHistory(conversationId).catch((failure) => {
-      if (selectedRef.current === conversationId) setError(failure.message)
-    }).finally(() => {
-      if (selectedRef.current === conversationId) setLoading(false)
-    })
-  }, [accessToken, conversationId, open, refreshHistory, tab])
-
-  /** 新建一轮真实对话，所有正文从服务端 Message 投影读取。 */
+  /** 始终使用默认项目管理助手，审批预授权仅对本轮绑定项目有效。 */
   const submit = async (event) => {
     event.preventDefault()
     const prompt = instruction.trim()
-    if (!prompt || !accessToken || busy) return
+    if (!prompt || !accessToken || busy || loading) return
     const scope = scopeRef.current
-    setSubmitting(true)
-    setError('')
+    const selected = selectedRef.current
+    setSubmitting(true); setError('')
     try {
+      const autoApplyChanges = Boolean(workspaceId) && approvalMode !== APPROVAL_MODE.ASK
       const run = await createConversationRun(accessToken, {
-        requestId: nextRequestId(), instruction: prompt,
-        projectId: conversationProjectId,
-        conversationId,
-        agentProfileId: selectedAgent || null,
-        permissionPolicy: selectedAgent ? agentCatalog.find((item) => item.profileId === selectedAgent)?.permissionPolicy
-          : conversationProjectId ? CREATIVE_PERMISSION.PROPOSE_CHANGES : CREATIVE_PERMISSION.READ_ONLY,
+        requestId: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        instruction: prompt, projectId: workspaceId, conversationId,
+        modelConfigId: selectedModel ? Number(selectedModel) : null,
+        permissionPolicy: workspaceId ? CREATIVE_PERMISSION.PROPOSE_CHANGES : CREATIVE_PERMISSION.READ_ONLY,
+        autoApplyChanges, autoApproveRiskyChanges: autoApplyChanges && approvalMode === APPROVAL_MODE.FULL,
       })
-      if (scope !== scopeRef.current) return
+      if (scope !== scopeRef.current || selected !== selectedRef.current) return
       setInstruction('')
-      if (selectedRef.current !== run.conversationId) selectConversation(run.conversationId)
-      await refreshHistory(run.conversationId)
-      await refreshList()
-    } catch (failure) {
-      if (scope === scopeRef.current) setError(failure.message)
-    } finally {
-      if (scope === scopeRef.current) setSubmitting(false)
-    }
+      if (selected !== run.conversationId) selectConversation(run.conversationId, run.projectId)
+      setLinkedRunId(null)
+      try { sessionStorage.removeItem(`${selectionKey}.operation`) } catch { /* 仅清理执行引用。 */ }
+      setLastRunId(run.runId)
+      setActiveRun(run)
+      setApprovalMode(APPROVAL_MODE.ASK)
+      await Promise.all([refreshHistory(run.conversationId), refreshList()])
+    } catch (failure) { if (scope === scopeRef.current) setError(failure.message) }
+    finally { setSubmitting(false) }
   }
 
-  /** 按历史主键游标加载更早消息，与实时投影按稳定键去重合并。 */
-  const loadEarlier = async () => {
-    if (!nextBeforeId || !conversationId || loading) return
-    const id = conversationId
-    setLoading(true)
-    try {
-      const snapshot = await getCreativeConversationHistory(accessToken, id, nextBeforeId)
-      if (selectedRef.current !== id) return
-      setMessages((current) => {
-        const merged = new Map([...snapshot.messages, ...current].map((message) => [message.projectionKey, message]))
-        return [...merged.values()].sort((left, right) => left.id - right.id)
-      })
-      setNextBeforeId(snapshot.nextBeforeId)
-    } catch (failure) { if (selectedRef.current === id) setError(failure.message) }
-    finally { if (selectedRef.current === id) setLoading(false) }
+  const stop = async () => {
+    if (!executing || stopRequested === focusedRun.runId) return
+    setStopRequested(focusedRun.runId); setError('')
+    try { await cancelCreativeRun(accessToken, focusedRun.runId) }
+    catch (failure) { setError(failure.message); setStopRequested(null) }
   }
 
-  /** 加载较早会话，避免下拉列表只覆盖服务端第一页。 */
-  const loadMoreConversations = async () => {
-    const beforeId = conversations.at(-1)?.id
-    if (!beforeId || loading) return
-    const scope = scopeRef.current
-    setLoading(true)
-    try {
-      const page = await listCreativeConversations(accessToken, filterProject, beforeId)
-      if (scope !== scopeRef.current) return
-      setConversations((current) => [...new Map([...current, ...page]
-        .map((conversation) => [conversation.conversationId, conversation])).values()]
-        .sort((left, right) => right.id - left.id))
-      setHasMoreConversations(page.length > 0)
-    } catch (failure) {
-      if (scope === scopeRef.current) setError(failure.message)
-    } finally {
-      if (scope === scopeRef.current) setLoading(false)
-    }
+  const detailRunId = linkedRunId || activeRun?.runId || lastRunId || messages.at(-1)?.runId
+  const assistantFallback = messages.filter((message) => message.runId === detailRunId && message.role === CREATIVE_MESSAGE_ROLE.ASSISTANT)
+    .map((message) => message.content).filter(Boolean).join('\n\n')
+  const originalInstruction = messages.find((message) =>
+    message.runId === detailRunId && message.role === CREATIVE_MESSAGE_ROLE.USER)?.content
+  const workspaceOptions = [{ value: '', label: '绑定项目', icon: Folder },
+    ...projects.map((project) => ({ value: String(project.id), label: project.name, icon: Folder }))]
+  if (workspaceId && !workspaceOptions.some((option) => option.value === String(workspaceId))) {
+    workspaceOptions.push({ value: String(workspaceId), label: `项目 #${workspaceId}`, icon: Folder })
   }
-
-  /** 请求取消后，从投影读取实际状态，不在本地伪造终态。 */
+  const stopping = executing && (stopRequested === focusedRun.runId || focusedRun.status === 'CANCEL_REQUESTED')
   if (!accessToken) return null
-  const detailRunId = activeRun?.runId || messages.at(-1)?.runId
-  const assistantFallback = messages.filter((message) => message.runId === detailRunId
-    && message.role === CREATIVE_MESSAGE_ROLE.ASSISTANT).map((message) => message.content || '').filter(Boolean).join('\n\n')
   return <aside className={`manga-assistant ${open ? 'open' : ''}`}>
-    <button className="assistant-toggle" type="button" onClick={() => { setHasOpened(true); setOpen((value) => !value) }} aria-label="打开 AI 创作任务中心">
-      {open ? <X size={20} /> : <Bot size={22} />}
-    </button>
+    <button className="assistant-toggle" type="button" onClick={toggle} aria-label="打开项目管理助手">{open ? <X size={20} /> : <Bot size={22} />}</button>
     {open && <div className="task-center-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false) }}>
       <section className="task-center" role="dialog" aria-modal="true" aria-labelledby="task-center-title" tabIndex={-1} ref={dialogRef}>
-        <header className="task-center-header"><div><span className="task-center-brand"><Bot size={20} /></span><div><h1 id="task-center-title">AI 创作任务中心</h1><small>漫剧助手 · 创作任务 · 执行记录</small></div></div>
-          <div>{projectId && <label className="task-filter"><input type="checkbox" checked={projectOnly} onChange={(event) => setProjectOnly(event.target.checked)} />当前项目</label>}
-            <button type="button" className="workbench-icon-button" aria-label="关闭任务中心" onClick={() => setOpen(false)}><X size={20} /></button></div>
-        </header>
+        <header className="task-center-header"><div><span className="task-center-brand"><Bot size={20} /></span>
+          <div><h1 id="task-center-title">项目管理助手</h1><small>{conversation?.title || '新会话'}</small></div></div>
+          <button type="button" className="workbench-icon-button" aria-label="关闭助手" onClick={() => setOpen(false)}><X size={20} /></button></header>
         <div className="task-center-body">
-          <nav className="task-center-sidebar" aria-label="创作目录">
-            <div className="workbench-tabs"><button type="button" className={tab === 'conversations' ? 'active' : ''} onClick={() => chooseTab('conversations')}><MessageSquare size={14} />会话</button>
-              <button type="button" className={tab === 'tasks' ? 'active' : ''} onClick={() => chooseTab('tasks')}><ListTodo size={14} />创作任务</button></div>
-            {tab === 'conversations' ? <>
-              <button type="button" className="task-new" disabled={submitting} onClick={() => selectConversation(null)}><Plus size={15} />发起新会话</button>
-              <div className="task-directory">{conversations.map((conversation) => <button key={conversation.conversationId} type="button"
-                className={conversationId === conversation.conversationId ? 'selected' : ''} onClick={() => selectConversation(conversation.conversationId)}>
-                <MessageSquare size={15} /><span><strong>{conversation.title}</strong><small>{conversation.updatedAt?.replace('T', ' ').slice(0, 16) || '创作对话'}</small></span></button>)}
-                {!conversations.length && <p className="workbench-muted">创建会话，开始你的故事。</p>}</div>
-              {hasMoreConversations && <button type="button" className="task-load-more" disabled={loading} onClick={loadMoreConversations}>加载更早会话</button>}
-            </> : <>
-              <span className="directory-caption">进行中</span><div className="task-directory">{tasks.filter((task) => !['COMPLETED', 'FAILED', 'CANCELLED'].includes(task.status)).map((task) => <TaskDirectoryItem key={task.runId} task={task} selected={selectedTask} onSelect={selectTask} />)}</div>
-              <span className="directory-caption">历史记录</span><div className="task-directory">{tasks.filter((task) => ['COMPLETED', 'FAILED', 'CANCELLED'].includes(task.status)).map((task) => <TaskDirectoryItem key={task.runId} task={task} selected={selectedTask} onSelect={selectTask} />)}</div>
-              {!tasks.length && <p className="workbench-muted">还没有创作任务。</p>}
-              {taskCursor && <button type="button" className="task-load-more" disabled={taskMoreLoading} onClick={moreTasks}>加载更早任务</button>}
-            </>}
+          <nav className="task-center-sidebar" aria-label="项目会话">
+            <ProjectConversationDirectory projects={projects} conversations={conversations} workspaceId={workspaceId}
+              conversationId={conversationId} disabled={submitting} onNew={newConversation}
+              onSelect={(item) => selectConversation(item.conversationId, item.projectId)} />
+            {hasMore && <button className="task-load-more" type="button" disabled={loading || !conversations.length} onClick={() => {
+              const oldest = Math.min(...conversations.map((item) => item.id))
+              setLoading(true)
+              void refreshList(oldest).catch((failure) => setError(failure.message)).finally(() => setLoading(false))
+            }}>加载更早会话</button>}
           </nav>
           <main className="task-center-main">
-            {tab === 'tasks' ? selectedTask
-              ? <div className="task-center-scroll"><CreativeRunDetails key={selectedTask} accessToken={accessToken} runId={selectedTask} onRunChanged={(id) => { selectTask(id); setTaskListVersion((value) => value + 1) }} /></div>
-              : <div className="workbench-empty"><Bot size={36} /><h2>每一步创作，都有迹可循</h2><p>从左侧选择任务，查看 Agent、工具调用、审批和生成结果。</p></div>
-              : <>
-                <div className="task-conversation-header"><div><h2>{conversations.find((item) => item.conversationId === conversationId)?.title || '新的创作对话'}</h2><small>{busy ? '正在创作，执行状态可在下方展开查看' : '从一个灵感，走向完整的故事'}</small></div>
-                  <WorkspaceSelect label="选择专业 Agent" disabled={busy || loading} value={selectedAgent} onChange={setSelectedAgent}
-                    options={[{ value: '', label: '平台创作导演' }, ...agentCatalog.map((agent) => ({ value: agent.profileId, label: `${agent.displayName} · v${agent.version}` }))]} /></div>
-                <div className="task-center-scroll assistant-output" aria-live="polite">
-                  {nextBeforeId && <button className="task-load-more" type="button" disabled={loading} onClick={loadEarlier}>加载更早消息</button>}
-                  {!messages.length && <div className="workbench-empty"><Bot size={36} /><h2>让故事开始发生</h2><p>{loading ? '正在恢复会话…' : '描述你的故事、角色或想调整的章节。'}</p></div>}
-                  {messages.filter((message) => message.role !== CREATIVE_MESSAGE_ROLE.TOOL
-                    && (message.role !== CREATIVE_MESSAGE_ROLE.ASSISTANT || message.runId !== detailRunId)).map((message) => <article className={`assistant-message ${message.role.toLowerCase()}`} key={message.projectionKey}>
-                    <strong>{message.role === CREATIVE_MESSAGE_ROLE.USER ? '你' : '漫剧助手'}</strong>
-                    <p>{message.content || (message.status === CREATIVE_MESSAGE_STATUS.ACTIVE ? '正在创作…' : '本轮未生成回答。')}</p>
-                    {message.role === CREATIVE_MESSAGE_ROLE.ASSISTANT && <button type="button" className="message-execution-link" onClick={() => selectTask(message.runId)}>查看本轮执行详情</button>}
-                  </article>)}
-                  {detailRunId && <CreativeRunDetails key={detailRunId} accessToken={accessToken} runId={detailRunId} assistantFallback={assistantFallback}
-                    onChanged={() => { if (selectedRef.current === conversationId) void refreshHistory(conversationId).catch((failure) => {
-                      if (selectedRef.current === conversationId) setError(failure.message)
-                    }) }} onRunChanged={(id) => { selectTask(id); setTaskListVersion((value) => value + 1) }}
-                    onRegenerate={setInstruction} />}
+            <div className="task-center-scroll assistant-output" aria-live="polite">
+              {nextBeforeId && <button className="task-load-more" type="button" disabled={loading} onClick={() => {
+                setLoading(true)
+                void refreshHistory(conversationId, nextBeforeId).catch((failure) => setError(failure.message)).finally(() => setLoading(false))
+              }}>加载更早消息</button>}
+              {!messages.length && !detailRunId && <div className="workbench-empty"><Bot size={36} /><h2>今天要创作什么？</h2>
+                {submitting ? <AssistantThinking label="正在提交" /> : <p>{loading ? '正在恢复会话…' : '选择项目后，可以直接在这里创作。'}</p>}</div>}
+              {messages.filter((message) => message.role !== CREATIVE_MESSAGE_ROLE.TOOL
+                && (message.role !== CREATIVE_MESSAGE_ROLE.ASSISTANT || message.runId !== detailRunId)).map((message) =>
+                <article className={`assistant-message ${message.role.toLowerCase()}`} key={message.projectionKey}>
+                  <strong>{message.role === CREATIVE_MESSAGE_ROLE.USER ? '你' : '项目管理助手'}</strong>
+                  {message.role === CREATIVE_MESSAGE_ROLE.ASSISTANT ? <><AssistantMarkdown text={message.content || '本轮未生成回答。'} />
+                    <button type="button" className="message-execution-link" onClick={() => setLinkedRunId(message.runId)}>查看本轮执行</button></>
+                    : <p>{message.content}</p>}
+                </article>)}
+              {linkedRunId && conversationId && <button className="workspace-secondary" type="button" onClick={() => setLinkedRunId(null)}>返回当前轮</button>}
+              {detailRunId && <CreativeRunDetails key={detailRunId} accessToken={accessToken} runId={detailRunId}
+                assistantFallback={assistantFallback} originalInstruction={originalInstruction}
+                conversationView={Boolean(conversationId) && !linkedRunId} stopInComposer onChanged={(run) => {
+                  if (linkedRunId) setLinkedSnapshot(run)
+                  else if (selectedRef.current === conversationId && conversationId) {
+                    setActiveRun(CREATIVE_TERMINAL_STATUSES.has(run.status) ? null : run)
+                    void refreshHistory(conversationId).catch((failure) => { if (selectedRef.current === conversationId) setError(failure.message) })
+                  }
+                }} onRunChanged={showOperation} onRegenerate={setInstruction} />}
+            </div>
+            <form className="task-composer" onSubmit={submit}>
+              <div className="assistant-project-binding">
+                <WorkspaceSelect label="绑定项目" value={String(workspaceId ?? '')}
+                  options={workspaceId ? workspaceOptions.map((item) => item.value ? item : { ...item, label: '解除项目绑定' }) : workspaceOptions}
+                  onChange={chooseWorkspace} disabled={busy || loading} />
+              </div>
+              <div className="assistant-compose-surface">
+                <textarea aria-label="创作需求" value={instruction} onChange={(event) => setInstruction(event.target.value)} rows={3} maxLength={12000}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing || event.keyCode === 229) return
+                    event.preventDefault()
+                    if (!busy && !loading && instruction.trim()) event.currentTarget.form.requestSubmit()
+                  }} placeholder="随心输入" />
+                <div className="task-composer-toolbar">
+                  <div className="task-composer-options assistant-approval">
+                    <WorkspaceSelect label="审批方式" disabled={busy || loading || !workspaceId} value={approvalMode}
+                      onChange={setApprovalMode} options={APPROVAL_OPTIONS} />
+                  </div>
+                  <div className="task-composer-options assistant-send-actions">
+                    <WorkspaceSelect label="对话模型" disabled={busy || loading} value={selectedModel} onChange={setSelectedModel}
+                      options={[{ value: '', label: '默认模型' }, ...modelOptions.map((model) => ({ value: String(model.configId), label: model.model, description: model.name }))]} />
+                    {executing ? <button className="workspace-primary" type="button" onClick={stop} disabled={stopping}>
+                      <Square size={14} fill="currentColor" />{stopping ? '正在停止' : '停止'}</button>
+                      : <button className="workspace-primary" type="submit" disabled={!instruction.trim() || busy || loading}><Send size={14} />{submitting ? '发送中' : '发送'}</button>}
+                  </div>
                 </div>
-                <form className="task-composer" onSubmit={submit}><textarea aria-label="创作需求" value={instruction} onChange={(event) => setInstruction(event.target.value)} rows={3} maxLength={12000} placeholder="描述你的漫剧创作任务…" />
-                  <div><small>业务内容先预览，经你批准后保存</small><button className="workspace-primary" type="submit" disabled={!instruction.trim() || busy || loading}><Send size={15} />发送</button></div></form>
-              </>}
+              </div>
+            </form>
             {error && <div className="workspace-alert" role="alert">{error}</div>}
           </main>
         </div>
@@ -366,8 +313,38 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
   </aside>
 }
 
-function TaskDirectoryItem({ task, selected, onSelect }) {
-  return <button type="button" className={selected === task.runId ? 'selected' : ''} onClick={() => onSelect(task.runId)}>
-    <span className={`task-dot ${task.status.toLowerCase()}`} /><span><strong>{creativeTaskName(task)}</strong><small>{RUN_STATUS_LABEL[task.status] || task.status} · {task.createdAt?.slice(5, 16).replace('T', ' ')}</small></span>
-  </button>
+/** 侧边栏只显示项目和会话，空项目也能直接发起对话。 */
+function ProjectConversationDirectory({ projects, conversations, workspaceId, conversationId, disabled, onNew, onSelect }) {
+  const [collapsed, setCollapsed] = useState({})
+  const groups = new Map(projects.map((project) => [String(project.id), { ...project, conversations: [] }]))
+  for (const conversation of conversations) {
+    const key = String(conversation.projectId ?? '')
+    if (!groups.has(key)) groups.set(key, { id: conversation.projectId, name: key ? `项目 #${key}` : '未绑定项目', conversations: [] })
+    groups.get(key).conversations.push(conversation)
+  }
+  return <>
+    <div className="assistant-directory-heading"><strong>项目</strong><button className="workbench-icon-button" type="button"
+      aria-label="新建会话" title="新建会话" disabled={disabled} onClick={() => onNew(workspaceId ?? null)}><SquarePen size={15} /></button></div>
+    {[...groups].map(([id, group]) => {
+      const visible = !collapsed[id]
+      return <section className="assistant-project-group" key={id}>
+        <div className={`assistant-project-row${id === String(workspaceId ?? '') ? ' selected' : ''}`}>
+          <button type="button" aria-expanded={visible} onClick={() => setCollapsed((current) => ({ ...current, [id]: visible }))}>
+            {visible ? <ChevronDown size={13} /> : <ChevronRight size={13} />}<Folder size={15} /><span>{group.name}</span>
+          </button>
+          <button type="button" disabled={disabled} aria-label={`在${group.name}新建会话`} title="新建会话" onClick={() => {
+            setCollapsed((current) => ({ ...current, [id]: false }))
+            onNew(group.id ?? null)
+          }}><Plus size={15} /></button>
+        </div>
+        {visible && <div className="task-directory assistant-project-conversations">
+          {group.conversations.map((item) => <button key={item.conversationId} type="button" disabled={disabled}
+            className={conversationId === item.conversationId ? 'selected' : ''} onClick={() => onSelect(item)}>
+            <MessageSquare size={13} /><span><strong>{item.title}</strong></span>
+          </button>)}
+          {!group.conversations.length && <small>暂无聊天</small>}
+        </div>}
+      </section>
+    })}
+  </>
 }

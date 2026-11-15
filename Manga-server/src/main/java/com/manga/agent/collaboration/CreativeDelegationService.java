@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.math.BigDecimal;
 
 /** 工具事务只提交冻结计划；不在模型回调栈内调度或等待其他 Agent。 */
 @Service
@@ -122,9 +121,8 @@ public class CreativeDelegationService {
             kernels.add(snapshot.fingerprint());
         }
         if (count == 0) return;
-        if (Objects.isNull(budget) || Objects.isNull(budget.estimatedUsdPerTurn()) || count > budget.maxAgents()
-                || kernels.size() > budget.maxKernels() || characters > budget.maxPromptCharacters() || turns > budget.maxReservedTurns()
-                || budget.estimatedUsdPerTurn().multiply(BigDecimal.valueOf(turns)).compareTo(budget.maxEstimatedUsd()) > 0) {
+        if (Objects.isNull(budget) || count > budget.maxAgents()
+                || kernels.size() > budget.maxKernels() || characters > budget.maxPromptCharacters() || turns > budget.maxReservedTurns()) {
             throw new AgentRuntimeException(CreativeErrorCode.BUDGET_EXCEEDED, DynamicAgentMessages.EXHAUSTED);
         }
     }

@@ -116,7 +116,7 @@ test('committed approval and media events wake their panels without waking on to
 test('regeneration starts a new proposal for the original shot with only public generation inputs', () => {
   const job = { changeSetId: 'proposal', projectId: 8, shotId: 12 }
   const proposed = { shotId: 12, provider: 'AGNES', configId: 23, model: 'agnes-image-2.5-flash',
-    width: 1248, height: 832, prompt: 'old prompt', estimatedCost: 0.01, configSnapshot: { baseUrl: 'provider' } }
+    width: 1248, height: 832, prompt: 'old prompt', configSnapshot: { baseUrl: 'provider' } }
   const proposal = { ...job, kind: 'IMAGE_GENERATION', proposed }
   const request = imageRegenerationRequest(proposal, job, ' different lighting  ', 'new-request')
   assert.equal(request.requestId, 'new-request')

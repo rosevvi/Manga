@@ -23,7 +23,7 @@ public final class InvocationActivity {
     private AgentRuntimeException fatal;
 
     public InvocationActivity(int maxNoProgressTurns) { this.maxNoProgressTurns = maxNoProgressTurns; }
-    /** 每次计费模型调用之前检查上一轮工具是否取得新事实或完成写入检查点。 */
+    /** 每次模型调用之前检查上一轮工具是否取得新事实或完成写入检查点。 */
     public void beforeModel() { beforeModel(true); }
     /** 所有模型调用都先拒绝致命故障；只有行动轮次参与无进展计数。 */
     public synchronized void beforeModel(boolean actionRound) {
@@ -41,7 +41,7 @@ public final class InvocationActivity {
     }
     /** 返回此执行内相同输入的真实调用次数。 */
     public synchronized int called(String fingerprint) { return counts.merge(fingerprint, 1, Integer::sum); }
-    /** 数据库或所有权故障不能由 Agent 通过继续计费推理来修复。 */
+    /** 数据库或所有权故障应终止本次推理。 */
     public synchronized void abort(AgentRuntimeException failure) { fatal = failure; }
     /** 缓存键包含业务 revision，旧版本不会命中新版本读取。 */
     public synchronized CapabilityResult cached(String key) { return cache.get(key); }

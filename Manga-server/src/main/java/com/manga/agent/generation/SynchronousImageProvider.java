@@ -21,7 +21,7 @@ import java.util.Objects;
 /** 同步图片提交共用凭据快照校验、有界响应读取和失败归类。 */
 @RequiredArgsConstructor
 abstract class SynchronousImageProvider implements GenerationProvider {
-    private final ImageGenerationQuoteService quotes;
+    private final ImageGenerationConfigService imageConfigs;
     private final ExternalHttpClientFactory clients;
     private final GenerationProperties properties;
     private final ChangeSetCodec codec;
@@ -36,7 +36,7 @@ abstract class SynchronousImageProvider implements GenerationProvider {
     public GenerationSubmission submit(GenerationJob job) {
         ResolvedAiProviderConfig config;
         try {
-            config = quotes.resolve(key(), job.getConfigId(), job.getUserId());
+            config = imageConfigs.resolve(key(), job.getConfigId(), job.getUserId());
             GenerationConfigSnapshot frozen = codec.read(job.getConfigSnapshotJson(), GenerationConfigSnapshot.class);
             if (!frozen.equals(GenerationConfigSnapshot.from(config))) throw new GenerationException(GenerationError.AUTHENTICATION);
         } catch (GenerationException exception) { throw exception; }

@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.ZoneId;
 
-/** 用户手动指定视频参数时直接生成报价提案，恢复后按真实作业结果结束。 */
+/** 根据用户手动指定的视频参数创建生成提案，恢复后按作业结果结束。 */
 @Component
 @RequiredArgsConstructor
 public class VideoProposalExecutor implements CreativeStepExecutor {

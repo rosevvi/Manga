@@ -278,7 +278,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   }
 
   return (
-    <div className="dashboard-shell">
+    <div className="dashboard-shell" data-view={activeNav}>
       <aside className={sidebarOpen ? 'dashboard-sidebar open' : 'dashboard-sidebar'}>
           <button className="dashboard-logo" type="button" onClick={() => { if (confirmCreativeNavigation()) onExit() }}>
           Manga
@@ -466,7 +466,8 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
           </>
         )}
       </main>
-      {!isGuest && <MangaAssistant accessToken={accessToken} userId={authSession?.user?.id} projectId={['project', 'storyboards'].includes(activeNav) ? selectedProjectId : null} />}
+      {!isGuest && <MangaAssistant accessToken={accessToken} userId={authSession?.user?.id} projects={projects}
+        onOpened={needsProjectList ? undefined : loadProjects} projectId={['project', 'storyboards'].includes(activeNav) ? selectedProjectId : null} />}
     </div>
   )
 }

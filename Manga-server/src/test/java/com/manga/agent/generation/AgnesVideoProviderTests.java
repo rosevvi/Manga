@@ -35,11 +35,11 @@ class AgnesVideoProviderTests {
 
     @Test
     void submitsAndPollsByVideoIdAndFrozenModel() {
-        var quotes = mock(VideoGenerationQuoteService.class);
+        var videoConfigs = mock(VideoGenerationConfigService.class);
         var clients = mock(ExternalHttpClientFactory.class);
         var config = new ResolvedAiProviderConfig(CONFIG_ID, AiProviderType.AGNES, AgnesEndpoint.BASE_URL,
                 AgnesVideoModel.FLASH.id(), "test-only", AiProxyType.NONE, null, null, null, null);
-        when(quotes.resolve(CONFIG_ID, USER_ID)).thenReturn(config);
+        when(videoConfigs.resolve(CONFIG_ID, USER_ID)).thenReturn(config);
         var requests = new ArrayList<String>();
         var client = WebClient.builder().baseUrl(AgnesEndpoint.BASE_URL).exchangeFunction(request -> {
             assertThat(request.headers().getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer test-only");
@@ -59,10 +59,10 @@ class AgnesVideoProviderTests {
             var codec = new ChangeSetCodec(new ObjectMapper(), validatorFactory.getValidator());
             var snapshot = GenerationConfigSnapshot.from(config);
             var request = new VideoGenerationChange(2L, CONFIG_ID, "Camera moves slowly", 5, "9:16",
-                    config.defaultModel(), null, "USD", snapshot);
+                    config.defaultModel(), snapshot);
             var job = GenerationJob.builder().userId(USER_ID).configId(CONFIG_ID).status(GenerationJobStatus.SUBMITTING)
                     .configSnapshotJson(codec.write(snapshot)).requestJson(codec.write(request)).build();
-            var provider = new AgnesVideoProvider(quotes, clients, null, codec);
+            var provider = new AgnesVideoProvider(videoConfigs, clients, null, codec);
             assertThat(provider.idempotentSubmission()).isFalse();
             var submitted = provider.submit(job);
             assertThat(submitted.providerJobId()).isEqualTo("video_test");

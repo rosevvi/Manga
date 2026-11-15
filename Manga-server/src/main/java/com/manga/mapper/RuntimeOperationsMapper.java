@@ -5,7 +5,6 @@ import com.manga.entity.ModelCallLedger;
 import com.manga.entity.ProviderCallGate;
 import com.manga.entity.CreativeRunArchive;
 import org.apache.ibatis.annotations.Param;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -16,11 +15,7 @@ public interface RuntimeOperationsMapper extends BaseMapper<ModelCallLedger> {
     ProviderCallGate lockGate(@Param("configId") long configId);
     void saveGate(@Param("gate") ProviderCallGate gate, @Param("actor") String actor);
     int activeCalls(@Param("configId") long configId, @Param("now") LocalDateTime now);
-    BigDecimal dailyReserved(@Param("configId") long configId, @Param("start") LocalDateTime start);
     int finish(@Param("call") ModelCallLedger call, @Param("actor") String actor);
-    ModelCallLedger lockCall(@Param("callId") String callId);
-    int settle(@Param("callId") String callId, @Param("amount") BigDecimal amount, @Param("userId") long userId,
-            @Param("note") String note, @Param("now") LocalDateTime now);
     List<ModelCallLedger> stale(@Param("now") LocalDateTime now);
     List<ModelCallLedger> byRun(@Param("runId") String runId, @Param("beforeId") Long beforeId);
     List<Map<String, Object>> overview(@Param("since") LocalDateTime since);

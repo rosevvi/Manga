@@ -10,9 +10,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class OpenAiImageProvider extends SynchronousImageProvider {
     /** 注入共享的图片提交依赖。 */
-    public OpenAiImageProvider(ImageGenerationQuoteService quotes, ExternalHttpClientFactory clients,
+    public OpenAiImageProvider(ImageGenerationConfigService imageConfigs, ExternalHttpClientFactory clients,
             GenerationProperties properties, ChangeSetCodec codec, ObjectMapper mapper) {
-        super(quotes, clients, properties, codec, mapper);
+        super(imageConfigs, clients, properties, codec, mapper);
     }
 
     /** 注册 OpenAI 和兼容网关的图片路由。 */

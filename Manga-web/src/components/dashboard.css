@@ -247,9 +247,19 @@
 }
 
 .dashboard-main {
+  --dashboard-content-top-space: 83px;
+  --dashboard-content-bottom-space: 35px;
   min-height: 100vh;
   margin-left: var(--dashboard-sidebar-width);
-  padding: 83px 32px 35px;
+  padding: var(--dashboard-content-top-space) 32px var(--dashboard-content-bottom-space);
+}
+
+.dashboard-shell[data-view="storyboards"] {
+  --dashboard-topbar-height: 56px;
+}
+
+.dashboard-shell[data-view="storyboards"] > .dashboard-main {
+  --dashboard-content-top-space: calc(var(--dashboard-topbar-height) + 6px);
 }
 
 .dashboard-welcome {
@@ -690,8 +700,10 @@
   }
 
   .dashboard-main {
+    --dashboard-content-top-space: 82px;
+    --dashboard-content-bottom-space: 30px;
     margin-left: 0;
-    padding: 82px 18px 30px;
+    padding-inline: 18px;
   }
 
   .sidebar-scrim {

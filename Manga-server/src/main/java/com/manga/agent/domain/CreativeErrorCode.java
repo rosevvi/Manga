@@ -35,7 +35,7 @@ public enum CreativeErrorCode {
     /** 模型密钥无效或权限不足。 */ MODEL_AUTHENTICATION_FAILED,
     /** 供应商限流。 */ MODEL_RATE_LIMITED,
     /** 模型响应不符合协议。 */ MODEL_PROTOCOL_ERROR,
-    /** 执行权失联且已发出模型请求，禁止自动重复计费。 */ MODEL_RESULT_UNCERTAIN,
+    /** 执行权失联且已发出模型请求，禁止自动重复执行。 */ MODEL_RESULT_UNCERTAIN,
     /** 手动生成结束时未产出所需业务提案。 */
     PROPOSAL_REQUIRED,
     /** 工具或能力执行失败。 */

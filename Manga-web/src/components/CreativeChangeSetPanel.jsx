@@ -115,7 +115,7 @@ function ProposalCard({ proposal, onDecide, onRegenerate }) {
   const video = proposal.kind === CHANGE_SET_KIND.VIDEO_GENERATION
   const media = video || proposal.kind === CHANGE_SET_KIND.IMAGE_GENERATION
   return <article className={`creative-proposal ${proposal.status.toLowerCase()}`}>
-    <header><strong>{media ? (video ? '视频生成与费用确认' : '图片生成与费用确认') : proposal.kind === CHANGE_SET_KIND.SCRIPT ? (proposal.chapterId ? '章节改写提案' : '新章节提案') : '分镜草稿提案'}</strong>
+    <header><strong>{media ? (video ? '视频生成提案' : '图片生成提案') : proposal.kind === CHANGE_SET_KIND.SCRIPT ? (proposal.chapterId ? '章节改写提案' : '新章节提案') : '分镜草稿提案'}</strong>
       <span>{media && proposal.status === CHANGE_SET_STATUS.APPLIED ? '已批准，请查看生成作业' : CHANGE_SET_STATUS_LABEL[proposal.status] || proposal.status}</span></header>
     {proposal.kind === CHANGE_SET_KIND.SCRIPT
       ? <div>{scriptDifferences(proposal.before, proposal.proposed).map((difference) => <details key={difference.field} open={difference.changed}>
@@ -126,11 +126,10 @@ function ProposalCard({ proposal, onDecide, onRegenerate }) {
       : media ? <div className="image-generation-preview">
         <dl><dt>目标镜头</dt><dd>#{proposal.proposed.shotId} · {proposal.before?.title}</dd>
           <dt>供应商 / 模型</dt><dd>{video ? 'Agnes' : proposal.proposed.provider} / {proposal.proposed.model}</dd>
-          <dt>配置</dt><dd>{proposal.proposed.configId ? `#${proposal.proposed.configId}` : '免费模拟器'}</dd>
+          <dt>配置</dt><dd>{proposal.proposed.configId ? `#${proposal.proposed.configId}` : '流程模拟器'}</dd>
           {proposal.proposed.configSnapshot?.baseUrl && <><dt>生成端点</dt><dd>{proposal.proposed.configSnapshot.baseUrl}</dd></>}
-          <dt>输出</dt><dd>{video ? `720P · ${proposal.proposed.aspectRatio} · ${proposal.proposed.seconds} 秒` : `${proposal.proposed.width} × ${proposal.proposed.height} · 1 张 PNG`}</dd>
-          <dt>预计费用</dt><dd>{proposal.proposed.estimatedCost} {proposal.proposed.currency}</dd></dl>
-        <p>批准后才会提交，实际费用以供应商账单为准。已提交的作业可能无法远程取消。</p>
+          <dt>输出</dt><dd>{video ? `720P · ${proposal.proposed.aspectRatio} · ${proposal.proposed.seconds} 秒` : `${proposal.proposed.width} × ${proposal.proposed.height} · 1 张 PNG`}</dd></dl>
+        <p>批准后提交生成。已提交的作业可能无法远程取消。</p>
         <details open><summary>批准的画面提示词</summary><pre>{proposal.proposed.prompt}</pre></details>
         {video ? <p>生成结果将在任务内提供播放和下载。</p>
           : <p>生成完成后，可在这条任务里预览并设为分镜参考图。</p>}
@@ -147,7 +146,7 @@ function ProposalCard({ proposal, onDecide, onRegenerate }) {
       <small>审批截止 {proposal.expiresAt?.replace('T', ' ')}</small>
       <details><summary>添加审批评论</summary><textarea aria-label="审批评论" maxLength={2000} rows={2} value={comment} onChange={(event) => setComment(event.target.value)} disabled={busy} /></details>
       <div className="creative-proposal-actions"><button className="workspace-secondary" type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.REJECT)}>不执行</button>
-        <button className="workspace-primary" type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.APPROVE)}>{busy ? '处理中…' : media ? '确认费用并生成' : '确认并应用'}</button></div>
+        <button className="workspace-primary" type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.APPROVE)}>{busy ? '处理中…' : media ? '确认并生成' : '确认并应用'}</button></div>
     </div>}
     {proposal.status === CHANGE_SET_STATUS.CONFLICTED && <p role="alert">项目、章节或生成配置已经变化，本提案没有应用。请基于最新内容重新生成。</p>}
     {retryable && onRegenerate && <button className="workspace-secondary" type="button" onClick={() => onRegenerate(proposal)}>基于最新内容重新生成</button>}

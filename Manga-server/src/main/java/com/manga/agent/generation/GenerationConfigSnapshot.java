@@ -4,7 +4,7 @@ import com.manga.common.enums.AiProviderType;
 import com.manga.common.enums.AiProxyType;
 import com.manga.dto.ResolvedAiProviderConfig;
 
-/** 只冻结计费端点和路由；凭据在执行时读取，允许正常轮换密钥。 */
+/** 只冻结供应商端点和路由；凭据在执行时读取，允许正常轮换密钥。 */
 public record GenerationConfigSnapshot(
         /** 配置主键。 */ Long configId,
         /** 接入类型。 */ AiProviderType providerType,

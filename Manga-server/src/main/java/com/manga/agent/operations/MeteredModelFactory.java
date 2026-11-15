@@ -50,7 +50,7 @@ public class MeteredModelFactory {
         return wrap(delegate, blueprint, context, new InvocationActivity(InvocationActivity.DEFAULT_MAX_NO_PROGRESS_TURNS));
     }
 
-    /** 模型与工具共用一次 Harness 的进展计数，停滞时在创建计费账本之前拒绝下一轮。 */
+    /** 模型与工具共用一次 Harness 的进展计数，停滞时在记录模型调用之前拒绝下一轮。 */
     public Model wrap(Model delegate, AgentBlueprint blueprint, AgentRuntimeContext context, InvocationActivity activity) {
         return new Model() {
             @Override public String getModelName() { return delegate.getModelName(); }
@@ -85,7 +85,7 @@ public class MeteredModelFactory {
         };
     }
 
-    /** 同时约束 SDK 自带计时与重试，避免下层默认值提前结束或重复计费。 */
+    /** 同时约束 SDK 自带计时与重试，避免下层默认值提前结束或重复调用。 */
     private GenerateOptions singleAttempt(ModelCallLedger call, GenerateOptions options) {
         Duration remaining = Duration.between(LocalDateTime.now(ZoneOffset.UTC), call.getExpiresAt());
         GenerateOptions enforced = GenerateOptions.builder().executionConfig(ExecutionConfig.builder()

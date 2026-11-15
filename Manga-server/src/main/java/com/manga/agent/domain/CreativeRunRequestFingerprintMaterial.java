@@ -22,11 +22,15 @@ public record CreativeRunRequestFingerprintMaterial(
         /** 用户提交的原始创作指令。 */
         String instruction,
         /** 专业配置、精确测试版本和模型选择参与幂等校验。 */
-        @JsonInclude(JsonInclude.Include.NON_NULL) AgentProfileSelection agentSelection
+        @JsonInclude(JsonInclude.Include.NON_NULL) AgentProfileSelection agentSelection,
+        /** 自动应用仅在显式授权时入指纹，保持既有逐次确认请求的指纹。 */
+        @JsonInclude(JsonInclude.Include.NON_NULL) Boolean autoApplyChanges,
+        /** 有高风险操作预授权时参与幂等校验。 */
+        @JsonInclude(JsonInclude.Include.NON_NULL) Boolean autoApproveRiskyChanges
 ) {
     /** 默认业务操作没有显式选择，保持原请求指纹材料。 */
     public CreativeRunRequestFingerprintMaterial(CreativeRunTriggerSource triggerSource, CreativeOperationType operationType,
             String conversationId, Long projectId, CreativeResourceReference target, AgentPermissionPolicy permissionPolicy, String instruction) {
-        this(triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, null);
+        this(triggerSource, operationType, conversationId, projectId, target, permissionPolicy, instruction, null, null, null);
     }
 }

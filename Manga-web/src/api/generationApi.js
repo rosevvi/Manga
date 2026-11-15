@@ -29,7 +29,7 @@ export function listGenerationJobs(accessToken, { projectId, runId, conversation
   if (mediaType) params.set('mediaType', mediaType)
   return authorizedRequest(accessToken, `${ENDPOINT}?${params}`)
 }
-/** 取消结果采用权，不承诺供应商停止计费。 */
+/** 取消结果采用权，已提交的作业可能继续执行。 */
 export function cancelGenerationJob(accessToken, jobId) {
   return authorizedRequest(accessToken, `${ENDPOINT}/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' })
 }

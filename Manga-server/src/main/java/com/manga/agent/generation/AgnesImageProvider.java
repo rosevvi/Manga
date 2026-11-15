@@ -13,9 +13,9 @@ public class AgnesImageProvider extends SynchronousImageProvider {
     private static final String SIZE_TIER = "1K";
 
     /** 注入共享的图片提交依赖。 */
-    public AgnesImageProvider(ImageGenerationQuoteService quotes, ExternalHttpClientFactory clients,
+    public AgnesImageProvider(ImageGenerationConfigService imageConfigs, ExternalHttpClientFactory clients,
             GenerationProperties properties, ChangeSetCodec codec, ObjectMapper mapper) {
-        super(quotes, clients, properties, codec, mapper);
+        super(imageConfigs, clients, properties, codec, mapper);
     }
 
     /** 注册 Agnes 图片路由。 */

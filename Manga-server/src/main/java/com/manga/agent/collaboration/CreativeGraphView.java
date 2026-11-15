@@ -48,7 +48,7 @@ public record CreativeGraphView(
             /** 冻结的版本名称，不从最新配置反查。 */ String displayName,
             /** 当前节点是否为管理员只读测试。 */ boolean sandbox
     ) { }
-    /** 预算为最大轮数预留；不能理解为真实 token 或费用统计。 */
+    /** 预算按单次最大轮数预留。 */
     public record Budget(
             /** Step 数上限。 */ int maxSteps,
             /** 深度上限。 */ int maxDepth,

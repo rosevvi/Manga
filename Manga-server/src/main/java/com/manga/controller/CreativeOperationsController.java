@@ -22,10 +22,10 @@ import java.util.List;
 @Validated
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Creative Usage", description = "创作 Run 的模型调用用量与费用诊断")
+@Tag(name = "Creative Usage", description = "创作 Run 的模型调用用量与状态诊断")
 public class CreativeOperationsController {
     private final RuntimeOperationsService operations;
-    /** 有界游标分页；空费用表示未知或未定价，不能视作免费。 */
+    /** 按调用 ID 游标分页。 */
     @GetMapping(RuntimeOperationsConstants.USER_PATH)
     @Operation(summary = "查询本人创作运行的模型用量")
     public ApiResponse<List<RuntimeOperationsViews.Call>> usage(@PathVariable String runId, @RequestParam(required = false) @Positive Long beforeId) {

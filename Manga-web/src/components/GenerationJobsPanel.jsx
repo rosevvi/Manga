@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { acknowledgeUnknownJob, cancelGenerationJob, listGenerationJobs, previewArtifactAdoption, adoptGeneratedArtifact, getGeneratedMediaDownload } from '../api/generationApi'
-import { resolveMediaUrl } from '../api/mediaUrl'
+import { acknowledgeUnknownJob, cancelGenerationJob, listGenerationJobs, previewArtifactAdoption, adoptGeneratedArtifact } from '../api/generationApi'
 import MediaImage from './MediaImage'
+import GeneratedMediaPreview from './GeneratedMediaPreview'
 import TaskImageResultActions from './TaskImageResultActions'
 import { CREATIVE_PROJECT_CHANGED, notifyCreativeProjectChanged } from './creativeProjectEvents'
 import { CHANGE_SET_KIND, REVISION_CONFLICT_CODE } from '../constants/changeSet'
@@ -64,7 +64,7 @@ export default function GenerationJobsPanel({ accessToken, projectId, runId, con
     {(compact ? jobs.filter((job) => job.artifactUrl).slice(0, 3) : jobs).map((job) => <GenerationCard key={job.jobId} job={job}
       accessToken={accessToken} onChanged={() => refreshRef.current?.()} onAdopted={onAdopted}
       onImageRegenerate={onImageRegenerate} canRegenerate={canRegenerate} />)}
-    {(!jobs.length || compact && !jobs.some((job) => job.artifactUrl)) && <p className="workbench-muted">暂无生成产物。选择镜头和模型，创建媒体提案后在任务中心批准。</p>}
+    {(!jobs.length || compact && !jobs.some((job) => job.artifactUrl)) && <p className="workbench-muted">暂无生成产物。也可以在项目管理助手中申请生成。</p>}
     {(cursors.length > 1 || jobs.length === GENERATION_PAGE_SIZE) && <div className="generation-actions">
       {cursors.length > 1 && <button className="workspace-secondary" type="button" onClick={() => setCursors((value) => value.slice(0, -1))}>较新作业</button>}
       {jobs.length === GENERATION_PAGE_SIZE && <button className="workspace-secondary" type="button" onClick={() => setCursors((value) => [...value, jobs.at(-1).id])}>更早作业</button>}
@@ -113,29 +113,16 @@ function GenerationCard({ job, accessToken, onChanged, onImageRegenerate, canReg
   }
   const video = job.mediaKind === CHANGE_SET_KIND.VIDEO_GENERATION
   const inlineImage = !video && onImageRegenerate && (job.artifactUrl || job.status === 'FAILED')
-  const download = () => act(async () => {
-    const result = await getGeneratedMediaDownload(accessToken, job.jobId)
-    const url = resolveMediaUrl(result.url)
-    if (!url) throw new Error('下载地址不可用，请重新加载产物')
-    const anchor = document.createElement('a')
-    anchor.href = url; anchor.download = `shot-${job.shotId}.mp4`; anchor.rel = 'noreferrer'
-    document.body.appendChild(anchor); anchor.click(); anchor.remove()
-  })
   return <article className="generation-card">
     <header><strong>镜头 #{job.shotId} · {job.provider}</strong><span>{GENERATION_STATUS_LABEL[job.status] || job.status}</span></header>
     {job.progress != null && <progress max="100" value={job.progress} aria-label={`生成进度 ${job.progress}%`} />}
     <small>{job.progress != null ? `${job.progress}% · ` : ''}耗时 {elapsed} 秒 · 更新于 {job.updatedAt?.replace('T', ' ')}</small>
-    {job.cancelRequested && <p>已撤销结果采用，供应商可能继续执行并计费。</p>}
+    {job.cancelRequested && <p>已撤销结果采用，供应商可能继续执行。</p>}
     {job.errorMessage && <p role="status">{job.errorMessage}</p>}
     {job.reconciliationNote && <p>核对说明：{job.reconciliationNote}</p>}
-    {video && job.artifactUrl && <video controls preload="metadata" aria-label="镜头视频" src={resolveMediaUrl(job.artifactUrl)} />}
     {inlineImage && <TaskImageResultActions accessToken={accessToken} job={job} onRegenerate={onImageRegenerate}
       canRegenerate={canRegenerate} onAdopted={() => { onChanged(); onAdopted?.() }} />}
-    {job.artifactUrl && !inlineImage && <a href={resolveMediaUrl(job.artifactUrl) || undefined} target="_blank" rel="noreferrer">
-      {!video && <MediaImage src={job.artifactUrl} alt={`镜头 ${job.shotId} 的生成产物`} showErrorText />}
-      <span>查看平台产物 #{job.artifactId}</span>
-    </a>}
-    {video && job.artifactUrl && <button type="button" className="workspace-secondary" disabled={busy} onClick={download}>下载视频</button>}
+    {job.artifactUrl && !inlineImage && <GeneratedMediaPreview accessToken={accessToken} job={job} src={job.artifactUrl} video={video} />}
     {job.artifactUrl && !video && !inlineImage && <button className="workspace-secondary" type="button" disabled={busy} onClick={previewAdoption}>用作镜头图片</button>}
     {job.adoptedAt && <small>最近采用：{job.adoptedAt.replace('T', ' ')} · 用户 #{job.adoptedBy}</small>}
     {adoption && <section className="generation-adoption" aria-label="确认采用图片">
@@ -151,7 +138,7 @@ function GenerationCard({ job, accessToken, onChanged, onImageRegenerate, canReg
     </section>}
     {!GENERATION_TERMINAL.has(job.status) && !job.cancelRequested && <button className="workspace-secondary" type="button" disabled={busy} onClick={() => act(() => cancelGenerationJob(accessToken, job.jobId))}>取消结果采用</button>}
     {job.status === 'UNKNOWN' && <div className="generation-reconcile">
-      <p>系统不会自动重新提交。请在供应商核对执行结果及账单，再结束平台等待。</p>
+      <p>系统不会自动重新提交。请在供应商核对执行结果，再结束平台等待。</p>
       <label><input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} />我已核对供应商，理解此操作不会退款或远程取消</label>
       <textarea rows={2} maxLength={2000} placeholder="核对说明（请勿填写密钥）" value={note} onChange={(event) => setNote(event.target.value)} />
       <button className="workspace-secondary" type="button" disabled={busy || !checked || !note.trim()} onClick={() => act(() => acknowledgeUnknownJob(accessToken, job.jobId, note))}>记录核对并结束等待</button>

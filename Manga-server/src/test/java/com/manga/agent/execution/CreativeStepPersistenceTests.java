@@ -87,15 +87,15 @@ class CreativeStepPersistenceTests {
                 Integer.class, stepId)).isEqualTo(1);
     }
 
-    /** 失联时已有模型调用，不能因恢复扫描而再次付费调用同一任务。 */
+    /** 失联时已有模型调用，恢复扫描应停止该步骤。 */
     @Test
     void shouldNotReplayExpiredStepAfterModelCall() {
         String runId = insertRun();
         String stepId = insertStep(runId, "RUNNING", "lost-worker", 5L, 1, 1L);
         jdbcTemplate.update("""
                 INSERT INTO manga_model_call_ledger (call_id, run_id, step_id, owner_epoch, config_id,
-                    model_name, blueprint_fingerprint, status, reserved_usd, started_at, expires_at, created_by, updated_by)
-                VALUES (?, ?, ?, 5, 100, 'test', ?, 'STARTED', 0.05, ?, ?, 'test', 'test')
+                    model_name, blueprint_fingerprint, status, started_at, expires_at, created_by, updated_by)
+                VALUES (?, ?, ?, 5, 100, 'test', ?, 'STARTED', ?, ?, 'test', 'test')
                 """, UUID.randomUUID().toString(), runId, stepId, "b".repeat(64), LocalDateTime.now().minusMinutes(2), LocalDateTime.now().plusMinutes(3));
         var expired = stepRepository.findByStepId(stepId).orElseThrow();
         assertThat(recoveryService.recover(expired, LocalDateTime.now())).isEmpty();

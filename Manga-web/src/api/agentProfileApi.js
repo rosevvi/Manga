@@ -11,6 +11,8 @@ const write = (token, path, value, method = 'POST') => authorizedRequest(token, 
 
 /** 当前启用的发布目录，不含 Prompt。 */
 export const listAgentCatalog = (token) => authorizedRequest(token, CATALOG_ENDPOINT)
+/** 当前用户可选的已启用对话模型。 */
+export const listAssistantModels = (token) => authorizedRequest(token, `${CATALOG_ENDPOINT}/model-options`)
 /** 管理员身份目录。 */
 export const listAdminAgents = (token) => authorizedRequest(token, ADMIN_AGENT_ENDPOINT)
 /** 当前指针、revision 与版本摘要。 */
@@ -35,7 +37,7 @@ export const rollbackAgentVersion = (token, key, version, value) => write(token,
 export const setAgentEnabled = (token, key, value) => write(token, `${profilePath(key)}/enabled`, value)
 /** 无模型调用的编译预览。 */
 export const previewAgentVersion = (token, key, version, value) => write(token, `${versionPath(key, version)}/preview`, value)
-/** 明确启动一个有费用、只读的模型测试 Run。 */
+/** 明确启动一个只读的模型测试 Run。 */
 export const testAgentVersion = (token, key, version, value) => write(token, `${versionPath(key, version)}/test`, value)
 /** 审计游标分页。 */
 export const getAgentAudits = (token, key, beforeId) => authorizedRequest(token,

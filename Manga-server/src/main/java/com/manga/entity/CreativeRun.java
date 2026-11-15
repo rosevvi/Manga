@@ -51,6 +51,12 @@ public class CreativeRun {
     private String workflowVersion;
     /** 创建时固化的最高权限策略。 */
     private AgentPermissionPolicy permissionPolicy;
+
+    /** 本轮用户是否预先授权应用章节和分镜提案。 */
+    private Boolean autoApplyChanges;
+
+    /** 用户明确授权本轮同时自动处理覆盖章节和媒体生成。 */
+    private Boolean autoApproveRiskyChanges;
     /** 临时 Agent 的冻结容量、规划费率与累计预留；实际结算另行记账。 */
     private String budgetJson;
     /** 运行触发来源。 */

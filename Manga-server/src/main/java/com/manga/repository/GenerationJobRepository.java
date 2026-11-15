@@ -61,10 +61,6 @@ public class GenerationJobRepository {
         return Optional.ofNullable(mapper.selectOne(new LambdaQueryWrapper<GenerationJob>()
                 .eq(GenerationJob::getProvider, provider).eq(GenerationJob::getProviderJobId, providerJobId)));
     }
-    /** 列表批量读取产物，避免每个卡片单独访问数据库。 */
-    public List<CreativeArtifact> artifacts(List<String> jobIds) {
-        return jobIds.isEmpty() ? List.of() : artifacts.selectList(new LambdaQueryWrapper<CreativeArtifact>().in(CreativeArtifact::getJobId, jobIds));
-    }
     /** 按作业查找唯一产物。 */
     public Optional<CreativeArtifact> artifact(String jobId) {
         return Optional.ofNullable(artifacts.selectOne(new LambdaQueryWrapper<CreativeArtifact>().eq(CreativeArtifact::getJobId, jobId)));

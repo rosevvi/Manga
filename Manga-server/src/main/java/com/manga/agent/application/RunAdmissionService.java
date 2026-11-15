@@ -356,6 +356,8 @@ public class RunAdmissionService {
                 .conversationId(Objects.isNull(conversation) ? null : conversation.getConversationId())
                 .userId(command.userId())
                 .projectId(projectId)
+                .autoApplyChanges(command.autoApplyChanges())
+                .autoApproveRiskyChanges(command.autoApproveRiskyChanges())
                 .engineVersion(properties.engineVersion())
                 .workflowType(CreativeWorkflowType.fromOperation(command.operationType()))
                 .workflowVersion(properties.workflowVersion())
@@ -387,7 +389,9 @@ public class RunAdmissionService {
     private String requestFingerprint(StartCreativeRunCommand command) {
         CreativeRunRequestFingerprintMaterial material = new CreativeRunRequestFingerprintMaterial(
                 command.triggerSource(), command.operationType(), command.conversationId(), command.projectId(),
-                command.target(), command.permissionPolicy(), command.instruction(), command.agentSelection());
+                command.target(), command.permissionPolicy(), command.instruction(), command.agentSelection(),
+                command.autoApplyChanges() ? Boolean.TRUE : null,
+                command.autoApproveRiskyChanges() ? Boolean.TRUE : null);
         try {
             byte[] json = objectMapper.writeValueAsBytes(material);
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(json));

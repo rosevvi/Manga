@@ -12,10 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /** 图片作业快照用于 SSE 重连和页面刷新，查询始终限定认证用户与项目。 */
 @Service
@@ -43,7 +40,7 @@ public class GenerationJobQueryService {
     public List<GenerationJobView> list(long userId, long projectId, String runId, String conversationId, Long beforeId) {
         return list(userId, projectId, runId, conversationId, beforeId, null, null);
     }
-    /** 先按认证范围、镜头和审批媒体类型过滤，再使用主键游标分页。 */
+    /** 按许可范围分页，并随作业一次读取已发布产物。 */
     @Transactional(readOnly = true)
     public List<GenerationJobView> list(long userId, long projectId, String runId, String conversationId,
             Long beforeId, Long shotId, AiModelType mediaType) {
@@ -52,9 +49,7 @@ public class GenerationJobQueryService {
         String kind = Objects.isNull(mediaType) ? null : mediaType == AiModelType.VIDEO
                 ? ChangeSetKind.VIDEO_GENERATION.name() : ChangeSetKind.IMAGE_GENERATION.name();
         List<GenerationJob> page = jobs.visible(userId, projectId, runId, conversationId, beforeId, GenerationConstants.PAGE_SIZE, shotId, kind);
-        Map<String, CreativeArtifact> artifacts = jobs.artifacts(page.stream().map(GenerationJob::getJobId).toList())
-                .stream().collect(Collectors.toMap(CreativeArtifact::getJobId, Function.identity()));
-        return page.stream().map(job -> view(job, artifacts.get(job.getJobId()))).toList();
+        return page.stream().map(job -> view(job, job.getListingArtifact())).toList();
     }
     /** 读取一个认证用户拥有的作业及平台产物。 */
     @Transactional(readOnly = true)

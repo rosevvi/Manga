@@ -28,6 +28,8 @@ export function createConversationRun(accessToken, request) {
       instruction: request.instruction,
       agentProfileId: request.agentProfileId || null,
       modelConfigId: request.modelConfigId || null,
+      autoApplyChanges: request.autoApplyChanges === true,
+      autoApproveRiskyChanges: request.autoApproveRiskyChanges === true,
     }),
   })
 }

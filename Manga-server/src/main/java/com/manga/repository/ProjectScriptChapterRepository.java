@@ -16,7 +16,12 @@ public class ProjectScriptChapterRepository {
     private final ProjectScriptChapterMapper mapper;
 
     public List<ProjectScriptChapter> findSummaries(long scriptId) {
-        return mapper.findSummaries(scriptId);
+        return mapper.findSummaries(scriptId, false);
+    }
+
+    /** 返回带场景数量的章节摘要，避免调用方逐章查场景。 */
+    public List<ProjectScriptChapter> findSummariesWithSceneCount(long scriptId) {
+        return mapper.findSummaries(scriptId, true);
     }
 
     public Optional<ProjectScriptChapter> findByIdAndScript(long chapterId, long scriptId) {

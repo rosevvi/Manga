@@ -146,7 +146,7 @@ public class AdminAgentProfileController {
 
     /** 显式启动一个只读、有限轮数的真实测试 Run。 */
     @PostMapping("/{key}/versions/{version}/test")
-    @Operation(summary = "启动 Agent 只读测试", description = "会使用管理员自己的模型并产生模型调用费用；不允许业务提案、付费媒体生成或委派。")
+    @Operation(summary = "启动 Agent 只读测试", description = "使用管理员已配置的模型，限制业务提案、媒体生成和委派。")
     public ApiResponse<CreativeRunResponse> test(@PathVariable String key, @PathVariable @Positive long version,
             @Valid @RequestBody AgentProfileApi.Test request) {
         long userId = SecurityUtils.requireCurrentUserId(); var started = tests.start(key, version, request, userId);

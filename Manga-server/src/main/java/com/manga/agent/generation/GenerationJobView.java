@@ -10,7 +10,7 @@ public record GenerationJobView(
         /** 稳定作业标识。 */ String jobId,
         /** 来源运行。 */ String runId,
         /** 来源步骤。 */ String stepId,
-        /** 费用批准提案。 */ String changeSetId,
+        /** 生成审批提案。 */ String changeSetId,
         /** 所属项目。 */ Long projectId,
         /** 目标镜头。 */ Long shotId,
         /** 实际使用的供应商。 */ GenerationProviderKey provider,

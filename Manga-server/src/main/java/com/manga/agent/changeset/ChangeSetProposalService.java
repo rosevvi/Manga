@@ -11,8 +11,8 @@ import com.manga.agent.domain.CreativeStepStatus;
 import com.manga.agent.event.RunAcceptedEventPayload;
 import com.manga.agent.generation.ImageGenerationChange;
 import com.manga.agent.generation.VideoGenerationChange;
-import com.manga.agent.generation.VideoGenerationQuoteService;
-import com.manga.agent.generation.ImageGenerationQuoteService;
+import com.manga.agent.generation.VideoGenerationConfigService;
+import com.manga.agent.generation.ImageGenerationConfigService;
 import com.manga.common.exception.BusinessException;
 import com.manga.dto.ProjectScriptChapterResponse;
 import com.manga.entity.CreativeChangeSet;
@@ -51,8 +51,8 @@ public class ChangeSetProposalService {
     private final StoryboardShotService storyboards;
     private final ProjectScriptService scripts;
     private final ChangeSetCodec codec;
-    private final ImageGenerationQuoteService generationQuotes;
-    private final VideoGenerationQuoteService videoQuotes;
+    private final ImageGenerationConfigService imageConfigs;
+    private final VideoGenerationConfigService videoConfigs;
     private final StoryboardShotRepository shots;
     private final CreativeReviewGate reviewGate;
 
@@ -83,12 +83,12 @@ public class ChangeSetProposalService {
             payload = storyboard;
             chapterId = storyboard.chapterId();
         } else if (kind == ChangeSetKind.VIDEO_GENERATION) {
-            VideoGenerationChange video = videoQuotes.canonicalize(codec.validate(input, VideoGenerationChange.class), run.getUserId());
+            VideoGenerationChange video = videoConfigs.canonicalize(codec.validate(input, VideoGenerationChange.class), run.getUserId());
             payload = video;
             mediaShotId = video.shotId();
             chapterId = mediaChapter(run, mediaShotId);
         } else {
-            ImageGenerationChange image = generationQuotes.canonicalize(codec.validate(input, ImageGenerationChange.class), run.getUserId());
+            ImageGenerationChange image = imageConfigs.canonicalize(codec.validate(input, ImageGenerationChange.class), run.getUserId());
             payload = image;
             mediaShotId = image.shotId();
             chapterId = mediaChapter(run, mediaShotId);

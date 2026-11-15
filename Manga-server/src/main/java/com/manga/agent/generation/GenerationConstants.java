@@ -10,7 +10,6 @@ public final class GenerationConstants {
     /** 回调只接收事实引用，禁止媒体数据或任意 URL。 */ public static final int CALLBACK_MAX_BYTES = 2048;
     /** 补偿调度表达式。 */ public static final String INTERVAL = "${manga.creative.generation.scan-interval:3s}";
     /** Fake 模型标识。 */ public static final String FAKE_MODEL = "fake-image";
-    /** 运维配置预计费用的计价币种。 */ public static final String CURRENCY = "USD";
     /** 指定的首个真实图片模型。 */ public static final String OPENAI_MODEL = "gpt-image-2";
     /** 固定质量，保证审批预览和实际请求一致。 */ public static final String QUALITY = "medium";
     /** 平台只接收 PNG，避免下载外部任意 URL。 */ public static final String FORMAT = StorageConstants.GENERATED_FORMAT;

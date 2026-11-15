@@ -20,7 +20,7 @@ export const CREATIVE_TOOL_LABEL = Object.freeze({
   /** 分镜镜头列表。 */ list_storyboard_shots: '读取分镜列表',
   /** 生成待批准的章节提案。 */ propose_script_change: '提出章节变更',
   /** 生成待批准的分镜提案。 */ propose_storyboard_change: '提出分镜草稿',
-  /** 图片生成需费用确认和批准。 */ propose_image_generation: '提出图片生成',
+  /** 图片生成支持生成审批。 */ propose_image_generation: '提出图片生成',
   /** 提交持久化多 Agent 子图。 */ delegate_creative_plan: '安排协作计划',
   /** 从已完成的 Worker 读取有界结果。 */ read_delegated_result: '读取协作结果',
   /** 读取当前启用的发布配置目录。 */ list_agent_profiles: '选择专业 Agent',

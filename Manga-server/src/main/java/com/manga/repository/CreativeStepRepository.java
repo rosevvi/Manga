@@ -110,7 +110,7 @@ public class CreativeStepRepository {
         return mapper.recoverExpired(step.getStepId(), step.getOwnerEpoch(), now, actor) == 1;
     }
 
-    /** 原子拒绝没有可恢复检查点的已计费执行。 */
+    /** 有模型调用记录且缺少可恢复检查点时，原子终止步骤恢复。 */
     public boolean failExpiredAfterModel(CreativeStep step, LocalDateTime now, String errorCode, String message, String actor) {
         return mapper.failExpiredAfterModel(step.getStepId(), step.getOwnerEpoch(), now, errorCode, message, actor) == 1;
     }

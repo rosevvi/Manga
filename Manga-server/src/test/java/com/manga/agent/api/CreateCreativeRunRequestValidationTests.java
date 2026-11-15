@@ -74,4 +74,16 @@ class CreateCreativeRunRequestValidationTests {
 
         assertThat(validator.validate(request)).isNotEmpty();
     }
+
+    @Test
+    void autoApplyRequiresProjectAndWritePermission() {
+        var unbound = new CreateCreativeRunRequest("auto-unbound", CreativeRunTriggerSource.CONVERSATION,
+                CreativeOperationType.ASSISTANT_CHAT, null, null, null, AgentPermissionPolicy.PROPOSE_CHANGES,
+                "生成分镜", null, null, true);
+        var readOnly = new CreateCreativeRunRequest("auto-read-only", CreativeRunTriggerSource.CONVERSATION,
+                CreativeOperationType.ASSISTANT_CHAT, null, 101L, null, AgentPermissionPolicy.READ_ONLY,
+                "生成分镜", null, null, true);
+        assertThat(validator.validate(unbound)).isNotEmpty();
+        assertThat(validator.validate(readOnly)).isNotEmpty();
+    }
 }

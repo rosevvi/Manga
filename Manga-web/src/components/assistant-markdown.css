@@ -1,0 +1,26 @@
+.assistant-markdown { min-width: 0; color: var(--creative-text); font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; }
+.assistant-markdown > :first-child { margin-top: 0; }
+.assistant-markdown > :last-child { margin-bottom: 0; }
+.assistant-markdown > * { margin: .6em 0; }
+.assistant-markdown h1, .assistant-markdown h2, .assistant-markdown h3 { line-height: 1.35; }
+.assistant-markdown h1 { font-size: 1.4em; }
+.assistant-markdown h2 { font-size: 1.25em; }
+.assistant-markdown h3 { font-size: 1.12em; }
+.assistant-markdown ul, .assistant-markdown ol { padding-inline-start: 1.55em; }
+.assistant-markdown a { color: var(--creative-accent); text-decoration: underline; text-underline-offset: 3px; }
+.assistant-markdown img { max-width: 100%; height: auto; border-radius: 8px; }
+.assistant-markdown pre, .assistant-markdown-table { overflow: auto; max-width: 100%; border: 1px solid var(--creative-line); border-radius: 8px; }
+.assistant-markdown pre { padding: 11px 14px; white-space: pre; background: var(--workspace-inset); }
+.assistant-markdown :not(pre) > code { padding: .1em .3em; border-radius: 4px; background: var(--workspace-inset); }
+.assistant-markdown table { border-collapse: collapse; width: 100%; }
+.assistant-markdown th, .assistant-markdown td { min-width: 6em; padding: 7px 11px; border: 1px solid var(--creative-line); text-align: start; }
+.assistant-markdown th { background: var(--workspace-inset); }
+.assistant-markdown blockquote { margin-inline: 0; padding-inline-start: 12px; border-inline-start: 2px solid var(--creative-accent); color: var(--creative-muted); }
+.assistant-markdown.streaming::after { content: ''; display: inline-block; width: .45em; height: .85em; margin-inline-start: .25em; background: var(--creative-accent); border-radius: 2px; animation: assistant-pulse 1s ease infinite; }
+.assistant-thinking { display: inline-flex; gap: 8px; align-items: center; color: var(--creative-muted); font-size: 12px; }
+.assistant-thinking-dots { display: inline-flex; gap: 3px; }
+.assistant-thinking-dots i { width: 4px; height: 4px; border-radius: 50%; background: var(--creative-accent); animation: assistant-pulse 1.2s ease infinite; }
+.assistant-thinking-dots i:nth-child(2) { animation-delay: .16s; }
+.assistant-thinking-dots i:nth-child(3) { animation-delay: .32s; }
+@keyframes assistant-pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .assistant-thinking-dots i, .assistant-markdown.streaming::after { animation: none; } }

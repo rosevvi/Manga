@@ -25,7 +25,7 @@ public enum CapabilityName {
     PROPOSE_SCRIPT_CHANGE("propose_script_change"),
     /** 保存批量分镜草稿提案，业务写入必须等待审批。 */
     PROPOSE_STORYBOARD_CHANGE("propose_storyboard_change"),
-    /** 提交镜头图片提案，真实计费提交必须等待用户批准。 */
+    /** 提交镜头图片提案，由平台按本轮审批方式推进生成。 */
     PROPOSE_IMAGE_GENERATION("propose_image_generation"),
     /** 持久化委派计划并暂停 Director。 */ DELEGATE_CREATIVE_PLAN("delegate_creative_plan"),
     /** Worker 提交经过 schema 校验的不可变结果。 */ SUBMIT_CREATIVE_STEP_RESULT("submit_creative_step_result"),

@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bot, CheckCircle2, ChevronDown, ChevronRight, LoaderCircle, Wrench } from 'lucide-react'
 import { CREATIVE_STEP_STATUS_LABEL } from '../constants/collaboration'
+import { CREATIVE_TERMINAL_STATUSES } from '../constants/changeSet'
 import { CREATIVE_TOOL_LABEL } from '../constants/creative'
 import { isAgentActivity, orderedExecutionSections, timelineCards } from './creativeTimeline'
+import AssistantMarkdown, { AssistantThinking } from './AssistantMarkdown'
 
 const ACTIVE = new Set(['RUNNING', 'READY', 'WAITING_CHILDREN', 'WAITING_APPROVAL', 'WAITING_JOB', 'WAITING_REPAIR_CONFIRMATION'])
+const TERMINAL_EVENTS = new Set(['RUN_COMPLETED', 'RUN_FAILED', 'RUN_CANCELLED'])
 const TECHNICAL_LABEL = { RUN_ACCEPTED: '任务已受理', RUN_STARTED: '任务开始', PLAN_CREATED: '协作计划建立',
   STEP_CREATED: '步骤已建立', STEP_STARTED: '开始执行', STEP_COMPLETED: '步骤完成', STEP_FAILED: '步骤失败',
   RUN_COMPLETED: '任务完成', RUN_FAILED: '任务失败', RUN_CANCELLED: '任务结束', RUN_CANCEL_REQUESTED: '请求停止',
   REPAIR_CONFIRMATION_REQUIRED: '等待确认修订', REPAIR_CONFIRMATION_DECIDED: '修订确认已处理' }
 
 /** 按计划、Agent 与工具组织服务端事实；手动折叠状态不会被增量更新覆盖。 */
-export default function CreativeExecutionTimeline({ runId, graph, events, run, assistantFallback }) {
+export default function CreativeExecutionTimeline({ runId, graph, events, run, assistantFallback, conversationView = false }) {
   const storageKey = `manga.execution-folds.${runId}`
   const [folds, setFolds] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}') }
@@ -38,6 +41,9 @@ export default function CreativeExecutionTimeline({ runId, graph, events, run, a
     }
   }
   const sections = orderedExecutionSections([...nodes.values()].filter((node) => !node.planId), plans, cards)
+  const terminal = CREATIVE_TERMINAL_STATUSES.has(run?.status) || events.some((item) => TERMINAL_EVENTS.has(item.type))
+  const waitingForReply = conversationView && !terminal && !assistantFallback
+    && !sections.some((section) => section.plan || section.items?.length)
 
   const setExpanded = (id, open) => {
     setFolds((previous) => {
@@ -88,13 +94,11 @@ export default function CreativeExecutionTimeline({ runId, graph, events, run, a
     setNewContent(true)
   }, [events])
 
-  const renderCard = (item, latestToolId) => {
-    if (item.type === 'CONTENT_DELTA') return <p className="process-prose" key={item.id}>{item.resultSummary}</p>
+  const renderCard = (item, latestToolId, streaming) => {
+    if (item.type === 'CONTENT_DELTA') return <AssistantMarkdown key={item.id} text={item.resultSummary} streaming={streaming} />
     if (item.type === 'REASONING_DELTA') {
-      const latest = cards.findLast((card) => card.stepId === item.stepId)
-      const streaming = latest?.id === item.id && nodes.get(item.stepId)?.status === 'RUNNING'
       return disclosure(`reasoning:${item.id}`, <><Bot size={14} /><strong>供应商分析</strong></>,
-        <p className="process-prose provider-reasoning">{item.resultSummary}</p>, streaming, 'process-reasoning')
+        <AssistantMarkdown text={item.resultSummary} streaming={streaming} />, streaming, 'process-reasoning')
     }
     const working = item.status === 'RUNNING'
     return disclosure(`tool:${item.stepId}:${item.ownerEpoch}:${item.actionId}`, <>
@@ -119,16 +123,20 @@ export default function CreativeExecutionTimeline({ runId, graph, events, run, a
       ? ({ STEP_STARTED: 'RUNNING', STEP_COMPLETED: 'COMPLETED', STEP_FAILED: 'FAILED' })[lastStatus.type] : node.status
     const active = current && ACTIVE.has(status)
     const latestToolId = items.findLast((item) => item.type.startsWith('TOOL_'))?.id
+    const renderedItems = items.map((item) => renderCard(item, latestToolId, !terminal && current && status === 'RUNNING' && items.at(-1)?.id === item.id))
+    // 根步骤的可见正文属于聊天；工具卡片和协作步骤继续使用各自的边界。
+    if (conversationView && !node.parentStepId && !node.planId) {
+      return items.length ? <div className="assistant-inline-response" key={id}>{renderedItems}</div> : null
+    }
     const directorHasOutput = !node.parentStepId && items.some((item) => item.type === 'CONTENT_DELTA')
     return disclosure(id, <>
       {current && status === 'RUNNING' ? <LoaderCircle size={16} className="process-spinner" /> : status === 'COMPLETED' ? <CheckCircle2 size={16} /> : <Bot size={16} />}
       <strong>{node.displayName || node.profileId || '创作 Agent'}</strong><span className="process-state">{current ? CREATIVE_STEP_STATUS_LABEL[status] || status : '已交给协作 Agent'}</span>
     </>, <>
-      {items.map((item) => renderCard(item, latestToolId))}
-      {current && status === 'RUNNING' && items.at(-1)?.type === 'CONTENT_DELTA' && <span className="process-writing" role="status"><LoaderCircle size={13} className="process-spinner" />正在输出</span>}
-      {!items.length && <p className="process-muted">{node.waitingReason || (active ? '正在执行，等待 Agent 输出或工具事件…' : '该步骤未输出额外过程文字。')}</p>}
+      {renderedItems}
+      {!items.length && (status === 'RUNNING' ? <AssistantThinking /> : <p className="process-muted">{node.waitingReason || (active ? '正在准备执行…' : '该步骤未输出额外过程文字。')}</p>)}
       {current && node.resultSummary && disclosure(`result:${node.stepId}`, <strong>最终结果</strong>, <>
-        <p className="process-prose">{node.resultSummary}</p>
+        <AssistantMarkdown text={node.resultSummary} />
         {node.verdict && <p>评审：{node.verdict === 'PASS' ? '通过' : '需要修订'}</p>}
         {!!node.issues?.length && <ul>{node.issues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>}
       </>)}
@@ -137,23 +145,25 @@ export default function CreativeExecutionTimeline({ runId, graph, events, run, a
     </>, active || directorHasOutput, 'process-agent')
   }
 
-  return <div className="creative-process" ref={anchor}>
-    <div className="process-toolbar"><strong>执行过程</strong><button className="workspace-secondary" type="button" onClick={() => {
+  return <div className={`creative-process${conversationView ? ' conversation-process' : ''}`} ref={anchor}>
+    {!conversationView && <div className="process-toolbar"><strong>执行过程</strong><button className="workspace-secondary" type="button" onClick={() => {
       const next = { ...folds }
       for (const node of nodes.values()) next[`agent:${node.stepId}`] = false
       for (const section of sections) next[section.id] = false
       next.technical = false
       setFolds(next)
       try { sessionStorage.setItem(storageKey, JSON.stringify(next)) } catch { /* 仅影响刷新后的折叠恢复。 */ }
-    }}>全部收起</button></div>
-    {assistantFallback && !hasAssistantText && <p className="process-prose">{assistantFallback}</p>}
+    }}>全部收起</button></div>}
+    {waitingForReply && <AssistantThinking />}
+    {assistantFallback && !hasAssistantText && <div className={conversationView ? 'assistant-inline-response' : undefined}>
+      <AssistantMarkdown text={assistantFallback} /></div>}
     {sections.map(({ id, plan, node, items, current }) => {
       if (node) return renderAgent(node, items, id, current)
       const workers = [...nodes.values()].filter((node) => node.planId === plan.planId)
       return disclosure(id, <strong>{plan.round ? `第 ${plan.round} 轮 · ` : ''}{plan.title}</strong>, workers.map((worker) => renderAgent(worker)),
         workers.some((node) => ACTIVE.has(node.status)), 'process-plan')
     })}
-    {disclosure('technical', '任务与调度记录', <ol className="process-technical">{events.filter((item) =>
+    {!conversationView && disclosure('technical', '任务与调度记录', <ol className="process-technical">{events.filter((item) =>
       !['CONTENT_DELTA', 'REASONING_DELTA'].includes(item.type) && !item.type.startsWith('TOOL_')).map((item) =>
       <li key={item.id}><time>{item.occurredAt?.slice(11, 19)}</time> {TECHNICAL_LABEL[item.type] || item.actionName || item.type}
         {item.failureReason && <p role="alert">{item.failureReason}</p>}</li>)}</ol>)}
