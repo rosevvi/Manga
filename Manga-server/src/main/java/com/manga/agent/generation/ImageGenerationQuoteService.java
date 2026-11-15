@@ -4,6 +4,8 @@ import com.manga.common.enums.AiProviderType;
 import com.manga.common.enums.AiModelType;
 import com.manga.common.exception.BusinessException;
 import com.manga.dto.ResolvedAiProviderConfig;
+import com.manga.entity.AiProviderConfig;
+import com.manga.integration.ai.AgnesEndpoint;
 import com.manga.service.AiProviderConfigService;
 import com.manga.repository.AiProviderConfigRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,49 +30,65 @@ public class ImageGenerationQuoteService {
     /** 仅返回选择图片端点所需摘要，避免通用配置管理 DTO 携带凭据。 */
     public List<ImageGenerationOption> options(long userId) {
         List<ImageGenerationOption> result = new ArrayList<>();
-        repository.findAllOwnedBy(userId).stream().filter(config -> Boolean.TRUE.equals(config.getEnabled())
-                && config.getModelType() == AiModelType.IMAGE && GenerationConstants.OPENAI_MODEL.equals(config.getDefaultModel())
-                && COMPATIBLE_TYPES.contains(config.getProviderType())).forEach(config -> result.add(new ImageGenerationOption(
-                GenerationProviderKey.OPENAI, config.getId(), config.getName(), GenerationConstants.OPENAI_MODEL,
-                properties.imagePrices().get(GenerationConstants.OPENAI_MODEL), GenerationConstants.CURRENCY)));
+        for (AiProviderConfig config : repository.findAllOwnedBy(userId)) {
+            if (!Boolean.TRUE.equals(config.getEnabled()) || config.getModelType() != AiModelType.IMAGE
+                    || Objects.isNull(config.getApiKeyCiphertext())) continue;
+            GenerationProviderKey provider = route(config.getProviderType(), config.getDefaultModel(), config.getBaseUrl());
+            if (Objects.nonNull(provider)) {
+                result.add(new ImageGenerationOption(provider, config.getId(), config.getName(), config.getDefaultModel(),
+                        properties.imagePrices().get(config.getDefaultModel()), GenerationConstants.CURRENCY,
+                        ImageGenerationSize.options(provider)));
+            }
+        }
         result.add(new ImageGenerationOption(GenerationProviderKey.FAKE, null, "免费流程验证（FAKE）", GenerationConstants.FAKE_MODEL,
-                BigDecimal.ZERO, GenerationConstants.CURRENCY));
+                BigDecimal.ZERO, GenerationConstants.CURRENCY, ImageGenerationSize.options(GenerationProviderKey.FAKE)));
         return List.copyOf(result);
     }
 
-    /** 只开放明确支持的三种尺寸及单张中等质量，服务端覆盖费用字段。 */
+    /** 校验供应商的原生尺寸，服务端按用户指定配置冻结模型、端点和费用。 */
     public ImageGenerationChange canonicalize(ImageGenerationChange input, long userId) {
-        boolean size = input.width() == 1024 && (input.height() == 1024 || input.height() == 1536)
-                || input.width() == 1536 && input.height() == 1024;
-        if (!size) throw new BusinessException(GenerationError.INVALID);
+        ImageGenerationSize.require(input.provider(), input.width(), input.height());
         BigDecimal price = BigDecimal.ZERO;
         GenerationConfigSnapshot snapshot = null;
         if (input.provider() == GenerationProviderKey.FAKE) {
             if (!GenerationConstants.FAKE_MODEL.equals(input.model())) throw new BusinessException(GenerationError.INVALID);
-        } else if (input.provider() == GenerationProviderKey.OPENAI) {
-            snapshot = GenerationConfigSnapshot.from(resolve(input.configId(), userId));
-            if (!GenerationConstants.OPENAI_MODEL.equals(input.model())) throw new BusinessException(GenerationError.INVALID);
+        } else {
+            ResolvedAiProviderConfig config = resolve(input.provider(), input.configId(), userId);
+            if (!Objects.equals(config.defaultModel(), input.model())) throw new BusinessException(GenerationError.INVALID);
+            snapshot = GenerationConfigSnapshot.from(config);
             price = properties.imagePrices().get(input.model());
             if (Objects.isNull(price) || price.signum() <= 0) throw new BusinessException(GenerationError.INVALID);
-        } else throw new BusinessException(GenerationError.INVALID);
+        }
         return new ImageGenerationChange(input.shotId(), input.provider(),
                 input.provider() == GenerationProviderKey.FAKE ? null : input.configId(), input.model(), input.prompt().trim(),
                 input.width(), input.height(), price, GenerationConstants.CURRENCY, snapshot);
     }
 
-    /** 校验配置归属、启用状态和 HTTPS；网络地址只能来自用户已保存的配置。 */
-    public ResolvedAiProviderConfig resolve(Long configId, long userId) {
+    /** 校验配置归属、启用、供应商和模型，拒绝使用错误的凭据或端点。 */
+    public ResolvedAiProviderConfig resolve(GenerationProviderKey provider, Long configId, long userId) {
         if (Objects.isNull(configId)) throw new BusinessException(GenerationError.INVALID);
         ResolvedAiProviderConfig config = configs.resolveOwned(userId, configId, AiModelType.IMAGE)
                 .orElseThrow(() -> new BusinessException(GenerationError.AUTHENTICATION));
-        URI endpoint;
-        try { endpoint = URI.create(config.baseUrl()); }
-        catch (IllegalArgumentException exception) { throw new BusinessException(GenerationError.INVALID); }
-        if (!COMPATIBLE_TYPES.contains(config.providerType()) || !"https".equals(endpoint.getScheme())
-                || Objects.isNull(endpoint.getHost()) || Objects.nonNull(endpoint.getUserInfo())
-                || Objects.nonNull(endpoint.getQuery()) || Objects.nonNull(endpoint.getFragment())
-                || !GenerationConstants.OPENAI_MODEL.equals(config.defaultModel())
+        if (Objects.isNull(provider) || route(config.providerType(), config.defaultModel(), config.baseUrl()) != provider
                 || Objects.isNull(config.apiKey()) || config.apiKey().isBlank()) throw new BusinessException(GenerationError.INVALID);
         return config;
+    }
+
+    /** 配置列表和作业执行使用相同的供应商识别规则。 */
+    private GenerationProviderKey route(AiProviderType type, String model, String address) {
+        if (type == AiProviderType.AGNES && AgnesEndpoint.supports(address) && AgnesImageModel.find(model).isPresent()) {
+            return GenerationProviderKey.AGNES;
+        }
+        if (Objects.isNull(type) || !COMPATIBLE_TYPES.contains(type) || !GenerationConstants.OPENAI_MODEL.equals(model)
+                || Objects.isNull(address)) return null;
+        try {
+            URI endpoint = URI.create(address);
+            if ("https".equals(endpoint.getScheme()) && Objects.nonNull(endpoint.getHost())
+                    && Objects.isNull(endpoint.getUserInfo()) && Objects.isNull(endpoint.getQuery())
+                    && Objects.isNull(endpoint.getFragment())) return GenerationProviderKey.OPENAI;
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+        return null;
     }
 }

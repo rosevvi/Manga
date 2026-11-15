@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.CreativeMessageProjectionMapper">
+    <insert id="ensure">
+        INSERT INTO manga_creative_message_projection(run_id, projected_through_sequence, created_by, updated_by)
+        SELECT run_id, projected_through_sequence, #{actor}, #{actor} FROM manga_creative_run WHERE run_id = #{runId}
+        ON DUPLICATE KEY UPDATE run_id = VALUES(run_id)
+    </insert>
+    <select id="lock" resultType="com.manga.entity.CreativeMessageProjection">
+        SELECT id, run_id, projected_through_sequence, owner_id, lease_until, created_at, updated_at, created_by, updated_by
+        FROM manga_creative_message_projection WHERE run_id = #{runId} FOR UPDATE
+    </select>
+    <update id="claim">
+        UPDATE manga_creative_message_projection SET owner_id = #{owner}, lease_until = #{until},
+            updated_by = #{owner}, updated_at = CURRENT_TIMESTAMP
+        WHERE run_id = #{runId} AND (owner_id IS NULL OR owner_id = #{owner} OR lease_until &lt;= #{now})
+    </update>
+    <update id="advance">
+        UPDATE manga_creative_message_projection SET projected_through_sequence = #{sequence}, owner_id = NULL,
+            lease_until = NULL, updated_by = #{owner}, updated_at = CURRENT_TIMESTAMP
+        WHERE run_id = #{runId} AND owner_id = #{owner}
+    </update>
+</mapper>

@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { createManualRun } from '../api/creativeRunApi'
 import { listImageGenerationOptions, listVideoGenerationOptions } from '../api/generationApi'
 import { CREATIVE_OPERATION, CREATIVE_PERMISSION, CREATIVE_RESOURCE } from '../constants/creative'
-import { IMAGE_SIZES } from '../constants/generation'
+import { IMAGE_PROMPT_MAX_LENGTH, IMAGE_SIZES } from '../constants/generation'
 import WorkspaceSelect from './WorkspaceSelect'
 import { openCreativeTask } from './creativeTaskEvents'
+import { imageProposalInstruction } from './changeSetPreview'
 import './generation.css'
 
 /** 镜头生成表单按媒体类型只列出对应用户配置，所有提交先审批。 */
@@ -34,6 +35,8 @@ export default function ImageGenerationPanel({ accessToken, projectId, shots = [
   }, [accessToken, projectId, video])
   useEffect(() => { setShotId(selectedShot ? String(selectedShot.id) : ''); setPrompt(selectedShot?.content || selectedShot?.title || '') }, [selectedShot?.id])
   const selected = options[Number(optionKey)]
+  const imageSizes = selected?.sizes?.length ? selected.sizes : IMAGE_SIZES
+  const selectedSize = imageSizes.includes(size) ? size : imageSizes[0]
   /** 视频直接使用已选参数创建提案；图片保留 Director 提案流程。 */
   const submit = async (event) => {
     event.preventDefault()
@@ -41,7 +44,7 @@ export default function ImageGenerationPanel({ accessToken, projectId, shots = [
     const expected = scope.current
     setBusy(true); setError('')
     try {
-      const [width, height] = size.split('x').map(Number)
+      const [width, height] = selectedSize.split('x').map(Number)
       const imageParameters = { shotId: Number(shotId), provider: selected.provider, configId: selected.configId,
         model: selected.model, prompt: prompt.trim(), width, height }
       const videoParameters = { shotId: Number(shotId), configId: selected.configId, prompt: prompt.trim(), seconds, aspectRatio }
@@ -50,8 +53,7 @@ export default function ImageGenerationPanel({ accessToken, projectId, shots = [
         operationType: video ? CREATIVE_OPERATION.GENERATE_SHOT_VIDEO : CREATIVE_OPERATION.GENERATE_SHOT_IMAGE,
         permissionPolicy: CREATIVE_PERMISSION.PROPOSE_CHANGES,
         target: { resourceType: CREATIVE_RESOURCE.STORYBOARD_SHOT, resourceId: Number(shotId) },
-        instruction: video ? JSON.stringify(videoParameters)
-          : `请读取目标镜头，按以下明确选择的参数调用 propose_image_generation 提交单张图片提案，等待我预览费用并批准，不要直接执行生成。参数：${JSON.stringify(imageParameters)}`,
+        instruction: video ? JSON.stringify(videoParameters) : imageProposalInstruction(imageParameters),
       })
       if (scope.current === expected) { setRunId(run.runId); openCreativeTask(run.runId, projectId) }
     } catch (failure) { if (scope.current === expected) setError(failure.message) }
@@ -72,9 +74,9 @@ export default function ImageGenerationPanel({ accessToken, projectId, shots = [
           options={['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'].map((ratio) => ({ value: ratio, label: ratio }))} /></label>
         <label>时长（秒）<input type="number" required min={4} max={12} value={seconds}
           onChange={(event) => setSeconds(Number(event.target.value))} /></label>
-      </> : <label>输出尺寸<WorkspaceSelect label="图片尺寸" value={size} onChange={setSize} options={IMAGE_SIZES.map((value) => ({ value, label: value }))} /></label>}
-      <label>画面提示词<textarea required rows={3} maxLength={4000} value={prompt} onChange={(event) => setPrompt(event.target.value)} /></label>
-      <small>{video ? '单个 720P MP4。' : '单张 PNG，中等质量。'}{selected?.estimatedCost != null
+      </> : <label>输出尺寸<WorkspaceSelect label="图片尺寸" value={selectedSize} onChange={setSize} options={imageSizes.map((value) => ({ value, label: value }))} /></label>}
+      <label>画面提示词<textarea required rows={3} maxLength={IMAGE_PROMPT_MAX_LENGTH} value={prompt} onChange={(event) => setPrompt(event.target.value)} /></label>
+      <small>{video ? '单个 720P MP4。' : '单张 PNG。'}{selected?.estimatedCost != null
         ? `预计 ${video ? (selected.estimatedCost * seconds).toFixed(3) : selected.estimatedCost} ${selected.currency}，批准后才会提交。`
         : '请在 AI 配置页启用对应类型的模型。'}</small>
       <button className="workspace-primary" type="submit" disabled={busy || !shotId || !prompt.trim() || selected?.estimatedCost == null}>

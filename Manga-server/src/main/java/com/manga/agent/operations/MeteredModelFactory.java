@@ -5,6 +5,7 @@ import com.manga.agent.capability.AgentRuntimeContext;
 import com.manga.agent.domain.CreativeErrorCode;
 import com.manga.agent.execution.CreativeExecutionFailure;
 import com.manga.agent.harness.AgentRuntimeException;
+import com.manga.agent.harness.InvocationActivity;
 import lombok.extern.slf4j.Slf4j;
 import java.util.concurrent.atomic.AtomicBoolean;
 import com.manga.common.constant.AsyncConstants;
@@ -46,6 +47,11 @@ public class MeteredModelFactory {
 
     /** 覆盖正常推理和 Compaction 的每一次 Model.stream 订阅。 */
     public Model wrap(Model delegate, AgentBlueprint blueprint, AgentRuntimeContext context) {
+        return wrap(delegate, blueprint, context, new InvocationActivity(InvocationActivity.DEFAULT_MAX_NO_PROGRESS_TURNS));
+    }
+
+    /** 模型与工具共用一次 Harness 的进展计数，停滞时在创建计费账本之前拒绝下一轮。 */
+    public Model wrap(Model delegate, AgentBlueprint blueprint, AgentRuntimeContext context, InvocationActivity activity) {
         return new Model() {
             @Override public String getModelName() { return delegate.getModelName(); }
             @Override public int getContextWindowSize() { return delegate.getContextWindowSize(); }
@@ -54,7 +60,11 @@ public class MeteredModelFactory {
             @Override
             public Flux<ChatResponse> stream(List<Msg> messages, List<ToolSchema> tools, GenerateOptions options) {
                 AtomicBoolean first = new AtomicBoolean();
-                return Flux.usingWhen(Mono.fromCallable(() -> usage.begin(blueprint, context)).subscribeOn(scheduler),
+                return Flux.usingWhen(Mono.fromCallable(() -> {
+                            // 无工具的 Compaction 调用不算一次 Agent 行动轮次。
+                            activity.beforeModel(Objects.nonNull(tools) && !tools.isEmpty());
+                            return usage.begin(blueprint, context);
+                        }).subscribeOn(scheduler),
                         call -> Flux.defer(() -> call.getExpiresAt().isAfter(LocalDateTime.now(ZoneOffset.UTC))
                                         ? delegate.stream(messages, tools, singleAttempt(call, options))
                                         : Flux.error(new TimeoutException()))

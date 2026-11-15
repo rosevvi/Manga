@@ -7,6 +7,8 @@ import com.manga.agent.api.CreativeTimelinePage;
 import com.manga.agent.blueprint.AgentBlueprint;
 import com.manga.agent.blueprint.AgentBlueprintCodec;
 import com.manga.agent.domain.CreativeEventType;
+import com.manga.agent.capability.CapabilityTarget;
+import com.manga.repository.CreativeGraphRepository;
 import com.manga.agent.domain.CreativeResourceType;
 import com.manga.agent.event.CreativeEventSources;
 import com.manga.common.enums.CommonResponseCode;
@@ -39,6 +41,7 @@ public class CreativeTimelineQueryService {
     private final CreativeEventRepository events;
     private final AgentBlueprintCodec blueprints;
     private final ObjectMapper mapper;
+    private final CreativeGraphRepository graph;
 
     /** 游标按扫描事实推进，隐藏的内部事件也推进水位，旧载荷缺失摘要时保留状态。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -48,30 +51,44 @@ public class CreativeTimelineQueryService {
         int pageSize = Math.clamp(limit, 1, 200);
         var rows = events.findBatchAfter(runId, Math.max(0, afterSequence), pageSize + 1);
         var page = rows.stream().limit(pageSize).toList();
-        Map<String, CreativeStep> byId = steps.findByRunId(runId).stream()
-                .collect(Collectors.toMap(CreativeStep::getStepId, Function.identity()));
-        Map<String, AgentBlueprint> specs = byId.values().stream().filter(step -> Objects.nonNull(step.getBlueprintSnapshotJson()))
-                .collect(Collectors.toMap(CreativeStep::getStepId, step -> blueprints.deserialize(step.getBlueprintSnapshotJson())));
-        var items = page.stream().filter(event -> !(event.getEventType() == CreativeEventType.CONTENT_DELTA
-                        && CreativeEventSources.WORKER.equals(event.getSource())))
-                .map(event -> item(event, byId.get(event.getStepId()), specs.get(event.getStepId()), run))
-                .toList();
+        var items = mapEvents(run, page);
         return new CreativeTimelinePage(items, page.isEmpty() ? afterSequence : page.getLast().getSequenceNo(),
                 run.getNextSequence() - 1, rows.size() > pageSize);
     }
 
+    /** SSE 和分页复用同一白名单映射；每批固定次数读取，Worker 正文不再被隐藏。 */
+    public List<CreativeTimelinePage.Item> publicEvents(String runId, List<CreativeEvent> page) {
+        var run = runs.findByRunId(runId).orElseThrow();
+        return mapEvents(run, page);
+    }
+
+    /** 元数据按批次装载，避免每条事件回查步骤和计划。 */
+    private List<CreativeTimelinePage.Item> mapEvents(CreativeRun run, List<CreativeEvent> page) {
+        Map<String, Integer> rounds = graph.plans(run.getRunId()).stream()
+                .collect(Collectors.toMap(plan -> plan.getPlanId(), plan -> plan.getRoundNo()));
+        Map<String, CreativeStep> byId = steps.findByRunId(run.getRunId()).stream()
+                .collect(Collectors.toMap(CreativeStep::getStepId, Function.identity()));
+        Map<String, AgentBlueprint> specs = byId.values().stream().filter(step -> Objects.nonNull(step.getBlueprintSnapshotJson()))
+                .collect(Collectors.toMap(CreativeStep::getStepId, step -> blueprints.deserialize(step.getBlueprintSnapshotJson())));
+        return page.stream()
+                .map(event -> item(event, byId.get(event.getStepId()), specs.get(event.getStepId()), run, rounds))
+                .toList();
+    }
+
     /** 显式白名单映射，新增内部载荷不会意外进入公开接口。 */
-    private CreativeTimelinePage.Item item(CreativeEvent event, CreativeStep step, AgentBlueprint blueprint, CreativeRun run) {
+    private CreativeTimelinePage.Item item(CreativeEvent event, CreativeStep step, AgentBlueprint blueprint, CreativeRun run, Map<String, Integer> rounds) {
         JsonNode payload = payload(event);
         String type = event.getEventType().name();
         boolean tool = event.getEventType() == CreativeEventType.TOOL_STARTED || event.getEventType() == CreativeEventType.TOOL_COMPLETED;
         String action = tool ? payload.path("toolName").asText("工具调用") : type;
         String status = payload.path("status").asText(type);
-        String result = tool ? text(payload, "resultSummary") : event.getEventType() == CreativeEventType.CONTENT_DELTA ? text(payload, "delta") : null;
+        String result = tool ? text(payload, "resultSummary") : event.getEventType() == CreativeEventType.CONTENT_DELTA
+                || event.getEventType() == CreativeEventType.REASONING_DELTA ? text(payload, "delta") : null;
         String failure = event.getEventType() == CreativeEventType.STEP_FAILED ? payload.path("errorMessage")
                 .asText(Objects.isNull(step) ? null : step.getErrorMessage())
                 : event.getEventType() == CreativeEventType.RUN_FAILED ? run.getErrorMessage()
-                : event.getEventType() == CreativeEventType.JOB_FAILED ? text(payload, "errorMessage") : null;
+                : event.getEventType() == CreativeEventType.JOB_FAILED ? text(payload, "errorMessage")
+                : tool ? text(payload, "failureReason") : null;
         String agent = Objects.isNull(blueprint) ? null : Objects.isNull(blueprint.executionPolicy())
                 ? blueprint.profileId() : blueprint.executionPolicy().displayName();
         Long epoch = payload.hasNonNull("ownerEpoch") ? payload.get("ownerEpoch").asLong() : null;
@@ -83,11 +100,17 @@ public class CreativeTimelineQueryService {
         LocalDateTime finished = date(payload, "finishedAt");
         if (event.getEventType() == CreativeEventType.STEP_STARTED) started = event.getCreatedAt();
         if (event.getEventType() == CreativeEventType.STEP_FAILED || event.getEventType() == CreativeEventType.STEP_COMPLETED) finished = event.getCreatedAt();
-        return new CreativeTimelinePage.Item(event.getRunId() + ":" + event.getSequenceNo(), event.getSequenceNo(), 2, type,
+        boolean planCreated = event.getEventType() == CreativeEventType.PLAN_CREATED;
+        String planId = planCreated ? text(payload, "planId") : Objects.isNull(step) ? null : step.getDelegationPlanId();
+        return new CreativeTimelinePage.Item(event.getRunId() + ":" + event.getSequenceNo(), event.getSequenceNo(), 3, type,
                 event.getStepId(), Objects.isNull(step) ? null : step.getParentStepId(), epoch, agent,
                 Objects.isNull(blueprint) ? null : blueprint.profileVersion(), text(payload, "toolCallId"), action, status,
                 event.getCreatedAt(), started, finished, text(payload, "inputSummary"),
-                result, resources, links, failure);
+                result, resources, links, failure, planId, rounds.get(planId), text(payload, "replyId"), text(payload, "blockId"),
+                text(payload, "inputFingerprint"), payload.hasNonNull("reused") ? payload.get("reused").asBoolean() : null,
+                payload.hasNonNull("callCount") ? payload.get("callCount").asInt() : null,
+                text(payload, planCreated ? "title" : "actionLabel"),
+                payload.hasNonNull("target") ? mapper.convertValue(payload.get("target"), CapabilityTarget.class) : null);
     }
 
     /** 旧事件和空载荷可展示基础事实；不猜测任何原始字段含义。 */

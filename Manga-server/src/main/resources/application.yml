@@ -181,11 +181,13 @@ manga:
       max-media-bytes: 20971520
       # 生成请求的完整等待超时，独立于连接检测的短超时。
       http-timeout: 5m
-      # 单张 medium 质量预计费用，单位 USD；需运维核价。空配置禁用真实生成。
-      # 这不是 OpenAI 的扣费硬上限，实际账单以供应商为准。
+      # 各模型单张预计费用，单位 USD。实际账单以供应商为准。
       image-prices:
         # 用户核定的单张预计费用，单位 USD；不是供应商扣费硬上限。
         gpt-image-2: 1
+        # Agnes 1K 文生图按官方公开标价估算，活动价以账户账单为准。
+        "[agnes-image-2.5-flash]": ${MANGA_AGNES_IMAGE_1K_ESTIMATED_USD:0.010}
+        "[agnes-image-2.1-flash]": ${MANGA_AGNES_IMAGE_1K_ESTIMATED_USD:0.010}
       # 平台异步中继 HMAC 密钥，至少 32 字符；空时关闭，当前仅供 Fake 验证。
       callback-secret: ${MANGA_GENERATION_CALLBACK_SECRET:}
       # 签名回调允许的时间偏移，单位分钟；防止长期重放。
@@ -324,6 +326,30 @@ manga:
       queue-capacity: 128
       # 关闭时等待执行资源释放的最长时间。
       await-termination: 30s
+    # 评审失败后的用户修订确认；等待不占模型资源，也不消耗执行时限。
+    repair:
+      # 单份确认单最多等待多久，过期后取消任务但保留候选。
+      confirmation-ttl: ${MANGA_CREATIVE_REPAIR_CONFIRMATION_TTL:24h}
+    # 消息投影独立消费已提交事件，饱和时由持久化水位补偿。
+    projection:
+      # 投影线程上限，与 Journal 和模型执行线程隔离。
+      max-threads: ${MANGA_CREATIVE_PROJECTION_MAX_THREADS:2}
+      # 每个底层线程可排队的投影调度任务数。
+      queue-capacity: ${MANGA_CREATIVE_PROJECTION_QUEUE_CAPACITY:256}
+      # 每批领取的租约，数据库事务仍持有检查点行锁。
+      lease: ${MANGA_CREATIVE_PROJECTION_LEASE:30s}
+    # 同一 Harness 内的无进展保护，不跨恢复代次累计。
+    activity:
+      # 连续相同读取或错误且没有新事实的模型轮次上限。
+      max-no-progress-turns: ${MANGA_CREATIVE_MAX_NO_PROGRESS_TURNS:3}
+    # 创作事件缓冲与数据库写入资源，独立于通用业务和 Step 调度线程池。
+    journal:
+      # 每个 Step 的合并事件预取数量；不是全局任务数，也不是内存字节上限。
+      event-queue-capacity: ${MANGA_CREATIVE_JOURNAL_EVENT_QUEUE_CAPACITY:4096}
+      # 专用写入 Scheduler 最大线程数；增大缓冲不额外增加数据库并发。
+      max-threads: ${MANGA_CREATIVE_JOURNAL_MAX_THREADS:16}
+      # 每个底层线程最多排队的调度任务数，与事件预取队列分别计数。
+      scheduler-queue-capacity: ${MANGA_CREATIVE_JOURNAL_SCHEDULER_QUEUE_CAPACITY:2048}
     # 多 Agent 协作；预算在 Run 受理时冻结，Worker 只产出候选内容，业务写入仍须审批。
     collaboration:
       # 每个 Run 的步骤总数上限，包含根、Worker 和汇合节点。

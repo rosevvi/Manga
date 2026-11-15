@@ -11,6 +11,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 验证 Creative Run 和 Step 状态机的合法迁移与终态不可逆约束。
  */
 class CreativeStateMachineTests {
+    /** 评审失败只能暂停确认或结束；确认后进入子任务等待，不能直接跳过评审完成。 */
+    @Test
+    void repairConfirmationCannotSkipWorkerReview() {
+        assertThat(CreativeStepStateMachine.canTransition(CreativeStepStatus.WAITING_CHILDREN,
+                CreativeStepStatus.WAITING_REPAIR_CONFIRMATION)).isTrue();
+        assertThat(CreativeStepStateMachine.canTransition(CreativeStepStatus.WAITING_REPAIR_CONFIRMATION,
+                CreativeStepStatus.WAITING_CHILDREN)).isTrue();
+        assertThat(CreativeStepStateMachine.canTransition(CreativeStepStatus.WAITING_REPAIR_CONFIRMATION,
+                CreativeStepStatus.COMPLETED)).isFalse();
+        assertThat(CreativeStepStateMachine.canTransition(CreativeStepStatus.WAITING_REPAIR_CONFIRMATION,
+                CreativeStepStatus.CANCELLED)).isTrue();
+    }
 
     @Test
     void shouldAllowRunToWaitResumeAndComplete() {

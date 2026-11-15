@@ -1,7 +1,6 @@
 package com.manga.integration.ai;
 
 import com.manga.common.constant.AiProviderConstants;
-import com.manga.agent.generation.AgnesVideoModel;
 import com.manga.common.enums.AiProviderType;
 import com.manga.integration.http.ExternalHttpClientFactory;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +32,7 @@ public class AiProviderHttpClient {
     public ResponseEntity<String> probe(AiProviderType providerType, String baseUrl, String apiKey,
             AiProviderProxySettings proxySettings) {
         if (providerType == AiProviderType.AGNES) {
-            return externalHttpClientFactory.createBoundedWebClient(AgnesVideoModel.BASE_URL,
+            return externalHttpClientFactory.createBoundedWebClient(AgnesEndpoint.BASE_URL,
                             proxySettings == null ? null : proxySettings.toExternalProxySettings(),
                             AGNES_PROBE_TIMEOUT, AGNES_PROBE_RESPONSE_BYTES)
                     .get().uri("/v1/models").headers(headers -> headers.setBearerAuth(apiKey))

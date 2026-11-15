@@ -1,5 +1,7 @@
 package com.manga.agent.execution;
 
+import java.util.Set;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.manga.agent.collaboration.CreativeDelegationService;
 import com.manga.agent.collaboration.CreativeGraphService;
@@ -14,6 +16,7 @@ import com.manga.agent.capability.AgentRuntimeContext;
 import com.manga.agent.changeset.ChangeSetApprovalService;
 import com.manga.agent.changeset.ChangeSetConstants;
 import com.manga.agent.config.CreativeExecutionProperties;
+import com.manga.agent.config.CreativeJournalProperties;
 import com.manga.agent.domain.CreativeErrorCode;
 import com.manga.agent.domain.CreativeRuntimeMessages;
 import com.manga.agent.domain.CreativeStepInput;
@@ -22,6 +25,9 @@ import com.manga.agent.domain.CreativeToolStatus;
 import com.manga.agent.harness.AgentRuntimeException;
 import com.manga.agent.harness.MangaAgentInvoker;
 import com.manga.common.constant.AsyncConstants;
+import com.manga.agent.event.CreativeTextChannel;
+import com.manga.agent.event.CreativeProgressMetrics;
+import com.manga.agent.capability.CapabilityName;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.AgentResultEvent;
 import io.agentscope.core.event.ExceedMaxItersEvent;
@@ -48,6 +54,8 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
     private final MangaAgentInvoker agentInvoker;
     private final CreativeStepLifecycleService lifecycleService;
     private final CreativeExecutionProperties executionProperties;
+    private final CreativeJournalProperties journalProperties;
+    private final CreativeProgressMetrics metrics;
     private final TaskScheduler taskScheduler;
     private final ObjectMapper objectMapper;
     private final Scheduler journalScheduler;
@@ -64,6 +72,8 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
             MangaAgentInvoker agentInvoker,
             CreativeStepLifecycleService lifecycleService,
             CreativeExecutionProperties executionProperties,
+            CreativeJournalProperties journalProperties,
+            CreativeProgressMetrics metrics,
             @Qualifier(AsyncConstants.MANGA_LEASE_SCHEDULER) TaskScheduler taskScheduler,
             @Qualifier(AsyncConstants.MANGA_JOURNAL_SCHEDULER) Scheduler journalScheduler,
             @Qualifier(AsyncConstants.MANGA_STREAM_TIMER) Scheduler streamTimer,
@@ -77,6 +87,8 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
         this.agentInvoker = agentInvoker;
         this.lifecycleService = lifecycleService;
         this.executionProperties = executionProperties;
+        this.journalProperties = journalProperties;
+        this.metrics = metrics;
         this.taskScheduler = taskScheduler;
         this.objectMapper = objectMapper;
         this.approvals = approvals;
@@ -120,14 +132,20 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
             if (Objects.nonNull(input.target())) instruction += ChangeSetConstants.TARGET_TEMPLATE
                     .formatted(input.target().resourceType(), input.target().resourceId());
             agentInvoker.invokeUntil(blueprint, context, graph.instruction(step, approvals.instruction(step, instruction)),
-                            event -> event instanceof ToolResultEndEvent && (approvals.hasDraft(step.stepId())
-                                    || delegation.hasDraft(step.runId(), step.stepId()) || Objects.nonNull(results.submitted(step.stepId()))))
+                            event -> event instanceof ToolResultEndEvent tool && checkpointSubmitted(step, tool.getToolCallName()))
                     .takeUntilOther(heartbeat.lossSignal())
                     .transform(events -> CreativeAgentEventBuffer.coalesce(events, streamTimer))
                     // delayError 保证失败前已接收的文本和工具按序落库。
-                    .publishOn(journalScheduler, true, CreativeAgentEventBuffer.JOURNAL_PREFETCH)
+                    .publishOn(journalScheduler, true, journalProperties.eventQueueCapacity())
                     .doOnNext(entry -> {
-                        if (Objects.nonNull(entry.delta())) flushText(step, new StringBuilder(entry.delta()), content);
+                        metrics.queued(System.nanoTime() - entry.queuedAtNanos());
+                        if (Objects.nonNull(entry.delta())) {
+                            if (!lifecycleService.appendText(step, entry.delta(), entry.replyId(), entry.blockId(), entry.channel())) {
+                                throw new AgentRuntimeException(CreativeErrorCode.OWNER_LEASE_LOST,
+                                        CreativeRuntimeMessages.AGENT_STEP_OWNER_LEASE_LOST);
+                            }
+                            if (entry.channel() == CreativeTextChannel.CONTENT) { content.append(entry.delta()); }
+                        }
                         else commitEvent(step, entry.event(), content);
                     })
                     .blockLast();
@@ -149,14 +167,16 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
         lifecycleService.complete(step, write(new AgentStepResult(content.toString())));
     }
 
-    /** 一次追加合并文本，围栏拒绝时立即停止当前执行器。 */
-    private void flushText(ClaimedCreativeStep step, StringBuilder pending, StringBuilder content) {
-        if (pending.isEmpty()) return;
-        String text = pending.toString();
-        if (!lifecycleService.appendDelta(step, text)) throw new AgentRuntimeException(
-                CreativeErrorCode.OWNER_LEASE_LOST, CreativeRuntimeMessages.AGENT_STEP_OWNER_LEASE_LOST);
-        content.append(text);
-        pending.setLength(0);
+    /** 只有会提交检查点的工具才查数据库，读取工具结束不再触发三次额外查询。 */
+    private boolean checkpointSubmitted(ClaimedCreativeStep step, String toolName) {
+        if (CapabilityName.SUBMIT_CREATIVE_STEP_RESULT.code().equals(toolName)) {
+            return Objects.nonNull(results.submitted(step.stepId()));
+        }
+        if (CapabilityName.DELEGATE_CREATIVE_PLAN.code().equals(toolName)) {
+            return delegation.hasDraft(step.runId(), step.stepId());
+        }
+        return Set.of(CapabilityName.PROPOSE_SCRIPT_CHANGE.code(), CapabilityName.PROPOSE_STORYBOARD_CHANGE.code(),
+                CapabilityName.PROPOSE_IMAGE_GENERATION.code()).contains(toolName) && approvals.hasDraft(step.stepId());
     }
 
     /** 恢复 Blueprint，并复核 Step 独立保存的指纹列。 */

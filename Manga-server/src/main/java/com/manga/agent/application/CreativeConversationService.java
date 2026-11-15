@@ -18,6 +18,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
+import com.manga.repository.CreativeMessageProjectionRepository;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
@@ -31,6 +33,8 @@ public class CreativeConversationService {
     private final CreativeMessageRepository messages;
     private final CreativeRunRepository runs;
     private final CreativeMessageProjector projector;
+    private final CreativeProjectionDispatcher projectionDispatcher;
+    private final CreativeMessageProjectionRepository projectionCheckpoints;
     private final CreativeMemoryProperties properties;
 
     /** 按创建主键倒序返回用户会话；分页不因会话更新时间变化而跳过记录。 */
@@ -40,12 +44,12 @@ public class CreativeConversationService {
                 .stream().map(this::view).toList();
     }
 
-    /** 返回一致的已投影消息和活动运行 cursor；SSE 只负责提示继续读取。 */
-    @Transactional
+    /** 返回已投影消息与恢复水位，查询线程不等待消息投影。 */
+    @Transactional(readOnly = true)
     public CreativeConversationHistory history(long userId, String conversationId, Long beforeId) {
         CreativeConversation conversation = requireOwned(userId, conversationId);
         for (String runId : runs.findUnprojected(conversationId, properties.projectionBatchSize())) {
-            while (projector.project(runId) > 0) { /* 从事务水位恢复遗漏投影。 */ }
+            projectionDispatcher.wake(runId);
         }
         List<CreativeMessage> page = new ArrayList<>(messages.history(
                 conversationId, beforeId, properties.historyPageSize() + 1));
@@ -57,18 +61,26 @@ public class CreativeConversationService {
                 .map(run -> new CreativeConversationHistory.ActiveRun(
                         run.getRunId(), run.getStatus(), Objects.requireNonNullElse(run.getProjectedThroughSequence(), 0L)))
                 .orElse(null);
-        return new CreativeConversationHistory(view(conversation), page.stream().map(this::view).toList(), nextBeforeId, active);
+        return new CreativeConversationHistory(view(conversation), page.stream().map(this::view).toList(), nextBeforeId, active,
+                runs.projectionWatermarks(conversationId, properties.historyPageSize()));
     }
 
     /** 在无活动 Run 时事务内重建全部消息并清空旧摘要水位，后续上下文会重新压缩。 */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void rebuild(long userId, String conversationId) {
+        requireOwned(userId, conversationId);
+        if (runs.findActiveConversation(conversationId).isPresent()) {
+            throw new BusinessException(CreativeRuntimeResponseCode.ACTIVE_RUN_CONFLICT, HttpStatus.CONFLICT);
+        }
+        var runIds = runs.findConversationRunIds(conversationId);
+        // 与异步投影保持检查点在前的锁顺序，避免消息外键与会话锁构成反向等待。
+        for (String runId : runIds) { projectionCheckpoints.lock(runId, SystemActor.CREATIVE_RUNTIME.code()); }
         CreativeConversation conversation = conversations.lockOwned(conversationId, userId)
                 .orElseThrow(this::unavailable);
         if (runs.findActiveConversation(conversationId).isPresent()) {
             throw new BusinessException(CreativeRuntimeResponseCode.ACTIVE_RUN_CONFLICT, HttpStatus.CONFLICT);
         }
-        for (String runId : runs.findConversationRunIds(conversationId)) { projector.rebuild(runId); }
+        for (String runId : runIds) { projector.rebuild(runId); }
         conversation.setMemorySummary("");
         conversation.setSummarizedThroughMessageId(0L);
         conversation.setUpdatedBy(SystemActor.CREATIVE_RUNTIME.code());
@@ -96,6 +108,7 @@ public class CreativeConversationService {
     private CreativeMessageView view(CreativeMessage message) {
         return new CreativeMessageView(message.getId(), message.getProjectionKey(), message.getRunId(),
                 message.getRole(), message.getStatus(), message.getContent(),
-                message.getToolName(), message.getToolStatus(), message.getCreatedAt());
+                message.getToolName(), message.getToolStatus(), message.getCreatedAt(),
+                message.getFirstSequence(), message.getLastSequence());
     }
 }

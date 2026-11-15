@@ -23,6 +23,9 @@ public enum CreativeEventType {
     STEP_FAILED,
     /** 模型输出一段增量文本。 */
     CONTENT_DELTA,
+    /** 供应商实际返回的分析文本增量，不注入主会话记忆。 */ REASONING_DELTA,
+    /** 评审未通过，等待用户确认是否修订。 */ REPAIR_CONFIRMATION_REQUIRED,
+    /** 修订确认已决定、冲突或到期。 */ REPAIR_CONFIRMATION_DECIDED,
     /** 工具调用开始。 */
     TOOL_STARTED,
     /** 工具调用完成。 */

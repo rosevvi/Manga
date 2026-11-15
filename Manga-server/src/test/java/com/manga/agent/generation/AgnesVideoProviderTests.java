@@ -6,6 +6,7 @@ import com.manga.common.enums.AiProviderType;
 import com.manga.common.enums.AiProxyType;
 import com.manga.dto.ResolvedAiProviderConfig;
 import com.manga.entity.GenerationJob;
+import com.manga.integration.ai.AgnesEndpoint;
 import com.manga.integration.http.ExternalHttpClientFactory;
 import jakarta.validation.Validation;
 import org.junit.jupiter.api.Test;
@@ -36,11 +37,11 @@ class AgnesVideoProviderTests {
     void submitsAndPollsByVideoIdAndFrozenModel() {
         var quotes = mock(VideoGenerationQuoteService.class);
         var clients = mock(ExternalHttpClientFactory.class);
-        var config = new ResolvedAiProviderConfig(CONFIG_ID, AiProviderType.AGNES, AgnesVideoModel.BASE_URL,
+        var config = new ResolvedAiProviderConfig(CONFIG_ID, AiProviderType.AGNES, AgnesEndpoint.BASE_URL,
                 AgnesVideoModel.FLASH.id(), "test-only", AiProxyType.NONE, null, null, null, null);
         when(quotes.resolve(CONFIG_ID, USER_ID)).thenReturn(config);
         var requests = new ArrayList<String>();
-        var client = WebClient.builder().baseUrl(AgnesVideoModel.BASE_URL).exchangeFunction(request -> {
+        var client = WebClient.builder().baseUrl(AgnesEndpoint.BASE_URL).exchangeFunction(request -> {
             assertThat(request.headers().getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer test-only");
             requests.add(request.method() + " " + request.url());
             String body = requests.size() == 1
@@ -53,7 +54,7 @@ class AgnesVideoProviderTests {
             return Mono.just(ClientResponse.create(HttpStatus.OK).header(HttpHeaders.CONTENT_TYPE, "application/json")
                     .body(body).build());
         }).build();
-        when(clients.createBoundedWebClient(eq(AgnesVideoModel.BASE_URL), any(), any(), anyInt())).thenReturn(client);
+        when(clients.createBoundedWebClient(eq(AgnesEndpoint.BASE_URL), any(), any(), anyInt())).thenReturn(client);
         try (var validatorFactory = Validation.buildDefaultValidatorFactory()) {
             var codec = new ChangeSetCodec(new ObjectMapper(), validatorFactory.getValidator());
             var snapshot = GenerationConfigSnapshot.from(config);

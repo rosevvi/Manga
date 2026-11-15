@@ -25,13 +25,19 @@ public class CapabilityToolkitFactory {
     private final CapabilityRegistry capabilityRegistry;
     private final ObjectMapper objectMapper;
     private final ToolActivitySummaries summaries;
+    private final ToolExecutionSupport support;
 
     /** 注册 Blueprint 明确列出的全部能力，并复核最终工具集合完全相等。 */
     public Toolkit create(AgentBlueprint blueprint) {
+        return create(blueprint, new InvocationActivity(InvocationActivity.DEFAULT_MAX_NO_PROGRESS_TURNS));
+    }
+
+    /** 每个 Harness 创建独立 Tool 对象，缓存与进展不随 Kernel 复用而泄漏。 */
+    public Toolkit create(AgentBlueprint blueprint, InvocationActivity activity) {
         Toolkit toolkit = new Toolkit();
         for (CapabilityManifest manifest : blueprint.capabilities()) {
             toolkit.registerAgentTool(new MangaCapabilityTool(
-                    capabilityRegistry.require(manifest.name()), objectMapper, summaries));
+                    capabilityRegistry.require(manifest.name()), objectMapper, summaries, support, activity));
         }
         Set<String> expected = blueprint.capabilities().stream()
                 .map(CapabilityManifest::name)

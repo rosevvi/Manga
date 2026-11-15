@@ -23,7 +23,7 @@ class CreativeContractEnumTests {
     @Test
     void shouldKeepStepStatusCodesStable() {
         assertThat(codes(CreativeStepStatus.values())).containsExactly(
-                "PENDING", "READY", "RUNNING", "WAITING_APPROVAL", "WAITING_JOB", "WAITING_CHILDREN",
+                "PENDING", "READY", "RUNNING", "WAITING_APPROVAL", "WAITING_REPAIR_CONFIRMATION", "WAITING_JOB", "WAITING_CHILDREN",
                 "WAITING_RETRY", "COMPLETED", "FAILED", "CANCEL_REQUESTED", "CANCELLED", "SKIPPED");
         for (CreativeStepStatus status : CreativeStepStatus.values()) {
             assertThat(CreativeStepStatus.fromCode(status.code())).isSameAs(status);
@@ -35,6 +35,7 @@ class CreativeContractEnumTests {
         assertThat(codes(AgentPermissionPolicy.values())).containsExactly(
                 "READ_ONLY", "PROPOSE_CHANGES", "CONFIRM_SIDE_EFFECTS", "AUTOMATION");
         assertThat(codes(CreativeErrorCode.values())).containsExactly(
+                "AGENT_NO_PROGRESS", "REPAIR_BUDGET_EXHAUSTED", "REPAIR_CONTEXT_CONFLICT",
                 "INVALID_REQUEST", "PERMISSION_DENIED", "DUPLICATE_REQUEST", "ACTIVE_RUN_CONFLICT",
                 "RUNTIME_UNAVAILABLE", "RUN_CONFIG_UNAVAILABLE", "STATE_STORE_UNAVAILABLE",
                 "STATE_SESSION_BUSY", "KERNEL_CAPACITY_EXHAUSTED", "MODEL_INVOCATION_FAILED",

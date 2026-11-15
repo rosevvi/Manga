@@ -1,5 +1,9 @@
 package com.manga.agent.application;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.config.CreativeMemoryProperties;
@@ -19,6 +23,12 @@ import com.manga.entity.CreativeRun;
 import com.manga.repository.CreativeEventRepository;
 import com.manga.repository.CreativeMessageRepository;
 import com.manga.repository.CreativeRunRepository;
+import com.manga.repository.CreativeMessageProjectionRepository;
+import com.manga.agent.config.CreativeProjectionProperties;
+import com.manga.agent.event.CreativeProgressMetrics;
+import com.manga.agent.api.CreativeRuntimeResponseCode;
+import com.manga.common.exception.BusinessException;
+import org.springframework.http.HttpStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,24 +49,39 @@ public class CreativeMessageProjector {
     private final CreativeMessageRepository messageRepository;
     private final CreativeMemoryProperties properties;
     private final ObjectMapper objectMapper;
+    private final CreativeMessageProjectionRepository checkpoints;
+    private final CreativeProjectionProperties projectionProperties;
+    private final CreativeProgressMetrics metrics;
+    private final String owner = SystemActor.CREATIVE_RUNTIME.code() + ":" + UUID.randomUUID();
 
-    /** 加 Run 行锁后按序推进一批事件；重复调用不会重复追加正文。 */
+    /** 只锁独立投影检查点；消息与水位同事务，Run 行锁只在最终镜像更新时短暂取得。 */
     @Transactional
     public int project(String runId) {
-        CreativeRun run = runRepository.lockByRunId(runId);
-        if (Objects.isNull(run) || Objects.isNull(run.getConversationId())) { return 0; }
-        return applyBatch(run);
+        var checkpoint = checkpoints.lock(runId, owner);
+        if (Objects.isNull(checkpoint) || !checkpoints.claim(runId, owner, LocalDateTime.now(),
+                LocalDateTime.now().plus(projectionProperties.lease()))) { return 0; }
+        CreativeRun run = runRepository.findByRunId(runId).orElse(null);
+        if (Objects.isNull(run)) { return 0; }
+        run.setProjectedThroughSequence(checkpoint.getProjectedThroughSequence());
+        int count = applyBatch(run);
+        checkpoints.advance(runId, run.getProjectedThroughSequence(), owner);
+        return count;
     }
 
     /** 在同一事务中清除该 Run 的派生消息，并从第一条事件完整重建。 */
     @Transactional
     public void rebuild(String runId) {
-        CreativeRun run = runRepository.lockByRunId(runId);
+        checkpoints.lock(runId, owner);
+        if (!checkpoints.claim(runId, owner, LocalDateTime.now(), LocalDateTime.now().plus(projectionProperties.lease()))) {
+            throw new BusinessException(CreativeRuntimeResponseCode.PROJECTION_BUSY, HttpStatus.CONFLICT);
+        }
+        CreativeRun run = runRepository.findByRunId(runId).orElse(null);
         if (Objects.isNull(run) || Objects.isNull(run.getConversationId())) { return; }
         messageRepository.deleteByRun(runId);
         run.setProjectedThroughSequence(0L);
         runRepository.updateProjectionCursor(runId, 0L, SystemActor.CREATIVE_RUNTIME.code());
         while (applyBatch(run) > 0) { /* 每批都推进水位，直到已提交日志末尾。 */ }
+        checkpoints.advance(runId, run.getProjectedThroughSequence(), owner);
     }
 
     /** 校验序号连续性并将一批可见消息变化与投影水位原子保存。 */
@@ -68,12 +93,14 @@ public class CreativeMessageProjector {
             if (event.getSequenceNo() != cursor + 1L) {
                 throw new IllegalStateException(CreativeMemoryConstants.PROJECTION_GAP);
             }
-            apply(run, event);
+            if (Objects.nonNull(run.getConversationId())) { apply(run, event); }
             cursor = event.getSequenceNo();
         }
         if (!events.isEmpty()) {
             runRepository.updateProjectionCursor(run.getRunId(), cursor, SystemActor.CREATIVE_RUNTIME.code());
             run.setProjectedThroughSequence(cursor);
+            metrics.projected(run.getNextSequence() - 1 - cursor,
+                    Duration.between(events.getLast().getCreatedAt(), LocalDateTime.now()));
         }
         return events.size();
     }

@@ -7,6 +7,7 @@ export const AGENT_PROFILE_LABEL = Object.freeze({
 export const CREATIVE_STEP_STATUS_LABEL = Object.freeze({
   PENDING: '等待依赖', READY: '待执行', RUNNING: '执行中', WAITING_CHILDREN: '等待协作汇合',
   WAITING_APPROVAL: '等待审批', WAITING_JOB: '等待生成作业', WAITING_RETRY: '等待重试',
+  WAITING_REPAIR_CONFIRMATION: '等待确认修订',
   COMPLETED: '已完成', FAILED: '失败', CANCEL_REQUESTED: '正在停止', CANCELLED: '已取消', SKIPPED: '已跳过',
 })
 /** 已进入终态的步骤无需再提供停止按钮。 */

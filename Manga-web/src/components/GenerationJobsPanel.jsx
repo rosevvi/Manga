@@ -2,49 +2,68 @@ import { useEffect, useRef, useState } from 'react'
 import { acknowledgeUnknownJob, cancelGenerationJob, listGenerationJobs, previewArtifactAdoption, adoptGeneratedArtifact, getGeneratedMediaDownload } from '../api/generationApi'
 import { resolveMediaUrl } from '../api/mediaUrl'
 import MediaImage from './MediaImage'
+import TaskImageResultActions from './TaskImageResultActions'
 import { CREATIVE_PROJECT_CHANGED, notifyCreativeProjectChanged } from './creativeProjectEvents'
-import { REVISION_CONFLICT_CODE } from '../constants/changeSet'
+import { CHANGE_SET_KIND, REVISION_CONFLICT_CODE } from '../constants/changeSet'
 import { GENERATION_PAGE_SIZE, GENERATION_POLL_MS, GENERATION_STATUS_LABEL, GENERATION_TERMINAL } from '../constants/generation'
 import './generation.css'
 
 /** 所有卡片从持久化快照恢复；分页期间也轮询正在查看的页。 */
-export default function GenerationJobsPanel({ accessToken, projectId, runId, conversationId, shotId, mediaType, compact = false }) {
+export default function GenerationJobsPanel({ accessToken, projectId, runId, conversationId, shotId, mediaType, compact = false,
+  wakeSequence = 0, waitingForJob = false, onImageRegenerate, canRegenerate = false, onAdopted }) {
   const [jobs, setJobs] = useState([])
   const [cursors, setCursors] = useState([null])
   const [error, setError] = useState('')
-  const [refreshKey, setRefreshKey] = useState(0)
   const scope = useRef(0)
+  const refreshRef = useRef(null)
+  const waiting = useRef(waitingForJob)
+  waiting.current = waitingForJob
   const cursor = cursors.at(-1)
   useEffect(() => { setCursors([null]); setJobs([]) }, [accessToken, projectId, runId, conversationId, shotId, mediaType])
   useEffect(() => {
     const expected = ++scope.current
     let busy = false
+    let again = false
     let timer
     setJobs([]); setError('')
     if (!accessToken || !projectId) return undefined
     const update = async () => {
-      if (busy) return
+      if (scope.current !== expected) return
+      if (busy) { again = true; return }
       window.clearTimeout(timer)
       busy = true
       try {
         const result = await listGenerationJobs(accessToken, { projectId, runId, conversationId, beforeId: cursor, shotId, mediaType })
         if (scope.current === expected) {
           setJobs(result); setError('')
-          if (result.some((job) => !GENERATION_TERMINAL.has(job.status))) timer = window.setTimeout(update, GENERATION_POLL_MS)
+          if ((waiting.current && !result.length) || result.some((job) => !GENERATION_TERMINAL.has(job.status))) {
+            timer = window.setTimeout(update, GENERATION_POLL_MS)
+          }
         }
       } catch (failure) {
         if (scope.current === expected) { setError(failure.message); timer = window.setTimeout(update, GENERATION_POLL_MS) }
       }
-      finally { busy = false }
+      finally {
+        busy = false
+        if (again) { again = false; void update() }
+      }
     }
+    refreshRef.current = update
     update()
     const changed = (event) => { if (String(event.detail?.projectId) === String(projectId)) void update() }
     window.addEventListener(CREATIVE_PROJECT_CHANGED, changed)
-    return () => { scope.current += 1; window.clearTimeout(timer); window.removeEventListener(CREATIVE_PROJECT_CHANGED, changed) }
-  }, [accessToken, projectId, runId, conversationId, cursor, refreshKey, shotId, mediaType])
+    return () => {
+      scope.current += 1; refreshRef.current = null
+      window.clearTimeout(timer); window.removeEventListener(CREATIVE_PROJECT_CHANGED, changed)
+    }
+  }, [accessToken, projectId, runId, conversationId, cursor, shotId, mediaType])
+  useEffect(() => { if (wakeSequence || waitingForJob) void refreshRef.current?.() }, [wakeSequence, waitingForJob])
+  if (runId && !jobs.length && !error && cursors.length === 1) return null
   return <section className="generation-jobs" aria-label="媒体生成作业">
     {!compact && (jobs.length > 0 || error || cursors.length > 1) && <h3>媒体生成作业</h3>}
-    {(compact ? jobs.filter((job) => job.artifactUrl).slice(0, 3) : jobs).map((job) => <GenerationCard key={job.jobId} job={job} accessToken={accessToken} onChanged={() => setRefreshKey((value) => value + 1)} />)}
+    {(compact ? jobs.filter((job) => job.artifactUrl).slice(0, 3) : jobs).map((job) => <GenerationCard key={job.jobId} job={job}
+      accessToken={accessToken} onChanged={() => refreshRef.current?.()} onAdopted={onAdopted}
+      onImageRegenerate={onImageRegenerate} canRegenerate={canRegenerate} />)}
     {(!jobs.length || compact && !jobs.some((job) => job.artifactUrl)) && <p className="workbench-muted">暂无生成产物。选择镜头和模型，创建媒体提案后在任务中心批准。</p>}
     {(cursors.length > 1 || jobs.length === GENERATION_PAGE_SIZE) && <div className="generation-actions">
       {cursors.length > 1 && <button className="workspace-secondary" type="button" onClick={() => setCursors((value) => value.slice(0, -1))}>较新作业</button>}
@@ -55,7 +74,7 @@ export default function GenerationJobsPanel({ accessToken, projectId, runId, con
 }
 
 /** 不提供未知提交的重试按钮，核对操作需要用户明确声明。 */
-function GenerationCard({ job, accessToken, onChanged }) {
+function GenerationCard({ job, accessToken, onChanged, onImageRegenerate, canRegenerate, onAdopted }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [checked, setChecked] = useState(false)
@@ -92,7 +111,8 @@ function GenerationCard({ job, accessToken, onChanged }) {
       if (mounted.current) { setError(failure.message); if (failure.code === REVISION_CONFLICT_CODE) setAdoptionConflict(true) }
     } finally { if (mounted.current) setBusy(false) }
   }
-  const video = job.provider === 'AGNES'
+  const video = job.mediaKind === CHANGE_SET_KIND.VIDEO_GENERATION
+  const inlineImage = !video && onImageRegenerate && (job.artifactUrl || job.status === 'FAILED')
   const download = () => act(async () => {
     const result = await getGeneratedMediaDownload(accessToken, job.jobId)
     const url = resolveMediaUrl(result.url)
@@ -109,12 +129,14 @@ function GenerationCard({ job, accessToken, onChanged }) {
     {job.errorMessage && <p role="status">{job.errorMessage}</p>}
     {job.reconciliationNote && <p>核对说明：{job.reconciliationNote}</p>}
     {video && job.artifactUrl && <video controls preload="metadata" aria-label="镜头视频" src={resolveMediaUrl(job.artifactUrl)} />}
-    {job.artifactUrl && <a href={resolveMediaUrl(job.artifactUrl) || undefined} target="_blank" rel="noreferrer">
+    {inlineImage && <TaskImageResultActions accessToken={accessToken} job={job} onRegenerate={onImageRegenerate}
+      canRegenerate={canRegenerate} onAdopted={() => { onChanged(); onAdopted?.() }} />}
+    {job.artifactUrl && !inlineImage && <a href={resolveMediaUrl(job.artifactUrl) || undefined} target="_blank" rel="noreferrer">
       {!video && <MediaImage src={job.artifactUrl} alt={`镜头 ${job.shotId} 的生成产物`} showErrorText />}
       <span>查看平台产物 #{job.artifactId}</span>
     </a>}
     {video && job.artifactUrl && <button type="button" className="workspace-secondary" disabled={busy} onClick={download}>下载视频</button>}
-    {job.artifactUrl && !video && <button className="workspace-secondary" type="button" disabled={busy} onClick={previewAdoption}>用作镜头图片</button>}
+    {job.artifactUrl && !video && !inlineImage && <button className="workspace-secondary" type="button" disabled={busy} onClick={previewAdoption}>用作镜头图片</button>}
     {job.adoptedAt && <small>最近采用：{job.adoptedAt.replace('T', ' ')} · 用户 #{job.adoptedBy}</small>}
     {adoption && <section className="generation-adoption" aria-label="确认采用图片">
       <strong>替换镜头「{adoption.target.title}」的图片</strong>

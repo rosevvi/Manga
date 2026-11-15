@@ -215,28 +215,43 @@ function AiProviderSettings({ accessToken, isGuest }) {
     const previousProvider = providerLookup.get(form.providerType)
     const nextProvider = providerLookup.get(providerType)
     const canApplyDefaultUrl = !form.baseUrl || form.baseUrl === previousProvider?.baseUrl
-    const canApplyDefaultModel = !form.defaultModel || form.defaultModel === previousProvider?.model
+    const canApplyDefaultModel = !form.defaultModel || form.defaultModel === suggestedModel(previousProvider, form.modelType)
+      || previousProvider?.modelsByType || nextProvider?.modelsByType
+    const modelType = nextProvider?.capabilities.includes(form.modelType) ? form.modelType : nextProvider?.capabilities[0] ?? 'TEXT'
     setForm((current) => ({
       ...current,
       providerType,
-      modelType: nextProvider?.capabilities.includes(current.modelType) ? current.modelType : nextProvider?.capabilities[0] ?? 'TEXT',
+      modelType,
       baseUrl: canApplyDefaultUrl || providerType === 'AGNES' ? nextProvider?.baseUrl ?? '' : current.baseUrl,
-      defaultModel: canApplyDefaultModel || providerType === 'AGNES' ? nextProvider?.model ?? '' : current.defaultModel,
+      defaultModel: providerType !== current.providerType && canApplyDefaultModel
+        ? suggestedModel(nextProvider, modelType) : current.defaultModel,
       apiKey: providerType === current.providerType ? current.apiKey : '',
     }))
   }
 
   const applyProviderPreset = (provider) => {
     keyGeneration.current += 1; setRevealedKey(''); setShowApiKey(false); setRevealingKey(false)
-    setForm((current) => ({
-      ...current,
-      providerType: provider.value,
-      modelType: provider.capabilities.includes(current.modelType) ? current.modelType : provider.capabilities[0] ?? 'TEXT',
-      apiKey: provider.value === current.providerType ? current.apiKey : '',
-      name: current.name || provider.label,
-      baseUrl: provider.baseUrl || current.baseUrl,
-      defaultModel: provider.model || current.defaultModel,
-    }))
+    setForm((current) => {
+      const modelType = provider.capabilities.includes(current.modelType) ? current.modelType : provider.capabilities[0] ?? 'TEXT'
+      return {
+        ...current,
+        providerType: provider.value,
+        modelType,
+        apiKey: provider.value === current.providerType ? current.apiKey : '',
+        name: current.name || provider.label,
+        baseUrl: provider.baseUrl || current.baseUrl,
+        defaultModel: suggestedModel(provider, modelType) || current.defaultModel,
+      }
+    })
+  }
+
+  const selectModelType = (modelType) => {
+    setForm((current) => {
+      if (modelType === current.modelType) return current
+      const provider = providerLookup.get(current.providerType)
+      const defaultModel = provider?.modelsByType ? suggestedModel(provider, modelType) : current.defaultModel
+      return { ...current, modelType, defaultModel, defaultConfig: false }
+    })
   }
 
   const submitConfig = async (event) => {
@@ -332,6 +347,7 @@ function AiProviderSettings({ accessToken, isGuest }) {
       const result = await testAiProviderDraftConnection(accessToken, {
         configId: editingConfig?.id,
         providerType: form.providerType,
+        modelType: form.modelType,
         baseUrl: form.baseUrl,
         defaultModel: form.defaultModel,
         apiKey: form.apiKey,
@@ -507,14 +523,14 @@ function AiProviderSettings({ accessToken, isGuest }) {
                     value: type,
                     label: MODEL_TYPE_LABEL[type],
                   }))}
-                  onChange={(modelType) => setForm({ ...form, modelType, defaultConfig: false })}
+                  onChange={selectModelType}
                 />
               </div>
               <label className="workspace-field">
                 <span>{translate('aiConfig.field.model')}</span>
                 <input maxLength={AI_CONFIG_LIMITS.model} value={form.defaultModel}
                   onChange={(event) => updateForm('defaultModel', event.target.value)}
-                  placeholder={providerLookup.get(form.providerType)?.model || translate('aiConfig.modelPlaceholder')} />
+                  placeholder={suggestedModel(providerLookup.get(form.providerType), form.modelType) || translate('aiConfig.modelPlaceholder')} />
               </label>
               <label className="workspace-field">
                 <span>{translate('aiConfig.field.apiKey')}</span>
@@ -621,15 +637,22 @@ function AiProviderSettings({ accessToken, isGuest }) {
 function AiSelectMenu(props) { return <WorkspaceSelect {...props} /> }
 
 function normalizeProviderOption(provider) {
+  const value = provider.value ?? provider.providerType
   return {
-    value: provider.value ?? provider.providerType,
+    value,
     label: provider.label ?? provider.providerType,
     baseUrl: provider.baseUrl ?? provider.defaultBaseUrl ?? '',
     model: provider.model ?? provider.recommendedModel ?? '',
+    modelsByType: AI_PROVIDER_OPTIONS.find((option) => option.value === value)?.modelsByType,
     apiKeyRequired: Boolean(provider.apiKeyRequired),
     capabilities: provider.capabilities ?? [],
     description: provider.description ?? '',
   }
+}
+
+/** 提供当前类型的可编辑预填值。 */
+function suggestedModel(provider, modelType) {
+  return provider?.modelsByType?.[modelType] ?? provider?.model ?? ''
 }
 
 function configPayload(form) {

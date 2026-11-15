@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @Slf4j
 public class CreativeMemoryMaintenance {
     private final CreativeRunRepository runs;
-    private final CreativeMessageProjector projector;
+    private final CreativeProjectionDispatcher projector;
     private final AgentStateSessionRepository sessions;
     private final AgentStateSessionService sessionService;
     private final CreativeMemoryProperties properties;
@@ -27,7 +27,7 @@ public class CreativeMemoryMaintenance {
     @Scheduled(fixedDelayString = CreativeSchedulingConstants.MEMORY_MAINTENANCE_INTERVAL)
     public void maintain() {
         for (String runId : runs.findUnprojected(null, properties.projectionBatchSize())) {
-            try { projector.project(runId); }
+            try { projector.wake(runId); }
             catch (RuntimeException exception) { log.warn("Message projection retry failed runId={}", runId, exception); }
         }
         LocalDateTime before = LocalDateTime.now().minus(properties.stateRetention());

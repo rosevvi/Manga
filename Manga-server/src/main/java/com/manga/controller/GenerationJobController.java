@@ -79,7 +79,7 @@ public class GenerationJobController {
     public record AdoptionRequest(/** 预览响应中的项目版本。 */ @Positive long expectedProjectRevision) { }
     /** 图片选项只返回最小摘要，不复用含密钥的配置管理响应。 */
     @GetMapping("/options")
-    @Operation(summary = "查询可选图片模型配置", description = "返回当前用户配置、固定模型和预计费用；费用为空表示尚未核价、不能生成。")
+    @Operation(summary = "查询可选图片模型配置", description = "返回当前用户的图片配置、模型、可用尺寸和预计费用；费用为空表示尚未核价。")
     public ApiResponse<List<ImageGenerationOption>> options() {
         long userId = SecurityUtils.requireCurrentUserId(); List<ImageGenerationOption> result = quotes.options(userId);
         log.debug("Generation options userId={} count={}", userId, result.size());

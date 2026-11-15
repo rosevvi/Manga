@@ -3,8 +3,9 @@ package com.manga.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.common.constant.AiSecretConstants;
+import com.manga.agent.generation.AgnesImageModel;
 import com.manga.agent.generation.AgnesVideoModel;
-import com.manga.agent.generation.VideoGenerationQuoteService;
+import com.manga.integration.ai.AgnesEndpoint;
 import com.manga.common.constant.AiProviderConstants;
 import com.manga.common.enums.AiProviderConfigResponseCode;
 import com.manga.common.enums.AiProviderType;
@@ -98,7 +99,7 @@ public class AiProviderConfigService {
         String name = request.name().trim();
         requireUniqueName(ownerUserId, name, null);
         AiModelType modelType = modelType(request.providerType(), request.modelType());
-        validateAgnes(request.providerType(), request.baseUrl(), request.defaultModel());
+        validateAgnes(request.providerType(), modelType, request.baseUrl(), request.defaultModel());
         boolean firstConfig = configRepository.findAllOwnedBy(ownerUserId).stream()
                 .noneMatch(item -> item.getModelType() == modelType);
         boolean defaultConfig = firstConfig || Boolean.TRUE.equals(request.defaultConfig());
@@ -153,7 +154,7 @@ public class AiProviderConfigService {
         boolean keyChanged = newApiKey != null;
         AiModelType modelType = modelType(request.providerType(),
                 request.modelType() == null ? current.getModelType() : request.modelType());
-        validateAgnes(request.providerType(), request.baseUrl(), request.defaultModel());
+        validateAgnes(request.providerType(), modelType, request.baseUrl(), request.defaultModel());
         boolean defaultConfig = request.defaultConfig() == null
                 ? Boolean.TRUE.equals(current.getDefaultConfig())
                 : request.defaultConfig();
@@ -282,6 +283,7 @@ public class AiProviderConfigService {
         AiProviderConfig config = AiProviderConfig.builder()
                 .id(request.configId())
                 .providerType(request.providerType())
+                .modelType(request.modelType())
                 .baseUrl(normalizeBaseUrl(request.baseUrl()))
                 .defaultModel(normalize(request.defaultModel()))
                 .proxyType(AiProxyType.normalize(request.proxyType()))
@@ -295,7 +297,7 @@ public class AiProviderConfigService {
     /** 检测 AI 服务连接并生成安全结果摘要。 */
     private AiProviderConnectionTestResponse testConnection(AiProviderConfig config, String apiKey, String proxyPassword) {
         Instant startedAt = Instant.now();
-        validateAgnes(config.getProviderType(), config.getBaseUrl(), config.getDefaultModel());
+        validateAgnes(config.getProviderType(), config.getModelType(), config.getBaseUrl(), config.getDefaultModel());
         if (config.getProviderType().apiKeyRequired() && (apiKey == null || apiKey.isBlank())) {
             return connectionResult(false, null, AiProviderConstants.CONNECTION_TEST_API_KEY_REQUIRED, startedAt);
         }
@@ -488,13 +490,16 @@ public class AiProviderConfigService {
                 config.getRemark(), config.getCreatedAt(), config.getUpdatedAt());
     }
 
-    /** Agnes 凭据只允许用于文档列明的网关及已支持的视频模型。 */
-    private void validateAgnes(AiProviderType provider, String baseUrl, String model) {
+    /** Agnes 凭据只发往官方网关，图片和视频配置分别校验对应模型。 */
+    private void validateAgnes(AiProviderType provider, AiModelType type, String baseUrl, String model) {
         if (provider != AiProviderType.AGNES) return;
-        if (!VideoGenerationQuoteService.supportsEndpoint(normalizeBaseUrl(baseUrl))) {
+        if (!AgnesEndpoint.supports(normalizeBaseUrl(baseUrl))) {
             throw new BusinessException(AiProviderConfigResponseCode.BASE_URL_INVALID);
         }
-        if (AgnesVideoModel.find(normalize(model)).isEmpty()) {
+        String modelId = normalize(model);
+        boolean image = (Objects.isNull(type) || type == AiModelType.IMAGE) && AgnesImageModel.find(modelId).isPresent();
+        boolean video = (Objects.isNull(type) || type == AiModelType.VIDEO) && AgnesVideoModel.find(modelId).isPresent();
+        if (!image && !video) {
             throw new BusinessException(AiProviderConfigResponseCode.MODEL_TYPE_INVALID);
         }
     }

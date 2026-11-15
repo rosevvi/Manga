@@ -3,5 +3,5 @@ package com.manga.agent.generation;
 public enum GenerationProviderKey {
     /** 无费用的确定性流程模拟器。 */ FAKE,
     /** OpenAI Images API，首个模型为 gpt-image-2。 */ OPENAI,
-    /** Agnes Video 2.5 系列异步 API。 */ AGNES
+    /** Agnes 图片及视频 API。 */ AGNES
 }

@@ -6,6 +6,8 @@ import com.manga.common.api.ResponseCode;
  * 定义创作运行时的稳定响应码。
  */
 public enum CreativeRuntimeResponseCode implements ResponseCode {
+    /** 新对话或重建需要等待另一投影领取者提交。 */
+    PROJECTION_BUSY("PROJECTION_BUSY", "历史消息正在恢复，请稍后重试"),
 
     /** 同一幂等键被用于不同的创作请求。 */
     IDEMPOTENCY_KEY_CONFLICT(

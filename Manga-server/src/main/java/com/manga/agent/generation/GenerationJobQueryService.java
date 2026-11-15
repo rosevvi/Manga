@@ -66,7 +66,8 @@ public class GenerationJobQueryService {
     /** 统一裁剪安全卡片字段。 */
     private GenerationJobView view(GenerationJob job, CreativeArtifact artifact) {
         return new GenerationJobView(job.getId(), job.getJobId(), job.getRunId(), job.getStepId(), job.getChangeSetId(),
-                job.getProjectId(), job.getShotId(), job.getProvider(), job.getStatus(), job.getProgress(), Boolean.TRUE.equals(job.getCancelRequested()),
+                job.getProjectId(), job.getShotId(), job.getProvider(), job.getMediaKind(), job.getStatus(), job.getProgress(),
+                Boolean.TRUE.equals(job.getCancelRequested()),
                 job.getErrorCode(), job.getErrorMessage(), Objects.isNull(artifact) ? null : artifact.getId(),
                 Objects.isNull(artifact) ? null : mediaStorageService.previewGeneratedImage(artifact.getUrl()),
                 job.getCreatedAt(), job.getSubmittedAt(), job.getFinishedAt(),

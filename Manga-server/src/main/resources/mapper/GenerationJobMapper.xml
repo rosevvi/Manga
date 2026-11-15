@@ -3,6 +3,8 @@
 <mapper namespace="com.manga.mapper.GenerationJobMapper">
     <select id="find" resultType="com.manga.entity.GenerationJob">
         SELECT id, job_id, run_id, step_id, change_set_id, user_id,
+               (SELECT s.kind FROM manga_creative_change_set s
+                WHERE s.change_set_id = manga_generation_job.change_set_id) AS media_kind,
                project_id, shot_id, provider, config_id, status, provider_job_id,
                progress, cancel_requested, error_code, error_message, owner_instance_id, owner_epoch,
                lease_until, attempts, next_action_at, submitted_at, finished_at, reconciled_by,
@@ -11,6 +13,8 @@
     </select>
     <select id="lock" resultType="com.manga.entity.GenerationJob">
         SELECT id, job_id, run_id, step_id, change_set_id, user_id,
+               (SELECT s.kind FROM manga_creative_change_set s
+                WHERE s.change_set_id = manga_generation_job.change_set_id) AS media_kind,
                project_id, shot_id, provider, config_id, config_snapshot_json, request_json,
                status, provider_job_id, progress, cancel_requested, result_base64, result_url, error_code,
                error_message, owner_instance_id, owner_epoch, lease_until, attempts, next_action_at,
@@ -26,6 +30,8 @@
     </select>
     <select id="findVisible" resultType="com.manga.entity.GenerationJob">
         SELECT id, job_id, run_id, step_id, change_set_id, user_id,
+               (SELECT s.kind FROM manga_creative_change_set s
+                WHERE s.change_set_id = manga_generation_job.change_set_id) AS media_kind,
                project_id, shot_id, provider, config_id, status, provider_job_id,
                progress, cancel_requested, error_code, error_message, owner_instance_id, owner_epoch,
                lease_until, attempts, next_action_at, submitted_at, finished_at, reconciled_by,

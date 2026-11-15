@@ -14,5 +14,7 @@ public record CreativeMessageView(
         /** 完整可见正文。 */ String content,
         /** 可选工具名称。 */ String toolName,
         /** 可选公开工具状态。 */ CreativeToolStatus toolStatus,
-        /** 消息首次产生时间。 */ LocalDateTime createdAt
+        /** 消息首次产生时间。 */ LocalDateTime createdAt,
+        /** 此消息覆盖的首个事件序号。 */ long firstSequence,
+        /** 此消息覆盖的最后事件序号。 */ long lastSequence
 ) { }

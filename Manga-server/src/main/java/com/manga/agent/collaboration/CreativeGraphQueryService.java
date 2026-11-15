@@ -44,6 +44,7 @@ public class CreativeGraphQueryService {
                 case READY -> "等待执行容量";
                 case WAITING_CHILDREN -> "等待协作步骤汇合";
                 case WAITING_APPROVAL -> "等待用户审批";
+                case WAITING_REPAIR_CONFIRMATION -> "评审发现问题，等待用户确认修订";
                 case WAITING_JOB -> "等待图片或视频作业";
                 case WAITING_RETRY -> "等待重试";
                 case CANCEL_REQUESTED -> "正在停止并释放执行资源";

@@ -2,6 +2,7 @@ package com.manga.agent.event;
 
 import com.manga.agent.capability.AgentRuntimeContext;
 import com.manga.agent.capability.CapabilitySummary;
+import com.manga.agent.capability.CapabilityTarget;
 import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -17,11 +18,23 @@ public class ToolActivitySummaries {
 
     /** 只接收领域声明的类型化摘要，原始工具参数和结果根本不进入缓存。 */
     public synchronized void record(AgentRuntimeContext context, String callId, CapabilitySummary summary, LocalDateTime started) {
+        record(context, callId, summary, started, null, false, 1, null);
+    }
+
+    /** 记录真实参数指纹、复用次数与安全错误，原始输入和结果不进入摘要缓存。 */
+    public synchronized void record(AgentRuntimeContext context, String callId, CapabilitySummary summary, LocalDateTime started,
+            String fingerprint, boolean reused, int callCount, String failure) {
         summaries.entrySet().removeIf(entry -> entry.getValue().finishedAt().isBefore(LocalDateTime.now().minus(RETENTION)));
         if (summaries.size() >= MAX_SUMMARIES) summaries.pollFirstEntry();
         CapabilitySummary visible = Objects.requireNonNullElseGet(summary, () -> new CapabilitySummary("当前项目", "已完成"));
         summaries.put(key(context.runId(), context.stepId(), context.ownerEpoch(), callId),
-                new Summary(visible.inputSummary(), visible.resultSummary(), started, LocalDateTime.now()));
+                new Summary(visible.inputSummary(), visible.resultSummary(), started, LocalDateTime.now(), fingerprint,
+                        reused, callCount, visible.actionLabel(), visible.target(), failure));
+    }
+
+    /** 开始事件可能先于工具结束，读取已有摘要时不提前移除。 */
+    public synchronized Summary peek(String runId, String stepId, long epoch, String callId) {
+        return summaries.get(key(runId, stepId, epoch, callId));
     }
 
     /** 每个工具完成只消费一次；进程退出或旧事件缺失摘要时安全退回名称和状态。 */
@@ -34,5 +47,8 @@ public class ToolActivitySummaries {
 
     /** 可公开的工具摘要，不携带正文与供应商原始响应。 */
     public record Summary(/** 输入资源摘要。 */ String inputSummary, /** 领域结果摘要。 */ String resultSummary,
-            /** 实际工具开始时间。 */ LocalDateTime startedAt, /** 实际工具结束时间。 */ LocalDateTime finishedAt) { }
+            /** 实际工具开始时间。 */ LocalDateTime startedAt, /** 实际工具结束时间。 */ LocalDateTime finishedAt,
+            /** 规范化后的输入指纹。 */ String inputFingerprint, /** 是否复用同执行读取。 */ boolean reused,
+            /** 相同输入的实际调用次数。 */ int callCount, /** 领域动作标题。 */ String actionLabel,
+            /** 明确目标引用。 */ CapabilityTarget target, /** 脱敏错误说明。 */ String failureReason) { }
 }

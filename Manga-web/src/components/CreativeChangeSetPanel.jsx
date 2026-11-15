@@ -6,7 +6,7 @@ import './creative-change-set.css'
 import { notifyCreativeProjectChanged } from './creativeProjectEvents'
 
 /** 会话和手动任务共用审批面板；差异、评论和最终状态都由服务端恢复。 */
-export default function CreativeChangeSetPanel({ accessToken, conversationId, runId, onDecided, onRegenerate }) {
+export default function CreativeChangeSetPanel({ accessToken, conversationId, runId, onDecided, onRegenerate, wakeSequence = 0 }) {
   const [proposals, setProposals] = useState([])
   const [error, setError] = useState('')
   const [hasMore, setHasMore] = useState(false)
@@ -22,6 +22,7 @@ export default function CreativeChangeSetPanel({ accessToken, conversationId, ru
     const requestVersion = ++version.current
     const page = await listCreativeChangeSets(accessToken, { conversationId, runId })
     if (expectedScope !== scope.current || requestVersion !== version.current) return
+    setError('')
     for (const proposal of page) {
       const previous = knownStatuses.current.get(proposal.changeSetId)
       if (previous && previous !== CHANGE_SET_STATUS.APPLIED && proposal.status === CHANGE_SET_STATUS.APPLIED) {
@@ -54,6 +55,11 @@ export default function CreativeChangeSetPanel({ accessToken, conversationId, ru
     update()
     return () => { scope.current += 1; window.clearTimeout(timer) }
   }, [accessToken, conversationId, runId, refresh])
+  useEffect(() => {
+    if (!wakeSequence || !accessToken || !runId) return
+    const expected = scope.current
+    void refresh().catch((failure) => { if (scope.current === expected) setError(failure.message) })
+  }, [accessToken, runId, wakeSequence, refresh])
 
   /** 读取更早提案，审批卡片按稳定标识去重。 */
   const loadMore = async () => {
@@ -84,6 +90,7 @@ export default function CreativeChangeSetPanel({ accessToken, conversationId, ru
     if (scope.current === expected) await onDecided?.()
   }
 
+  if (!proposals.length && !error) return null
   return <section className="creative-proposals" aria-label="AI 变更提案">
     {proposals.map((proposal) => <ProposalCard key={proposal.changeSetId} proposal={proposal}
       onDecide={decide} onRegenerate={onRegenerate} />)}
@@ -125,7 +132,8 @@ function ProposalCard({ proposal, onDecide, onRegenerate }) {
           <dt>预计费用</dt><dd>{proposal.proposed.estimatedCost} {proposal.proposed.currency}</dd></dl>
         <p>批准后才会提交，实际费用以供应商账单为准。已提交的作业可能无法远程取消。</p>
         <details open><summary>批准的画面提示词</summary><pre>{proposal.proposed.prompt}</pre></details>
-        <p>生成结果保存为独立平台产物。</p>
+        {video ? <p>生成结果将在任务内提供播放和下载。</p>
+          : <p>生成完成后，可在这条任务里预览并设为分镜参考图。</p>}
       </div>
       : <div><p>保留已有 {proposal.before?.length || 0} 个镜头，追加 {proposal.proposed.shots.length} 个草稿。</p>
         {proposal.proposed.shots.map((shot, index) => <details key={index} open={index === 0}>
@@ -134,10 +142,13 @@ function ProposalCard({ proposal, onDecide, onRegenerate }) {
               画面: shot.content, 对白: shot.dialogue, 音效: shot.soundEffect, 备注: shot.notes }).map(([label, value]) =>
               <div key={label}><dt>{label}</dt><dd>{value ?? '（空）'}</dd></div>)}
           </dl></details>)}</div>}
-    {pending && <><small>审批截止：{proposal.expiresAt?.replace('T', ' ')}（有效期由服务端校验）</small>
-      <label>审批评论<textarea maxLength={2000} rows={2} value={comment} onChange={(event) => setComment(event.target.value)} disabled={busy} /></label>
-      <div className="creative-proposal-actions"><button className="workspace-secondary" type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.REJECT)}>拒绝</button>
-        <button className="workspace-primary" type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.APPROVE)}>{busy ? '处理中…' : media ? '确认费用并批准生成' : '批准并保存'}</button></div></>}
+    {pending && <div className="creative-proposal-decision">
+      <strong>{media ? '要按以上参数开始生成吗？' : '要将以上提案应用到项目吗？'}</strong>
+      <small>审批截止 {proposal.expiresAt?.replace('T', ' ')}</small>
+      <details><summary>添加审批评论</summary><textarea aria-label="审批评论" maxLength={2000} rows={2} value={comment} onChange={(event) => setComment(event.target.value)} disabled={busy} /></details>
+      <div className="creative-proposal-actions"><button className="workspace-secondary" type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.REJECT)}>不执行</button>
+        <button className="workspace-primary" type="button" disabled={busy} onClick={() => decide(APPROVAL_DECISION.APPROVE)}>{busy ? '处理中…' : media ? '确认费用并生成' : '确认并应用'}</button></div>
+    </div>}
     {proposal.status === CHANGE_SET_STATUS.CONFLICTED && <p role="alert">项目、章节或生成配置已经变化，本提案没有应用。请基于最新内容重新生成。</p>}
     {retryable && onRegenerate && <button className="workspace-secondary" type="button" onClick={() => onRegenerate(proposal)}>基于最新内容重新生成</button>}
     {proposal.comment && <p>审批评论：{proposal.comment}</p>}

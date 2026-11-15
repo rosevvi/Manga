@@ -15,6 +15,8 @@ public enum CreativeStepStatus {
     RUNNING(false),
     /** Step 等待用户审批。 */
     WAITING_APPROVAL(false),
+    /** Step 等待用户授权下一轮修订，不持有模型执行资源。 */
+    WAITING_REPAIR_CONFIRMATION(false),
     /** Step 等待图片、视频或语音外部作业。 */
     WAITING_JOB(false),
     /** Step 等待子 Step 收敛。 */

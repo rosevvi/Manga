@@ -9,6 +9,12 @@ import java.util.List;
 
 /** 协作图的批量查询和状态更新 SQL，调用方必须先取得 Run 行锁。 */
 public interface CreativeGraphMapper {
+    /** 只写结构化结果，不覆盖并发心跳续签的 lease 字段。 */
+    int saveResult(@Param("stepId") String stepId, @Param("owner") String owner, @Param("epoch") long epoch,
+            @Param("result") String result, @Param("actor") String actor);
+    /** 只写跨轮次已读引用，避免读取审计回写旧 owner 或租约快照。 */
+    int recordReads(@Param("stepId") String stepId, @Param("owner") String owner, @Param("epoch") long epoch,
+            @Param("reads") String reads, @Param("actor") String actor);
     /** 批量读取计划，避免逐步骤查询。 */
     List<CreativeDelegation> plans(@Param("runId") String runId);
     /** 批量读取依赖边。 */

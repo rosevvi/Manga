@@ -1,5 +1,6 @@
 package com.manga.dto;
 
+import com.manga.common.enums.AiModelType;
 import com.manga.common.enums.AiProviderType;
 import com.manga.common.enums.AiProxyType;
 import jakarta.validation.constraints.Max;
@@ -33,6 +34,8 @@ public record AiProviderConnectionTestRequest(
         /** AI 服务商类型。 */
         @NotNull(message = AI_PROVIDER_REQUIRED)
         AiProviderType providerType,
+        /** 草稿所选模型用途，用于校验供应商与模型是否匹配。 */
+        AiModelType modelType,
         /** AI 服务基础地址。 */
         @NotBlank(message = AI_BASE_URL_REQUIRED)
         @Size(max = AI_BASE_URL_MAX_LENGTH, message = AI_BASE_URL_TOO_LONG)

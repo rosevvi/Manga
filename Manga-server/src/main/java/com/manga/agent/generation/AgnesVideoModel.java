@@ -11,8 +11,6 @@ public enum AgnesVideoModel {
     /** 低延迟视频模型。 */
     FLASH("agnes-video-2.5-flash");
 
-    /** 官方海外网关。 */
-    public static final String BASE_URL = "https://apihub.agnes-ai.com";
     /** 首版提供两个模型均支持的分辨率。 */
     public static final String SIZE = "720P";
     /** 官方 720P 公布标价，实际费用以供应商账单为准。 */

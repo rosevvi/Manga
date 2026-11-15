@@ -72,7 +72,7 @@ public class GenerationJobWorker {
         try {
             job = lifecycle.claim(id);
             if (Objects.isNull(job)) return;
-            GenerationProvider provider = providers.require(job.getProvider());
+            GenerationProvider provider = providers.require(job);
             if (job.getStatus() == GenerationJobStatus.SUBMITTING) lifecycle.accept(job, provider.submit(job));
             else if (job.getStatus() == GenerationJobStatus.MATERIALIZING) {
                 if (Boolean.TRUE.equals(job.getCancelRequested())) {

@@ -40,9 +40,10 @@ export const AI_PROVIDER_OPTIONS = Object.freeze([
     label: 'Agnes AI',
     baseUrl: 'https://apihub.agnes-ai.com',
     model: 'agnes-video-2.5-flash',
+    modelsByType: { IMAGE: 'agnes-image-2.5-flash' },
     apiKeyRequired: true,
-    capabilities: ['VIDEO'],
-    description: 'Agnes Video 2.5 和 2.5 Flash',
+    capabilities: ['VIDEO', 'IMAGE'],
+    description: 'Agnes Image Flash 和 Agnes Video 2.5 系列',
   },
   {
     value: 'OPENAI_COMPATIBLE',

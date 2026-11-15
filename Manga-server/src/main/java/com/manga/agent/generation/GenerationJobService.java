@@ -128,7 +128,7 @@ public class GenerationJobService {
                 || Objects.nonNull(job.getLeaseUntil()) && job.getLeaseUntil().isAfter(now)) return null;
         long previous = job.getOwnerEpoch();
         if (run.getStatus().isTerminal() || run.getStatus() == CreativeRunStatus.CANCEL_REQUESTED) job.setCancelRequested(true);
-        if (job.getStatus() == GenerationJobStatus.SUBMITTING && !providers.require(job.getProvider()).idempotentSubmission()) {
+        if (job.getStatus() == GenerationJobStatus.SUBMITTING && !providers.require(job).idempotentSubmission()) {
             unknown(job, GenerationError.SUBMISSION_UNKNOWN); jobs.save(job, previous); emit(job, CreativeEventType.JOB_PROGRESS); return null;
         }
         if (job.getStatus() == GenerationJobStatus.PENDING_SUBMISSION) {

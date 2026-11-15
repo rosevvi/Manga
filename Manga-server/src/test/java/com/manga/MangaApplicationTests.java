@@ -306,6 +306,36 @@ class MangaApplicationTests {
         assertThat(checkConstraintCount).isGreaterThanOrEqualTo(4);
     }
 
+    /** 验证 Agnes 图片配置通过保存入口后可被图片选项读取，视频配置与之隔离。 */
+    @Test
+    void agnesImageConfigurationAppearsOnlyInImageOptions() throws Exception {
+        long userId = jdbcTemplate.queryForObject("SELECT MIN(id) FROM manga_user", Long.class);
+        String authorization = "Bearer " + tokenService.issue(userId, "admin", "Admin", Set.of(UserRole.ADMIN), null, false).accessToken();
+        String name = "agnes-image-" + UUID.randomUUID();
+        String config = """
+                {"name":"%s","providerType":"AGNES","modelType":"IMAGE","baseUrl":"https://apihub.agnes-ai.com/v1",
+                 "defaultModel":"agnes-image-2.5-flash","apiKey":"test-only","enabled":true}
+                """.formatted(name);
+        String configPath = "/api/v1/ai-provider-configs";
+        mockMvc.perform(post(configPath).header("Authorization", authorization).contentType(MediaType.APPLICATION_JSON)
+                        .content(config.replace("agnes-image-2.5-flash", "agnes-video-2.5-flash")))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post(configPath).header("Authorization", authorization).contentType(MediaType.APPLICATION_JSON).content(config))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.modelType").value("IMAGE"));
+        String optionsPath = "/api/v1/generation-jobs/";
+        String images = mockMvc.perform(get(optionsPath + "options").header("Authorization", authorization))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var image = objectMapper.readTree(images).path("data").valueStream()
+                .filter(option -> name.equals(option.path("name").asText())).findFirst().orElseThrow();
+        assertThat(image.path("provider").asText()).isEqualTo("AGNES");
+        assertThat(image.path("estimatedCost").decimalValue().signum()).isPositive();
+        assertThat(image.path("sizes").valueStream().map(size -> size.asText()))
+                .containsExactly("1024x1024", "1248x832", "832x1248");
+        String videos = mockMvc.perform(get(optionsPath + "video-options").header("Authorization", authorization))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(videos).doesNotContain(name);
+    }
+
     /** 验证拒绝与审批后轮询、MP4 转存和 Run 恢复。 */
     @Test
     void videoProposalAndJobCompleteWithoutUsingTextModel() throws Exception {

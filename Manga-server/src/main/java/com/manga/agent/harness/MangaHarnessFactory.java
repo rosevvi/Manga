@@ -29,6 +29,7 @@ public class MangaHarnessFactory {
     private final CapabilityToolkitFactory toolkitFactory;
     private final AgentStateStore stateStore;
     private final MeteredModelFactory meteredModels;
+    private final CreativeActivityProperties activityProperties;
 
     /**
      * 先完成配置契约预检，再创建模型和 Toolkit；中途失败时立即关闭已创建资源。
@@ -40,8 +41,16 @@ public class MangaHarnessFactory {
         try {
             toolkit = toolkitFactory.create(blueprint);
             Toolkit stableToolkit = toolkit;
-            HarnessProvider provider = context -> new AgentScopeHarnessLease(
-                    buildHarness(blueprint, model, stableToolkit.copy(), context), context);
+            HarnessProvider provider = context -> {
+                InvocationActivity activity = new InvocationActivity(activityProperties.maxNoProgressTurns());
+                Toolkit invocationToolkit = toolkitFactory.create(blueprint, activity);
+                try {
+                    return new AgentScopeHarnessLease(buildHarness(blueprint, model, invocationToolkit, context, activity), context);
+                } catch (RuntimeException | Error failure) {
+                    invocationToolkit.closeMcpClients();
+                    throw failure;
+                }
+            };
             return new AgentKernel(blueprint, model, stableToolkit, provider);
         } catch (RuntimeException | Error exception) {
             if (Objects.nonNull(toolkit)) {
@@ -57,13 +66,13 @@ public class MangaHarnessFactory {
             AgentBlueprint blueprint,
             OwnedChatModel model,
             Toolkit toolkit,
-            AgentRuntimeContext context) {
+            AgentRuntimeContext context, InvocationActivity activity) {
         return HarnessAgent.builder()
                 .agentId(blueprint.kernelKey().value())
                 .name(blueprint.profileId())
                 .description(AGENT_DESCRIPTION)
                 .sysPrompt(blueprint.systemPrompt())
-                .model(meteredModels.wrap(model.model(), blueprint, context))
+                .model(meteredModels.wrap(model.model(), blueprint, context, activity))
                 .toolkit(toolkit)
                 .permissionContext(MangaToolPermissionPolicy.forBlueprint(blueprint))
                 .stateStore(stateStore)

@@ -94,3 +94,15 @@ export async function streamCreativeRunEvents(accessToken, runId, afterSequence,
     if (done) break
   }
 }
+
+/** 查询需用户确认的修订与已有候选，结果不包含模型执行配置。 */
+export async function getRepairDecisions(accessToken, runId) {
+  return authorizedRequest(accessToken, `${CREATIVE_RUN_ENDPOINT}/${runId}/repair-decisions`)
+}
+
+/** 幂等授权修订或结束；不调用 ChangeSet 批准接口。 */
+export async function decideRepair(accessToken, runId, decisionId, request) {
+  return authorizedRequest(accessToken, `${CREATIVE_RUN_ENDPOINT}/${runId}/repair-decisions/${decisionId}/decide`, {
+    method: 'POST', body: JSON.stringify(request),
+  })
+}

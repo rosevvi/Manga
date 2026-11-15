@@ -4,6 +4,8 @@ export const IMAGE_PROVIDER = Object.freeze({ OPENAI: 'OPENAI', FAKE: 'FAKE' })
 export const IMAGE_MODEL = Object.freeze({ OPENAI: 'gpt-image-2', FAKE: 'fake-image' })
 /** 平台允许的单张图片尺寸。 */
 export const IMAGE_SIZES = Object.freeze(['1024x1024', '1536x1024', '1024x1536'])
+/** 图片提案允许的提示词长度，与后端提案约束一致。 */
+export const IMAGE_PROMPT_MAX_LENGTH = 4000
 /** 作业状态标签，不将未知结果误标为失败后自动重试。 */
 export const GENERATION_STATUS_LABEL = Object.freeze({
   PENDING_SUBMISSION: '排队等待提交', SUBMITTING: '正在生成', SUBMITTED: '供应商已受理', RUNNING: '供应商执行中',

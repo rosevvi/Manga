@@ -20,3 +20,5 @@
 .creative-proposal-trace small { overflow-wrap: anywhere; }
 .assistant-panel .creative-diff { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 680px) { .creative-diff { grid-template-columns: minmax(0, 1fr); } }
+.creative-proposal-decision { display: grid; gap: 9px; border-top: 1px solid var(--workspace-line); padding-top: 12px; margin-top: 10px; }
+.creative-proposal-decision textarea { width: 100%; box-sizing: border-box; }

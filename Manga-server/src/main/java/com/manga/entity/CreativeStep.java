@@ -71,6 +71,8 @@ public class CreativeStep {
     private Integer delegationRound;
     /** 经过校验的不可变 Worker 结果。 */
     private String resultJson;
+    /** 本步骤已读取的跨轮次候选及评审引用，仅用于修订来源校验。 */
+    private String readResultStepIdsJson;
     /** 汇合后给父步骤的摘要和结果引用。 */
     private String continuationJson;
     /** 已预留模型预算的最近执行代次。 */

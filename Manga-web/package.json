@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:browser": "node test/creativeProcess.browser.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.3",
     "https-proxy-agent": "7.0.6",
+    "playwright-core": "^1.65.1",
     "vite": "^8.1.1"
   },
   "dependencies": {

@@ -26,7 +26,8 @@ public class ReadDelegatedResultCapability implements MangaAgentCapability {
     /** 在可信上下文内执行，参数中没有用户、Run 或 owner 覆盖入口。 */
     @Override
     public CapabilityResult execute(CapabilityCommand command, AgentRuntimeContext context) {
-        return new CapabilityResult(mapper.valueToTree(results.read(command.input(), context)));
+        var result = results.read(command.input(), context);
+        return new CapabilityResult(mapper.valueToTree(result), results.describeRead(command.input(), context, result));
     }
 }
 

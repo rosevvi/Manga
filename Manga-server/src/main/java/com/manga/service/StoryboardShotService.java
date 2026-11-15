@@ -44,7 +44,7 @@ public class StoryboardShotService {
         var project = revisionService.lock(projectId, userId);
         StoryboardShot shot = requireShot(projectId, shotId);
         return new StoryboardImageSnapshot(shotId, shot.getTitle(), project.getRevision(),
-                previewImage(shot, project.getOwnerUserId()));
+                previewImage(shot, project.getOwnerUserId()), shot.getImageArtifactId());
     }
     /** 只在预览版本仍有效时采用；与产物审计事务一起提交或回滚。 */
     @Transactional

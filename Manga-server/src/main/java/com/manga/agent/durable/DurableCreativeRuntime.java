@@ -6,6 +6,7 @@ import com.manga.agent.application.CreativeRunStartResult;
 import com.manga.agent.application.CreativeRuntime;
 import com.manga.agent.application.RunAdmissionService;
 import com.manga.agent.application.StartCreativeRunCommand;
+import com.manga.agent.application.CreativeProjectionBarrier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -18,10 +19,14 @@ public class DurableCreativeRuntime implements CreativeRuntime {
 
     private final RunAdmissionService admissionService;
     private final CreativeRunCancellationService cancellationService;
+    private final CreativeProjectionBarrier projectionBarrier;
 
     /** 受理请求并创建可立即调度的根 Step。 */
     @Override
     public CreativeRunStartResult start(StartCreativeRunCommand command) {
+        var replay = admissionService.replayIfAdmitted(command);
+        if (replay.isPresent()) { return replay.orElseThrow(); }
+        projectionBarrier.beforeStart(command.userId(), command.conversationId());
         return admissionService.admit(command);
     }
 

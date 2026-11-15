@@ -7,7 +7,7 @@ export function getGeneratedMediaDownload(accessToken, jobId) {
 }
 /** 每次采用前读取最新图片与项目版本，不沿用生成时的旧 revision。 */
 export function previewArtifactAdoption(accessToken, jobId) {
-  return authorizedRequest(accessToken, `${ENDPOINT}/${encodeURIComponent(jobId)}/adoption-preview`)
+  return authorizedRequest(accessToken, `${ENDPOINT}/${encodeURIComponent(jobId)}/adoption-preview`, { cache: 'no-store' })
 }
 /** 确认只提交预览 revision，图片地址由服务器决定。 */
 export function adoptGeneratedArtifact(accessToken, jobId, expectedProjectRevision) {

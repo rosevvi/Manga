@@ -1,5 +1,8 @@
 package com.manga.agent.harness;
 
+import com.manga.common.exception.BusinessException;
+import java.util.List;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.capability.AgentRuntimeContext;
@@ -31,13 +34,17 @@ public final class MangaCapabilityTool extends ToolBase {
     private final CapabilityDescriptor descriptor;
     private final ObjectMapper objectMapper;
     private final ToolActivitySummaries summaries;
+    private final ToolExecutionSupport support;
+    private final InvocationActivity activity;
 
-    public MangaCapabilityTool(MangaAgentCapability capability, ObjectMapper objectMapper, ToolActivitySummaries summaries) {
+    public MangaCapabilityTool(MangaAgentCapability capability, ObjectMapper objectMapper, ToolActivitySummaries summaries,
+            ToolExecutionSupport support, InvocationActivity activity) {
         super(toolDefinition(capability.descriptor(), objectMapper));
         this.capability = capability;
         this.descriptor = capability.descriptor();
         this.objectMapper = objectMapper;
         this.summaries = summaries;
+        this.support = support; this.activity = activity;
     }
 
     /** 从调用上下文解析身份和项目边界后执行能力，并返回结构化 JSON 文本。 */
@@ -58,15 +65,43 @@ public final class MangaCapabilityTool extends ToolBase {
                                 .formatted(descriptor.name().code()));
             }
             LocalDateTime started = LocalDateTime.now();
-            CapabilityResult result = capability.execute(
-                    new CapabilityCommand(objectMapper.valueToTree(param.getInput()),
-                            Objects.isNull(param.getToolUseBlock()) ? null : param.getToolUseBlock().getId()),
-                    context);
-            summaries.record(context, Objects.isNull(param.getToolUseBlock()) ? null : param.getToolUseBlock().getId(),
-                    result.summary(), started);
-            return ToolResultBlock.text(result.data().toString());
+            String callId = Objects.isNull(param.getToolUseBlock()) ? null : param.getToolUseBlock().getId();
+            var input = objectMapper.valueToTree(param.getInput());
+            String fingerprint = support.fingerprint(descriptor.name(), input);
+            int count = activity.called(fingerprint);
+            try {
+                String cacheKey = descriptor.readOnly() ? support.cacheKey(descriptor.name(), fingerprint, context) : null;
+                CapabilityResult result = Objects.isNull(cacheKey) ? null : activity.cached(cacheKey);
+                boolean reused = Objects.nonNull(result);
+                if (!reused) {
+                    result = capability.execute(new CapabilityCommand(input, callId), context);
+                    if (Objects.nonNull(cacheKey)) { activity.remember(cacheKey, result); }
+                }
+                activity.succeeded(Objects.isNull(cacheKey) ? fingerprint : cacheKey, descriptor.readOnly());
+                summaries.record(context, callId, result.summary(), started, fingerprint, reused, count, null);
+                return ToolResultBlock.text(result.data().toString());
+            } catch (RuntimeException failure) {
+                String reason = support.safeFailure(failure);
+                summaries.record(context, callId, null, started, fingerprint, false, count, reason);
+                if (failure instanceof ToolInputValidationException invalid) {
+                    return ToolResultBlock.error(objectMapper.valueToTree(new InvalidInputResult(
+                            ToolInputValidationException.CODE, reason, invalid.issues())).toString());
+                }
+                if (failure instanceof BusinessException
+                        || failure instanceof AgentRuntimeException agentFailure
+                        && agentFailure.errorCode() != CreativeErrorCode.OWNER_LEASE_LOST) {
+                    return ToolResultBlock.error(reason);
+                }
+                activity.abort(failure instanceof AgentRuntimeException agentFailure ? agentFailure
+                        : new AgentRuntimeException(CreativeErrorCode.CAPABILITY_EXECUTION_FAILED, reason, failure));
+                return ToolResultBlock.error(reason);
+            }
         });
     }
+
+    /** 模型可安全消费的字段错误，不包含被拒绝的原始值。 */
+    private record InvalidInputResult(/** 稳定错误类型。 */ String code, /** 公开原因。 */ String message,
+            /** 可修正的字段约束。 */ List<ToolInputValidationException.FieldIssue> fieldErrors) { }
 
     /** 将 Manifest 使用的 JsonNode Schema 转为 AgentScope ToolBase 定义。 */
     private static ToolBase.Builder toolDefinition(

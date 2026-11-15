@@ -1,5 +1,7 @@
 package com.manga.repository;
 
+import java.time.LocalDateTime;
+
 import com.manga.entity.CreativeRun;
 import com.manga.mapper.CreativeRunMapper;
 import lombok.RequiredArgsConstructor;
@@ -7,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import com.manga.agent.api.CreativeConversationHistory;
 
 /**
  * 封装 Creative Run 的持久化访问。
@@ -16,6 +19,14 @@ import java.util.Optional;
 public class CreativeRunRepository {
 
     private final CreativeRunMapper mapper;
+    /** 暂停或恢复时只修改计时字段，避免旧快照覆盖事件序号。 */
+    public void updateDeadline(String runId, LocalDateTime deadline, String actor) {
+        mapper.updateDeadline(runId, deadline, actor);
+    }
+    /** 读取会话最近运行的恢复水位，历史接口不强制同步投影。 */
+    public List<CreativeConversationHistory.ProjectionWatermark> projectionWatermarks(String conversationId, int limit) {
+        return mapper.projectionWatermarks(conversationId, limit);
+    }
     /** 按用户和项目读取手动任务历史。 */
     public List<CreativeRun> findManual(long userId, Long projectId, Long beforeId, int limit) {
         return mapper.findManual(userId, projectId, beforeId, limit);

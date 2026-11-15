@@ -13,6 +13,8 @@ import com.manga.agent.domain.CreativeStepStatus;
 import com.manga.agent.domain.CreativeToolStatus;
 import com.manga.agent.domain.SystemActor;
 import com.manga.agent.event.ContentDeltaEventPayload;
+import com.manga.agent.event.CreativeTextChannel;
+import com.manga.agent.event.CreativeProgressMetrics;
 import com.manga.agent.event.CreativeEventSources;
 import com.manga.agent.event.StepCompletedEventPayload;
 import com.manga.agent.event.ToolExecutionEventPayload;
@@ -49,6 +51,7 @@ public class CreativeStepLifecycleService {
     private final ApplicationEventPublisher publisher;
     private final AgentBlueprintCodec blueprints;
     private final ToolActivitySummaries summaries;
+    private final CreativeProgressMetrics metrics;
 
     /** 判断当前执行器是否仍持有有效运行权；取消或租约过期时返回 false。 */
     @Transactional(readOnly = true)
@@ -66,7 +69,15 @@ public class CreativeStepLifecycleService {
     @Transactional
     public boolean appendDelta(ClaimedCreativeStep claimed, String delta) {
         return appendOwnedEvent(claimed, CreativeEventType.CONTENT_DELTA,
-                new ContentDeltaEventPayload(delta));
+                new ContentDeltaEventPayload(delta, claimed.ownerEpoch(), null, null));
+    }
+
+    /** 正文与供应商分析分别追加，身份边界由事件合并器保留。 */
+    @Transactional
+    public boolean appendText(ClaimedCreativeStep claimed, String delta, String replyId, String blockId, CreativeTextChannel channel) {
+        return appendOwnedEvent(claimed, channel == CreativeTextChannel.REASONING
+                        ? CreativeEventType.REASONING_DELTA : CreativeEventType.CONTENT_DELTA,
+                new ContentDeltaEventPayload(delta, claimed.ownerEpoch(), replyId, blockId));
     }
 
     /** 追加不暴露参数和结果正文的工具开始事件。 */
@@ -74,7 +85,7 @@ public class CreativeStepLifecycleService {
     public boolean appendToolStarted(ClaimedCreativeStep claimed, String toolCallId, String toolName) {
         return appendOwnedEvent(claimed, CreativeEventType.TOOL_STARTED,
                 new ToolExecutionEventPayload(toolCallId, toolName, CreativeToolStatus.RUNNING,
-                        2, claimed.ownerEpoch(), null, null, LocalDateTime.now(), null));
+                        3, claimed.ownerEpoch(), null, null, LocalDateTime.now(), null));
     }
 
     /** 追加不暴露参数和结果正文的工具完成事件。 */
@@ -86,10 +97,17 @@ public class CreativeStepLifecycleService {
             CreativeToolStatus status) {
         var summary = summaries.take(claimed.runId(), claimed.stepId(), claimed.ownerEpoch(), toolCallId);
         return appendOwnedEvent(claimed, CreativeEventType.TOOL_COMPLETED,
-                new ToolExecutionEventPayload(toolCallId, toolName, status, 2, claimed.ownerEpoch(),
+                new ToolExecutionEventPayload(toolCallId, toolName, status, 3, claimed.ownerEpoch(),
                         Objects.isNull(summary) ? null : summary.inputSummary(),
                         Objects.isNull(summary) ? null : summary.resultSummary(),
-                        Objects.isNull(summary) ? null : summary.startedAt(), LocalDateTime.now()));
+                        Objects.isNull(summary) ? null : summary.startedAt(),
+                        Objects.isNull(summary) ? LocalDateTime.now() : summary.finishedAt(),
+                        Objects.isNull(summary) ? null : summary.inputFingerprint(),
+                        Objects.isNull(summary) ? null : summary.reused(),
+                        Objects.isNull(summary) ? null : summary.callCount(),
+                        Objects.isNull(summary) ? null : summary.actionLabel(),
+                        Objects.isNull(summary) ? null : summary.target(),
+                        Objects.isNull(summary) ? null : summary.failureReason()));
     }
 
     /** 周期续签 Step 执行租约；取消、过期或 owner 变化时返回 false。 */
@@ -110,15 +128,20 @@ public class CreativeStepLifecycleService {
             CreativeEventType eventType,
             Object payload) {
         long started = System.nanoTime();
-        runRepository.lockByRunId(claimed.runId());
-        if (!renewLease(claimed)) {
+        var run = runRepository.lockByRunId(claimed.runId());
+        CreativeStep current = stepRepository.findByStepId(claimed.stepId()).orElseThrow();
+        if (Objects.isNull(claimed.deadlineAt()) || !claimed.deadlineAt().isAfter(LocalDateTime.now())
+                || current.getStatus() != CreativeStepStatus.RUNNING
+                || !Objects.equals(current.getOwnerInstanceId(), claimed.ownerInstanceId())
+                || current.getOwnerEpoch() != claimed.ownerEpoch() || Objects.isNull(current.getLeaseUntil())
+                || !current.getLeaseUntil().isAfter(LocalDateTime.now())) {
             return false;
         }
         // Worker 执行细节写入 Journal，正文投影按 source 排除，时间线仍可重建。
-        CreativeStep current = stepRepository.findByStepId(claimed.stepId()).orElseThrow();
-        eventService.append(claimed.runId(), claimed.stepId(), eventType,
+        eventService.appendLocked(run, claimed.stepId(), eventType,
                 Objects.nonNull(current.getParentStepId()) ? CreativeEventSources.WORKER : CreativeEventSources.AGENT_SCOPE,
                 null, payload);
+        metrics.persisted(System.nanoTime() - started);
         log.debug("Agent event persisted stepId={} epoch={} type={} durationMs={}",
                 claimed.stepId(), claimed.ownerEpoch(), eventType, (System.nanoTime() - started) / 1_000_000);
         return true;

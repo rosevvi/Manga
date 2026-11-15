@@ -6,6 +6,9 @@ import java.util.Arrays;
  * 定义创作运行可持久化、可检索的稳定失败编码。
  */
 public enum CreativeErrorCode {
+    /** 多轮重复读取或相同错误，没有有效进展。 */ AGENT_NO_PROGRESS,
+    /** 修订预算耗尽，保留候选和问题。 */ REPAIR_BUDGET_EXHAUSTED,
+    /** 确认修订时业务版本发生变化。 */ REPAIR_CONTEXT_CONFLICT,
 
     /** 请求不满足创作运行契约。 */
     INVALID_REQUEST,

@@ -2,6 +2,7 @@ package com.manga.agent.api;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.manga.agent.capability.CapabilityTarget;
 
 /** 按事件序号分页的安全执行事实，可重复读取和从断点恢复。 */
 public record CreativeTimelinePage(
@@ -31,7 +32,16 @@ public record CreativeTimelinePage(
             /** 安全结果摘要或助手公开正文增量。 */ String resultSummary,
             /** 可供界面定位的产物标识。 */ List<String> resourceIds,
             /** 定位项目工作台的安全链接，不包含长期供应商地址。 */ List<ResourceLink> resourceLinks,
-            /** 脱敏失败原因。 */ String failureReason
+            /** 脱敏失败原因。 */ String failureReason,
+            /** 所属协作计划。 */ String planId,
+            /** 所属计划轮次，根步骤为空。 */ Integer round,
+            /** 回复标识。 */ String replyId,
+            /** 文本块标识。 */ String blockId,
+            /** 规范化输入指纹。 */ String inputFingerprint,
+            /** 是否复用读取。 */ Boolean reused,
+            /** 相同输入调用次数。 */ Integer callCount,
+            /** 领域目标明确的动作标题。 */ String actionLabel,
+            /** 类型化资源目标。 */ CapabilityTarget target
     ) { }
     /** 导航链接仅由平台根据归属项目构造。 */
     public record ResourceLink(/** 链接标题。 */ String label, /** 应用内相对路径。 */ String href) { }

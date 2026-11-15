@@ -1,5 +1,7 @@
 package com.manga.agent.application;
 
+import com.manga.repository.CreativeMessageProjectionRepository;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.CreativeAgentTestSupport;
 import com.manga.agent.api.CreativeConversationHistory;
@@ -97,6 +99,9 @@ class CreativeConversationMemoryIntegrationTests {
     private MangaAgentInvoker invoker;
     @MockitoBean
     private CreativeStepDispatcher dispatcher;
+    /** 本组显式推进投影，重启和损坏事件测试不与异步消费者竞争。 */
+    @MockitoBean
+    private CreativeProjectionDispatcher projectionDispatcher;
     @Autowired
     private CreativeRuntime runtime;
     @Autowired
@@ -143,6 +148,37 @@ class CreativeConversationMemoryIntegrationTests {
     private TokenService tokenService;
     @Autowired
     private PlatformTransactionManager transactionManager;
+    @Autowired
+    private CreativeMessageProjectionRepository checkpoints;
+
+    /** 投影检查点被慢消费者锁住时，事件追加和历史读取仍可独立完成。 */
+    @Test
+    void slowProjectionDoesNotBlockJournalOrHistory() throws Exception {
+        var started = start(null, "独立投影锁");
+        var locked = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
+            var projection = workers.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+                checkpoints.lock(started.runId(), "test:slow-projection");
+                locked.countDown(); await(release);
+            }));
+            assertThat(locked.await(1, TimeUnit.SECONDS)).isTrue();
+            try {
+                var appended = workers.submit(() -> eventService.append(started.runId(), CreativeEventType.CONTENT_DELTA,
+                        new ContentDeltaEventPayload("投影阻塞期间的正文")));
+                assertThat(appended.get(2, TimeUnit.SECONDS).getSequenceNo()).isPositive();
+                var history = workers.submit(() -> conversations.history(USER_ID, started.conversationId(), null));
+                assertThat(history.get(2, TimeUnit.SECONDS).projections()).anySatisfy(watermark -> {
+                    assertThat(watermark.runId()).isEqualTo(started.runId());
+                    assertThat(watermark.throughSequence()).isGreaterThan(watermark.projectedThroughSequence());
+                });
+            } finally { release.countDown(); }
+            projection.get(2, TimeUnit.SECONDS);
+        }
+        while (projector.project(started.runId()) > 0) { /* 恢复后从旧水位补齐。 */ }
+        assertThat(assistant(started.runId()).getContent()).isEqualTo("投影阻塞期间的正文");
+        runtime.cancel(new CancelCreativeRunCommand(started.runId(), USER_ID));
+    }
 
     /** 提供真实 Codec 可验证的 Blueprint 和确定性模型流。 */
     @BeforeEach
@@ -250,6 +286,7 @@ class CreativeConversationMemoryIntegrationTests {
         CreativeRunStartResult next = start(first.conversationId(), "继续创作");
         // 新轮已受理后，旧 owner 才确认取消；旧终态不能撤销新轮状态会话或再次推进代次。
         lifecycle.acknowledgeCancellation(claimed);
+        while (projector.project(cancelled.runId()) > 0) { /* 旧轮终态在独立消费者提交后收敛工具状态。 */ }
         CreativeRun nextRun = runs.findByRunId(next.runId()).orElseThrow();
         CreativeStep nextStep = steps.findByRunId(next.runId()).getFirst();
         CreativeStepInput input = objectMapper.readValue(nextStep.getInputJson(), CreativeStepInput.class);
@@ -396,8 +433,10 @@ class CreativeConversationMemoryIntegrationTests {
 
     /** 创建实际受理事务；测试调度替身避免与手动领取竞争。 */
     private CreativeRunStartResult start(String conversationId, String instruction) {
-        return runtime.start(StartCreativeRunCommand.conversation(USER_ID,
+        var result = runtime.start(StartCreativeRunCommand.conversation(USER_ID,
                 UUID.randomUUID().toString(), conversationId, null, instruction));
+        while (projector.project(result.runId()) > 0) { /* 等待已受理事件的显式投影水位。 */ }
+        return result;
     }
 
     /** 使用真实数据库领取 Step。 */
@@ -409,6 +448,7 @@ class CreativeConversationMemoryIntegrationTests {
     /** 执行真实 Agent Step、事件投影和 Run 聚合。 */
     private void execute(CreativeRunStartResult run) {
         executor.execute(claim(run));
+        while (projector.project(run.runId()) > 0) { /* 验证最终一致后的业务内容。 */ }
     }
 
     /** 查询当前助手正文，供投影事务回滚断言使用。 */

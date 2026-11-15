@@ -1,7 +1,26 @@
 import { CHANGE_SET_KIND } from '../constants/changeSet.js'
+import { CREATIVE_OPERATION, CREATIVE_PERMISSION, CREATIVE_RESOURCE } from '../constants/creative.js'
 
 /** 后端单轮指令的最大字符数。 */
 const MAX_INSTRUCTION_CHARS = 12000
+
+/** 用用户选择的参数创建图片提案指令，报价、凭据和端点由服务端解析。 */
+export function imageProposalInstruction({ shotId, provider, configId, model, prompt, width, height }) {
+  return `请读取目标镜头，按以下参数调用 propose_image_generation 提交单张图片提案，等待我确认费用并批准。参数：${JSON.stringify({ shotId, provider, configId, model, prompt, width, height })}`
+}
+
+/** 重生成绑定产物的原始镜头，并复用原提案的模型、配置和尺寸。 */
+export function imageRegenerationRequest(proposal, job, prompt, requestId) {
+  if (proposal.kind !== CHANGE_SET_KIND.IMAGE_GENERATION || proposal.changeSetId !== job.changeSetId
+    || String(proposal.projectId) !== String(job.projectId)
+    || String(proposal.proposed?.shotId) !== String(job.shotId) || !prompt.trim()) {
+    throw new Error('无法恢复这张图片的生成参数')
+  }
+  return { requestId, projectId: job.projectId, operationType: CREATIVE_OPERATION.GENERATE_SHOT_IMAGE,
+    target: { resourceType: CREATIVE_RESOURCE.STORYBOARD_SHOT, resourceId: job.shotId },
+    permissionPolicy: CREATIVE_PERMISSION.PROPOSE_CHANGES,
+    instruction: imageProposalInstruction({ ...proposal.proposed, prompt: prompt.trim() }) }
+}
 
 /** 生成章节完整字段差异，不隐藏清空内容或场景结构变化。 */
 export function scriptDifferences(before, proposed) {

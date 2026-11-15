@@ -1,5 +1,7 @@
 package com.manga.agent.application;
 
+import org.springframework.transaction.annotation.Propagation;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,6 +11,8 @@ import com.manga.agent.domain.CreativeEventType;
 import com.manga.agent.domain.CreativeRuntimeMessages;
 import com.manga.agent.domain.SystemActor;
 import com.manga.agent.event.CreativeEventRedisSignalService;
+import com.manga.agent.event.CreativeEventsCommitted;
+import com.manga.repository.CreativeMessageProjectionRepository;
 import com.manga.agent.event.CreativeEventSources;
 import com.manga.agent.state.AgentStateSessionService;
 import com.manga.entity.CreativeEvent;
@@ -40,9 +44,9 @@ public class CreativeEventService {
     private final CreativeEventRedisSignalService redisSignalService;
     private final ObjectMapper objectMapper;
     private final CreativeRuntimeProperties runtimeProperties;
-    private final CreativeMessageProjector messageProjector;
     private final AgentStateSessionService stateSessions;
     private final ApplicationEventPublisher publisher;
+    private final CreativeMessageProjectionRepository projectionCheckpoints;
 
     /** 在同一事务内追加由 Creative Runtime 产生的事件。 */
     @Transactional
@@ -58,6 +62,14 @@ public class CreativeEventService {
         if (Objects.isNull(run)) {
             throw new IllegalArgumentException(CreativeRuntimeMessages.RUN_NOT_FOUND);
         }
+        return appendLocked(run, stepId, eventType, source, correlationId, payload);
+    }
+
+    /** 调用方已经持有 Run 行锁时复用该快照，避免每条正文重复执行同一锁查询。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public CreativeEvent appendLocked(CreativeRun run, String stepId, CreativeEventType eventType,
+            String source, String correlationId, Object payload) {
+        String runId = run.getRunId();
         long sequence = Objects.isNull(run.getNextSequence()) ? 1L : run.getNextSequence();
         String actor = SystemActor.CREATIVE_RUNTIME.code();
         CreativeEvent event = eventRepository.create(CreativeEvent.builder()
@@ -78,8 +90,8 @@ public class CreativeEventService {
         }
         run.setUpdatedBy(actor);
         runRepository.update(run);
-        // 写入事实后同步推进可重建投影；批次游标和消息使用同一事务提交。
-        messageProjector.project(runId);
+        if (sequence == 1L) { projectionCheckpoints.create(runId, actor); }
+        publisher.publishEvent(new CreativeEventsCommitted(runId, sequence));
         if (eventType == CreativeEventType.RUN_CANCEL_REQUESTED || isTerminal(eventType)) {
             stateSessions.retire(run, eventType != CreativeEventType.RUN_COMPLETED);
             publisher.publishEvent(new CreativeRunStopped(runId));

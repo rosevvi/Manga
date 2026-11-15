@@ -4,6 +4,7 @@ import com.manga.common.enums.AiModelType;
 import com.manga.common.enums.AiProviderType;
 import com.manga.common.exception.BusinessException;
 import com.manga.dto.ResolvedAiProviderConfig;
+import com.manga.integration.ai.AgnesEndpoint;
 import com.manga.repository.AiProviderConfigRepository;
 import com.manga.service.AiProviderConfigService;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +28,7 @@ public class VideoGenerationQuoteService {
         return repository.findAllOwnedBy(userId).stream()
                 .filter(config -> config.getModelType() == AiModelType.VIDEO && config.getProviderType() == AiProviderType.AGNES)
                 .filter(config -> Boolean.TRUE.equals(config.getEnabled()) && config.getApiKeyCiphertext() != null)
-                .filter(config -> supportsEndpoint(config.getBaseUrl()) && AgnesVideoModel.find(config.getDefaultModel()).isPresent())
+                .filter(config -> AgnesEndpoint.supports(config.getBaseUrl()) && AgnesVideoModel.find(config.getDefaultModel()).isPresent())
                 .map(config -> new ImageGenerationOption(GenerationProviderKey.AGNES, config.getId(),
                         config.getName(), config.getDefaultModel(), AgnesVideoModel.USD_PER_SECOND, GenerationConstants.CURRENCY))
                 .toList();
@@ -47,13 +48,9 @@ public class VideoGenerationQuoteService {
     /** 运行时校验类型、归属、启用和官方端点，不允许将 Agnes 密钥发送到自填域名。 */
     public ResolvedAiProviderConfig resolve(long configId, long userId) {
         return configs.resolveOwned(userId, configId, AiModelType.VIDEO)
-                .filter(value -> value.providerType() == AiProviderType.AGNES && supportsEndpoint(value.baseUrl()))
+                .filter(value -> value.providerType() == AiProviderType.AGNES && AgnesEndpoint.supports(value.baseUrl()))
                 .filter(value -> AgnesVideoModel.find(value.defaultModel()).isPresent() && value.apiKey() != null && !value.apiKey().isBlank())
                 .orElseThrow(() -> new BusinessException(GenerationError.AUTHENTICATION));
     }
 
-    /** 允许用户填官方根地址或带 /v1 的文档地址。 */
-    public static boolean supportsEndpoint(String address) {
-        return AgnesVideoModel.BASE_URL.equals(address) || (AgnesVideoModel.BASE_URL + "/v1").equals(address);
-    }
 }

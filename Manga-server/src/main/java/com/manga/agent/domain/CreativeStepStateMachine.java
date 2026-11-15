@@ -66,7 +66,12 @@ public final class CreativeStepStateMachine {
         approvalTransitions.add(CreativeStepStatus.WAITING_JOB);
         transitions.put(CreativeStepStatus.WAITING_APPROVAL, approvalTransitions);
         transitions.put(CreativeStepStatus.WAITING_JOB, resumeTransitions());
-        transitions.put(CreativeStepStatus.WAITING_CHILDREN, resumeTransitions());
+        EnumSet<CreativeStepStatus> childrenTransitions = resumeTransitions();
+        childrenTransitions.add(CreativeStepStatus.WAITING_REPAIR_CONFIRMATION);
+        transitions.put(CreativeStepStatus.WAITING_CHILDREN, childrenTransitions);
+        transitions.put(CreativeStepStatus.WAITING_REPAIR_CONFIRMATION, EnumSet.of(
+                CreativeStepStatus.WAITING_CHILDREN, CreativeStepStatus.FAILED,
+                CreativeStepStatus.CANCEL_REQUESTED, CreativeStepStatus.CANCELLED));
         transitions.put(CreativeStepStatus.WAITING_RETRY, EnumSet.of(
                 CreativeStepStatus.READY,
                 CreativeStepStatus.FAILED,

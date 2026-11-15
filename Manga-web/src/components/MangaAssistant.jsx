@@ -19,7 +19,7 @@ function nextRequestId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-/** 使用服务端消息投影展示连续对话；SSE 只唤醒刷新，不在本地拼接正文。 */
+/** 历史读取消息投影，当前创作在同一时间线依序展示正文、工具和操作。 */
 export default function MangaAssistant({ accessToken, userId, projectId }) {
   const [open, setOpen] = useState(false)
   const [hasOpened, setHasOpened] = useState(false)
@@ -302,6 +302,8 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
   /** 请求取消后，从投影读取实际状态，不在本地伪造终态。 */
   if (!accessToken) return null
   const detailRunId = activeRun?.runId || messages.at(-1)?.runId
+  const assistantFallback = messages.filter((message) => message.runId === detailRunId
+    && message.role === CREATIVE_MESSAGE_ROLE.ASSISTANT).map((message) => message.content || '').filter(Boolean).join('\n\n')
   return <aside className={`manga-assistant ${open ? 'open' : ''}`}>
     <button className="assistant-toggle" type="button" onClick={() => { setHasOpened(true); setOpen((value) => !value) }} aria-label="打开 AI 创作任务中心">
       {open ? <X size={20} /> : <Bot size={22} />}
@@ -341,15 +343,16 @@ export default function MangaAssistant({ accessToken, userId, projectId }) {
                 <div className="task-center-scroll assistant-output" aria-live="polite">
                   {nextBeforeId && <button className="task-load-more" type="button" disabled={loading} onClick={loadEarlier}>加载更早消息</button>}
                   {!messages.length && <div className="workbench-empty"><Bot size={36} /><h2>让故事开始发生</h2><p>{loading ? '正在恢复会话…' : '描述你的故事、角色或想调整的章节。'}</p></div>}
-                  {messages.filter((message) => message.role !== CREATIVE_MESSAGE_ROLE.TOOL).map((message) => <article className={`assistant-message ${message.role.toLowerCase()}`} key={message.projectionKey}>
+                  {messages.filter((message) => message.role !== CREATIVE_MESSAGE_ROLE.TOOL
+                    && (message.role !== CREATIVE_MESSAGE_ROLE.ASSISTANT || message.runId !== detailRunId)).map((message) => <article className={`assistant-message ${message.role.toLowerCase()}`} key={message.projectionKey}>
                     <strong>{message.role === CREATIVE_MESSAGE_ROLE.USER ? '你' : '漫剧助手'}</strong>
                     <p>{message.content || (message.status === CREATIVE_MESSAGE_STATUS.ACTIVE ? '正在创作…' : '本轮未生成回答。')}</p>
                     {message.role === CREATIVE_MESSAGE_ROLE.ASSISTANT && <button type="button" className="message-execution-link" onClick={() => selectTask(message.runId)}>查看本轮执行详情</button>}
                   </article>)}
-                  {detailRunId && <CreativeRunDetails key={detailRunId} accessToken={accessToken} runId={detailRunId} showText={false}
+                  {detailRunId && <CreativeRunDetails key={detailRunId} accessToken={accessToken} runId={detailRunId} assistantFallback={assistantFallback}
                     onChanged={() => { if (selectedRef.current === conversationId) void refreshHistory(conversationId).catch((failure) => {
                       if (selectedRef.current === conversationId) setError(failure.message)
-                    }) }} onRunChanged={selectTask}
+                    }) }} onRunChanged={(id) => { selectTask(id); setTaskListVersion((value) => value + 1) }}
                     onRegenerate={setInstruction} />}
                 </div>
                 <form className="task-composer" onSubmit={submit}><textarea aria-label="创作需求" value={instruction} onChange={(event) => setInstruction(event.target.value)} rows={3} maxLength={12000} placeholder="描述你的漫剧创作任务…" />

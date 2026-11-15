@@ -1,5 +1,8 @@
 package com.manga.agent.execution;
 
+import com.manga.agent.event.CreativeProgressMetrics;
+import com.manga.agent.event.CreativeTextChannel;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.blueprint.AgentBlueprint;
 import com.manga.agent.blueprint.AgentBlueprintCodec;
@@ -8,6 +11,7 @@ import com.manga.agent.capability.AgentRuntimeContext;
 import com.manga.agent.changeset.ChangeSetApprovalService;
 import com.manga.agent.changeset.ChangeSetConstants;
 import com.manga.agent.config.CreativeExecutionProperties;
+import com.manga.agent.config.CreativeJournalProperties;
 import com.manga.agent.collaboration.CreativeDelegationService;
 import com.manga.agent.collaboration.CreativeGraphService;
 import com.manga.agent.collaboration.CreativeStepResultService;
@@ -92,7 +96,7 @@ class AgentCreativeStepExecutorTests {
                 new ToolResultEndEvent("reply-1", "tool-1", "get_script_structure", ToolResultState.SUCCESS),
                 new TextBlockDeltaEvent("reply-1", "block-1", "第二段")
         ).cast(AgentEvent.class));
-        when(lifecycleService.appendDelta(any(), any())).thenReturn(true);
+        when(lifecycleService.appendText(any(), any(), any(), any(), any())).thenReturn(true);
         when(lifecycleService.appendToolStarted(any(), any(), any())).thenReturn(true);
         when(lifecycleService.appendToolCompleted(any(), any(), any(), any())).thenReturn(true);
         when(lifecycleService.canContinue(claimed)).thenReturn(true);
@@ -102,6 +106,8 @@ class AgentCreativeStepExecutorTests {
                 invoker,
                 lifecycleService,
                 properties(),
+                new CreativeJournalProperties(4096, 16, 2048),
+                mock(CreativeProgressMetrics.class),
                 scheduler,
                 Schedulers.immediate(), streamTimer,
                 objectMapper, approvals, mock(CreativeDelegationService.class), graph,
@@ -111,11 +117,11 @@ class AgentCreativeStepExecutorTests {
 
         assertThat(context.getValue().stateSessionId()).isEqualTo("state-session-1");
         assertThat(context.getValue().projectId()).isEqualTo(21L);
-        verify(lifecycleService).appendDelta(claimed, "第一段");
+        verify(lifecycleService).appendText(claimed, "第一段", "reply-1", "block-1", CreativeTextChannel.CONTENT);
         verify(lifecycleService).appendToolStarted(claimed, "tool-1", "get_script_structure");
         verify(lifecycleService).appendToolCompleted(
                 claimed, "tool-1", "get_script_structure", CreativeToolStatus.SUCCESS);
-        verify(lifecycleService).appendDelta(claimed, "第二段");
+        verify(lifecycleService).appendText(claimed, "第二段", "reply-1", "block-1", CreativeTextChannel.CONTENT);
         verify(lifecycleService).complete(claimed, "{\"content\":\"第一段第二段\"}");
         verify(scheduledFuture).cancel(false);
         var order = inOrder(scheduler, blueprintCodec, budgets, lifecycleService, scheduledFuture);

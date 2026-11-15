@@ -1,5 +1,8 @@
 package com.manga.agent.application;
 
+import com.manga.agent.api.CreativeTimelinePage;
+import java.time.Duration;
+
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.manga.agent.domain.CreativeEventType;
 import com.manga.agent.api.CreativeRunResponse;
@@ -20,6 +23,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 
 /**
  * 验证 Creative Event 从数据库游标回放、实时唤醒补查和终态关闭。
@@ -80,7 +85,7 @@ class CreativeEventStreamServiceTests {
         CreativeEventStreamService service = service(eventService, signals);
 
         StepVerifier.withVirtualTime(() -> service.stream(RUN_ID, USER_ID, 0L))
-                .thenAwait(java.time.Duration.ofMillis(301))
+                .thenAwait(Duration.ofMillis(301))
                 .assertNext(envelope -> assertThat(envelope.eventType())
                         .isEqualTo(CreativeEventType.RUN_CANCELLED))
                 .verifyComplete();
@@ -95,7 +100,7 @@ class CreativeEventStreamServiceTests {
         when(queryService.findOwned(RUN_ID, USER_ID)).thenReturn(run);
         when(eventService.findAfter(RUN_ID, 4L)).thenReturn(List.of());
         CreativeEventStreamService service = new CreativeEventStreamService(
-                queryService, eventService, signals(Flux.never()), Schedulers.immediate());
+                queryService, eventService, signals(Flux.never()), Schedulers.immediate(), timeline());
 
         StepVerifier.create(service.stream(RUN_ID, USER_ID, 4L)).verifyComplete();
     }
@@ -104,7 +109,7 @@ class CreativeEventStreamServiceTests {
     private CreativeEventStreamService service(CreativeEventService eventService,
             CreativeEventRedisSignalService signals) {
         CreativeRunQueryService queryService = mock(CreativeRunQueryService.class);
-        return new CreativeEventStreamService(queryService, eventService, signals, Schedulers.immediate());
+        return new CreativeEventStreamService(queryService, eventService, signals, Schedulers.immediate(), timeline());
     }
 
     /** 创建在订阅确认后返回指定唤醒流的 Redis 信号服务。 */
@@ -112,6 +117,16 @@ class CreativeEventStreamServiceTests {
         CreativeEventRedisSignalService signals = mock(CreativeEventRedisSignalService.class);
         when(signals.wakeupsWhenSubscribed(RUN_ID)).thenReturn(Mono.just(wakeups));
         return signals;
+    }
+
+    /** SSE 映射单独验证，此处保留事件数量与顺序来覆盖订阅和断线行为。 */
+    private CreativeTimelineQueryService timeline() {
+        var service = mock(CreativeTimelineQueryService.class);
+        when(service.publicEvents(anyString(), any())).thenAnswer(invocation -> {
+            List<CreativeEvent> rows = invocation.getArgument(1);
+            return rows.stream().map(row -> mock(CreativeTimelinePage.Item.class)).toList();
+        });
+        return service;
     }
 
     /** 创建一条最小的已提交 Creative Event 记录。 */

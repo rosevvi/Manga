@@ -1,5 +1,7 @@
 package com.manga.config;
 
+import com.manga.agent.config.CreativeJournalProperties;
+import com.manga.agent.config.CreativeProjectionProperties;
 import com.manga.common.constant.AsyncConstants;
 import com.manga.common.logging.MdcTaskDecorator;
 import com.manga.config.properties.AsyncExecutorProperties;
@@ -81,8 +83,15 @@ public class AsyncConfig implements AsyncConfigurer {
 
     /** 每次订阅串行消费，线程数与待处理任务均有界。 */
     @Bean(name = AsyncConstants.MANGA_JOURNAL_SCHEDULER, destroyMethod = "dispose")
-    public Scheduler mangaJournalScheduler() {
-        return Schedulers.newBoundedElastic(properties.maxPoolSize(), properties.queueCapacity(), "manga-journal");
+    public Scheduler mangaJournalScheduler(CreativeJournalProperties journalProperties) {
+        return Schedulers.newBoundedElastic(journalProperties.maxThreads(),
+                journalProperties.schedulerQueueCapacity(), "manga-journal");
+    }
+
+    /** 消息投影使用独立有界线程资源，批次排队不占用 Journal 或模型执行线程。 */
+    @Bean(name = AsyncConstants.MANGA_PROJECTION_SCHEDULER, destroyMethod = "dispose")
+    public Scheduler mangaProjectionScheduler(CreativeProjectionProperties projection) {
+        return Schedulers.newBoundedElastic(projection.maxThreads(), projection.queueCapacity(), "manga-projection");
     }
 
     /** 此线程只发出计时信号，禁止执行阻塞数据库操作。 */

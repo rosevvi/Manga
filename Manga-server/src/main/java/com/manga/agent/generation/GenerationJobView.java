@@ -1,5 +1,7 @@
 package com.manga.agent.generation;
 
+import com.manga.agent.changeset.ChangeSetKind;
+
 import java.time.LocalDateTime;
 
 /** 浏览器可恢复的作业卡片，不序列化内部 Entity。 */
@@ -12,6 +14,7 @@ public record GenerationJobView(
         /** 所属项目。 */ Long projectId,
         /** 目标镜头。 */ Long shotId,
         /** 实际使用的供应商。 */ GenerationProviderKey provider,
+        /** 决定预览和采用方式的媒体提案类型。 */ ChangeSetKind mediaKind,
         /** 持久化阶段。 */ GenerationJobStatus status,
         /** 真实百分比，无信息时为空。 */ Integer progress,
         /** 用户已撤销结果采用权。 */ boolean cancelRequested,

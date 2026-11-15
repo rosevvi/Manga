@@ -4,5 +4,6 @@ public record StoryboardImageSnapshot(
         /** 镜头主键。 */ long shotId,
         /** 镜头标题。 */ String title,
         /** 项目当前版本。 */ long projectRevision,
-        /** 当前图片地址，可为空。 */ String imageUrl
+        /** 当前图片地址，可为空。 */ String imageUrl,
+        /** 当前参考图采用的平台产物，手动图片或未设置时为空。 */ Long artifactId
 ) { }

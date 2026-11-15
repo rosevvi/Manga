@@ -103,9 +103,19 @@
         WHERE run_id = #{runId}
         FOR UPDATE
     </select>
+    <select id="projectionWatermarks" resultType="com.manga.agent.api.CreativeConversationHistory$ProjectionWatermark">
+        SELECT r.run_id, COALESCE(p.projected_through_sequence, 0) AS projected_through_sequence,
+               r.next_sequence - 1 AS through_sequence, r.status
+        FROM manga_creative_run r LEFT JOIN manga_creative_message_projection p ON p.run_id = r.run_id
+        WHERE r.conversation_id = #{conversationId} ORDER BY r.id DESC LIMIT #{limit}
+    </select>
+    <update id="updateDeadline">
+        UPDATE manga_creative_run SET deadline_at = #{deadline}, updated_by = #{actor}
+        WHERE run_id = #{runId}
+    </update>
     <select id="findUnprojected" resultType="string">
         SELECT run_id FROM manga_creative_run
-        WHERE conversation_id IS NOT NULL AND projected_through_sequence &lt; next_sequence - 1
+        WHERE projected_through_sequence &lt; next_sequence - 1
         <if test="conversationId != null">AND conversation_id = #{conversationId}</if>
         ORDER BY id ASC LIMIT #{limit}
     </select>

@@ -1,8 +1,10 @@
 package com.manga.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.manga.agent.changeset.ChangeSetKind;
 import com.manga.agent.generation.GenerationJobStatus;
 import com.manga.agent.generation.GenerationProviderKey;
 import lombok.AllArgsConstructor;
@@ -28,8 +30,11 @@ public class GenerationJob {
     private String runId;
     /** 等待作业的步骤。 */
     private String stepId;
-    /** 批准的唯一图片提案。 */
+    /** 批准的唯一媒体生成提案。 */
     private String changeSetId;
+    /** 查询时从批准提案读取的媒体类型，供 worker 和作业视图使用。 */
+    @TableField(exist = false)
+    private ChangeSetKind mediaKind;
     /** 作业归属用户。 */
     private Long userId;
     /** 归属项目。 */

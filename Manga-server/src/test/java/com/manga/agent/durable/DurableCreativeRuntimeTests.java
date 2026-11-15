@@ -5,6 +5,7 @@ import com.manga.agent.application.CreativeRunCancellationService;
 import com.manga.agent.application.CreativeRunStartResult;
 import com.manga.agent.application.RunAdmissionService;
 import com.manga.agent.application.StartCreativeRunCommand;
+import com.manga.agent.application.CreativeProjectionBarrier;
 import com.manga.agent.domain.CreativeRunStatus;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +24,7 @@ class DurableCreativeRuntimeTests {
     void shouldDelegateAdmission() {
         RunAdmissionService admissionService = mock(RunAdmissionService.class);
         CreativeRunCancellationService cancellationService = mock(CreativeRunCancellationService.class);
-        DurableCreativeRuntime runtime = new DurableCreativeRuntime(admissionService, cancellationService);
+        DurableCreativeRuntime runtime = new DurableCreativeRuntime(admissionService, cancellationService, mock(CreativeProjectionBarrier.class));
         StartCreativeRunCommand command = StartCreativeRunCommand.conversation(
                 101L, "request-test", null, null, "创建漫剧项目");
         CreativeRunStartResult expected = new CreativeRunStartResult(
@@ -42,7 +43,7 @@ class DurableCreativeRuntimeTests {
     void shouldDelegateCancellation() {
         RunAdmissionService admissionService = mock(RunAdmissionService.class);
         CreativeRunCancellationService cancellationService = mock(CreativeRunCancellationService.class);
-        DurableCreativeRuntime runtime = new DurableCreativeRuntime(admissionService, cancellationService);
+        DurableCreativeRuntime runtime = new DurableCreativeRuntime(admissionService, cancellationService, mock(CreativeProjectionBarrier.class));
         CancelCreativeRunCommand command = new CancelCreativeRunCommand("run-test", 101L);
 
         runtime.cancel(command);

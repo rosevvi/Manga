@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.manga.mapper.CreativeGraphMapper">
+    <update id="saveResult">
+        UPDATE manga_creative_step SET result_json = #{result}, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE step_id = #{stepId} AND status = 'RUNNING' AND owner_instance_id = #{owner} AND owner_epoch = #{epoch}
+          AND lease_until &gt; CURRENT_TIMESTAMP AND result_json IS NULL
+    </update>
+    <update id="recordReads">
+        UPDATE manga_creative_step SET read_result_step_ids_json = #{reads}, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE step_id = #{stepId} AND status = 'RUNNING' AND owner_instance_id = #{owner} AND owner_epoch = #{epoch}
+          AND lease_until &gt; CURRENT_TIMESTAMP
+    </update>
     <select id="plans" resultType="com.manga.entity.CreativeDelegation">
         SELECT id, plan_id, run_id, parent_step_id, trigger_tool_call_id, owner_epoch, round_no,
                title, status, frozen_json, request_fingerprint, join_step_id,

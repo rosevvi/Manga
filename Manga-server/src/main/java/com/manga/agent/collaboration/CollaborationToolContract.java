@@ -10,8 +10,8 @@ import com.manga.agent.domain.AgentPermissionPolicy;
 public final class CollaborationToolContract {
     /** 委派协议同时支持已发布配置身份与临时只读声明的语义版本。 */
     public static final int DELEGATION_VERSION = 3;
-    /** 结果提交和读取协议未改变，不随委派协议一同升级。 */
-    public static final int RESULT_VERSION = 1;
+    /** 结果协议支持字段约束反馈与修订来源读取校验。 */
+    public static final int RESULT_VERSION = 2;
     /** 每次恢复后允许的最大领取次数。 */
     public static final int RETRY_ATTEMPTS = 3;
     /** 系统汇合节点名，不接受模型指定。 */

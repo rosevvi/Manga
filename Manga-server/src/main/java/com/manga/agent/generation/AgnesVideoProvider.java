@@ -3,8 +3,10 @@ package com.manga.agent.generation;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.manga.agent.changeset.ChangeSetCodec;
+import com.manga.agent.changeset.ChangeSetKind;
 import com.manga.dto.ResolvedAiProviderConfig;
 import com.manga.entity.GenerationJob;
+import com.manga.integration.ai.AgnesEndpoint;
 import com.manga.integration.ai.AiProviderProxySettings;
 import com.manga.integration.http.ExternalHttpClientFactory;
 import com.manga.service.storage.GeneratedMediaFormat;
@@ -42,6 +44,10 @@ public class AgnesVideoProvider implements GenerationProvider {
     /** 注册 Agnes 视频路由。 */
     @Override
     public GenerationProviderKey key() { return GenerationProviderKey.AGNES; }
+
+    /** 只接收已批准的视频作业。 */
+    @Override
+    public ChangeSetKind mediaKind() { return ChangeSetKind.VIDEO_GENERATION; }
 
     /** Agnes 返回 MP4 文件。 */
     @Override
@@ -91,7 +97,7 @@ public class AgnesVideoProvider implements GenerationProvider {
         ResolvedAiProviderConfig config = resolve(job);
         byte[] bytes;
         try {
-            bytes = clients.createBoundedWebClient(AgnesVideoModel.BASE_URL, proxy(config).toExternalProxySettings(),
+            bytes = clients.createBoundedWebClient(AgnesEndpoint.BASE_URL, proxy(config).toExternalProxySettings(),
                             properties.httpTimeout(), properties.maxMediaBytes())
                     .get().uri(uri).retrieve().bodyToMono(byte[].class).block(properties.httpTimeout());
         } catch (RuntimeException exception) {
@@ -146,7 +152,7 @@ public class AgnesVideoProvider implements GenerationProvider {
 
     /** 同一个官方网关处理认证请求，不向媒体下载传递认证头。 */
     private WebClient client(ResolvedAiProviderConfig config) {
-        return clients.createBoundedWebClient(AgnesVideoModel.BASE_URL, proxy(config).toExternalProxySettings(),
+        return clients.createBoundedWebClient(AgnesEndpoint.BASE_URL, proxy(config).toExternalProxySettings(),
                 API_TIMEOUT, RESPONSE_LIMIT).mutate().defaultHeaders(headers -> headers.setBearerAuth(config.apiKey())).build();
     }
 

@@ -47,7 +47,7 @@ export default function StoryboardModule({ accessToken, projects, selectedProjec
   const project = projects.find((item) => String(item.id) === String(projectId))
   const dirty = JSON.stringify(form) !== baseline
   useUnsavedChanges(dirty)
-  current.current = { dirty, creating }
+  current.current = { dirty, imageEdited: form.imageUrl !== JSON.parse(baseline).imageUrl }
 
   const visibleShots = useMemo(() => shots.filter((shot) => (selection.chapter === 'all'
     || selection.chapter === 'unassigned' && !shot.chapterId || String(shot.chapterId) === selection.chapter)
@@ -90,11 +90,15 @@ export default function StoryboardModule({ accessToken, projects, selectedProjec
     setForm(next); setBaseline(JSON.stringify(next))
   }, [selectedShot?.id, creating])
 
-  /** 正文更新或采用图片后，只有没有本地草稿才刷新编辑字段。 */
+  /** 接收最新参考图，保留未保存的正文和显式编辑过的图片地址。 */
   useEffect(() => {
-    if (!selectedShot || current.current.dirty || creating) return
+    if (!selectedShot || creating) return
     const next = shotForm(selectedShot)
-    setForm(next); setBaseline(JSON.stringify(next))
+    if (!current.current.dirty) { setForm(next); setBaseline(JSON.stringify(next)); return }
+    if (!current.current.imageEdited) {
+      setForm((value) => ({ ...value, imageUrl: next.imageUrl }))
+      setBaseline((value) => JSON.stringify({ ...JSON.parse(value), imageUrl: next.imageUrl }))
+    }
   }, [selectedShot, creating])
 
   const navigateSelection = (patch) => {
@@ -219,7 +223,7 @@ export default function StoryboardModule({ accessToken, projects, selectedProjec
         <details><summary className="workbench-muted">参考图地址</summary><input aria-label="参考图地址" maxLength={PROJECT_LIMITS.shotImageUrl} value={form.imageUrl} onChange={(event) => update('imageUrl', event.target.value)} /></details>
       </form> : <main className="shot-detail-editor workbench-empty"><Film size={34} /><h2>让文字变成镜头</h2><p>选择章节生成分镜提案，或手动添加第一个镜头。</p><button type="button" className="workspace-primary" onClick={create}><Plus size={14} />新增镜头</button></main>}
       <aside className="shot-media-preview"><div className="workbench-tabs"><button type="button" className={mediaType === 'IMAGE' ? 'active' : ''} onClick={() => changeMedia('IMAGE')}>图片</button><button type="button" className={mediaType === 'VIDEO' ? 'active' : ''} onClick={() => changeMedia('VIDEO')}>视频</button></div>
-        {selectedShot ? <>{mediaType === 'IMAGE' && <div className="shot-preview-frame"><MediaImage src={selectedShot.imageUrl} alt={selectedShot.title} fallback={<ImageOff size={30} />} showErrorText /></div>}
+        {selectedShot ? <>{mediaType === 'IMAGE' && <div className="shot-preview-frame"><MediaImage src={selectedShot.imagePreviewUrl || selectedShot.imageUrl} alt={selectedShot.title} fallback={<ImageOff size={30} />} showErrorText /></div>}
           <ImageGenerationPanel key={`${projectId}.${selectedShot.id}.${mediaType}`} accessToken={accessToken} projectId={projectId} selectedShot={selectedShot} shots={shots} mediaType={mediaType} />
           <GenerationJobsPanel key={`${projectId}.${selectedShot.id}.${mediaType}.history`} accessToken={accessToken} projectId={projectId} shotId={selectedShot.id} mediaType={mediaType} /></> : <p className="workbench-muted">保存并选择一个镜头后，可配置模型、生成图片或 Agnes 视频。</p>}
       </aside>
@@ -229,7 +233,7 @@ export default function StoryboardModule({ accessToken, projects, selectedProjec
       <button type="button" className="workbench-icon-button" aria-label="后移镜头" disabled={saving || !selectedShot || shots.at(-1)?.id === selectedShot.id} onClick={() => move(1)}><ArrowDown size={14} /></button>
       <button type="button" className="workspace-secondary" onClick={create}><Plus size={13} />添加镜头</button></div></header>
       <div className="shot-filmstrip-scroll">{visibleShots.map((shot) => <button type="button" key={shot.id} className={selectedShot?.id === shot.id ? 'shot-thumbnail active' : 'shot-thumbnail'} onClick={() => chooseShot(shot)}>
-        <span className="shot-thumbnail-visual"><MediaImage src={shot.imageUrl} alt={shot.title} fallback={<ImageOff size={23} />} /></span><span className="shot-thumbnail-label"><strong>{shot.shotNumber || shot.title}</strong><small>{shot.durationSeconds}s</small></span></button>)}</div>
+        <span className="shot-thumbnail-visual"><MediaImage src={shot.imagePreviewUrl || shot.imageUrl} alt={shot.title} fallback={<ImageOff size={23} />} /></span><span className="shot-thumbnail-label"><strong>{shot.shotNumber || shot.title}</strong><small>{shot.durationSeconds}s</small></span></button>)}</div>
     </section>
   </section>
 }

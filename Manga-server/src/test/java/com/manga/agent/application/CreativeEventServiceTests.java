@@ -1,5 +1,7 @@
 package com.manga.agent.application;
 
+import com.manga.repository.CreativeMessageProjectionRepository;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.config.CreativeRuntimeProperties;
 import com.manga.agent.domain.CreativeEventType;
@@ -52,8 +54,8 @@ class CreativeEventServiceTests {
                 signals,
                 new ObjectMapper(),
                 new CreativeRuntimeProperties("durable-v1", "v1", 1, Duration.ofMinutes(30)),
-                mock(CreativeMessageProjector.class),
-                mock(AgentStateSessionService.class), mock(ApplicationEventPublisher.class));
+                mock(AgentStateSessionService.class), mock(ApplicationEventPublisher.class),
+                mock(CreativeMessageProjectionRepository.class));
         TransactionSynchronizationManager.setActualTransactionActive(true);
         TransactionSynchronizationManager.initSynchronization();
 

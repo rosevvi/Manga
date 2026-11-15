@@ -1,5 +1,9 @@
 package com.manga.agent.collaboration;
 
+import com.manga.agent.capability.CapabilityContractSupport;
+import com.manga.entity.CreativeRepairDecision;
+import java.util.UUID;
+
 import com.manga.agent.application.CreativeEventService;
 import com.manga.agent.application.CreativeIdentifierGenerator;
 import com.manga.agent.application.CreativeRunAggregationService;
@@ -61,6 +65,7 @@ public class CreativeGraphService {
     private final CreativeEventService events;
     private final CreativeRunAggregationService aggregation;
     private final ApplicationEventPublisher publisher;
+    private final CreativeRepairCheckpointService repairs;
 
     /** 必须在模型流、HarnessLease 和 KernelHandle 已关闭后调用；草稿重放只物化一次。 */
     @Transactional
@@ -72,6 +77,43 @@ public class CreativeGraphService {
         CreativeStep parent = steps.findByStepId(claim.stepId()).orElseThrow();
         CollaborationGuard.requireOwner(parent, claim.ownerInstanceId(), claim.ownerEpoch(), claim.stateSessionId());
         FrozenDelegation frozen = codec.read(plan.getFrozenJson(), FrozenDelegation.class);
+        return materialize(run, parent, plan, frozen, List.of());
+    }
+
+    /** 用户确认后的修订只复用既有冻结规格；显式依赖授权原候选和评审的读取。 */
+    public String resumeRepair(CreativeRun run, CreativeStep parent, CreativeRepairDecision decision, String comment) {
+        var source = steps.findByStepId(decision.getCandidateStepId()).orElseThrow();
+        var reviewer = steps.findByStepId(decision.getReviewStepId()).orElseThrow();
+        var budget = graph.budget(run.getRunId());
+        if (decision.getRoundNo() > budget.getMaxRepairRounds()
+                || steps.findByRunId(run.getRunId()).size() + 3 > budget.getMaxSteps()) {
+            throw new AgentRuntimeException(CreativeErrorCode.REPAIR_BUDGET_EXHAUSTED, RepairMessages.EXHAUSTED);
+        }
+        var candidateBlueprint = blueprints.deserialize(source.getBlueprintSnapshotJson());
+        var reviewerBlueprint = blueprints.deserialize(reviewer.getBlueprintSnapshotJson());
+        var request = new DelegatePlanRequest("第 " + (decision.getRoundNo() + 1) + " 轮候选修订", List.of(
+                new DelegatePlanRequest.Node(RepairMessages.REPAIR_NODE, candidateBlueprint.profileId(),
+                        RepairMessages.REPAIR_INSTRUCTION.formatted(source.getStepId(), reviewer.getStepId(),
+                                Objects.requireNonNullElse(comment, "无")), List.of()),
+                new DelegatePlanRequest.Node(RepairMessages.REVIEW_NODE, reviewerBlueprint.profileId(),
+                        RepairMessages.REVIEW_INSTRUCTION.formatted(reviewer.getStepId()), List.of(RepairMessages.REPAIR_NODE))));
+        CreativeDelegation plan = new CreativeDelegation();
+        plan.setPlanId(UUID.randomUUID().toString()); plan.setRunId(run.getRunId());
+        plan.setParentStepId(parent.getStepId()); plan.setOwnerEpoch(parent.getOwnerEpoch());
+        plan.setTriggerToolCallId(decision.getDecisionId()); plan.setRoundNo(decision.getRoundNo() + 1);
+        plan.setTitle(request.title()); plan.setStatus(DelegationStatus.DRAFT);
+        var frozen = new FrozenDelegation(request, List.of(candidateBlueprint, reviewerBlueprint));
+        plan.setFrozenJson(codec.write(frozen));
+        plan.setRequestFingerprint(CapabilityContractSupport.sha256(codec.write(frozen)));
+        plan.setCreatedBy(decision.getUpdatedBy()); plan.setUpdatedBy(decision.getUpdatedBy());
+        graph.create(plan);
+        materialize(run, parent, plan, frozen, List.of(source.getStepId(), reviewer.getStepId()));
+        return plan.getPlanId();
+    }
+
+    /** 所有节点、跨轮次结果引用、许可与投递信号在持有 Run 锁的同一事务物化。 */
+    private boolean materialize(CreativeRun run, CreativeStep parent, CreativeDelegation plan,
+            FrozenDelegation frozen, List<String> sourceResults) {
         CreativeStepInput input = codec.read(parent.getInputJson(), CreativeStepInput.class);
         Map<String, CreativeStep> nodes = new HashMap<>();
         for (int index = 0; index < frozen.request().nodes().size(); index++) {
@@ -100,6 +142,11 @@ public class CreativeGraphService {
             for (String predecessor : node.dependsOn()) edge(run.getRunId(), nodes.get(predecessor).getStepId(), nodes.get(node.key()).getStepId());
             boolean sink = frozen.request().nodes().stream().noneMatch(other -> other.dependsOn().contains(node.key()));
             if (sink) edge(run.getRunId(), nodes.get(node.key()).getStepId(), join.getStepId());
+        }
+        if (!sourceResults.isEmpty()) {
+            for (String source : sourceResults) {
+                edge(run.getRunId(), source, nodes.get(RepairMessages.REPAIR_NODE).getStepId());
+            }
         }
         edge(run.getRunId(), join.getStepId(), parent.getStepId());
         parent.setDelegationRound(plan.getRoundNo());
@@ -177,9 +224,11 @@ public class CreativeGraphService {
             CreativeStep parent = current.stream().filter(step -> step.getStepId().equals(plan.getParentStepId())).findFirst().orElseThrow();
             if (parent.getStatus() != CreativeStepStatus.WAITING_CHILDREN) continue;
             var summaries = summaries(current.stream().filter(step -> plan.getPlanId().equals(step.getDelegationPlanId())).toList());
-            ready(run, parent, identifiers.nextStateSessionId(), codec.write(new Continuation(plan.getPlanId(), plan.getRoundNo(), summaries)));
             plan.setStatus(DelegationStatus.COMPLETED);
             graph.update(plan);
+            if (!repairs.pause(run, parent, plan, current)) {
+                ready(run, parent, identifiers.nextStateSessionId(), codec.write(new Continuation(plan.getPlanId(), plan.getRoundNo(), summaries)));
+            }
             log.info("Creative collaboration joined runId={} planId={} parentStepId={}", runId, plan.getPlanId(), parent.getStepId());
         }
         aggregation.aggregate(runId);

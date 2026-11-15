@@ -1,5 +1,11 @@
 package com.manga.agent.application;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.manga.agent.api.CreativeTimelinePage;
+import java.util.ArrayList;
+import java.util.List;
+
 import com.manga.agent.domain.CreativeEventType;
 import com.manga.agent.api.CreativeRunResponse;
 import com.manga.agent.event.CreativeEventEnvelope;
@@ -32,6 +38,7 @@ public class CreativeEventStreamService {
     private final CreativeEventService eventService;
     private final CreativeEventRedisSignalService redisSignalService;
     private final Scheduler mangaBlockingScheduler;
+    private final CreativeTimelineQueryService timeline;
 
     /** 校验 Run 所有权后，从指定事件序号继续回放并实时推送至终态。 */
     public Flux<CreativeEventEnvelope> stream(String runId, long userId, long afterSequence) {
@@ -84,14 +91,22 @@ public class CreativeEventStreamService {
 
     /** 在受控阻塞 Scheduler 上读取指定游标后的数据库事件。 */
     private Flux<CreativeEventEnvelope> readAfter(String runId, AtomicLong cursor) {
-        return Mono.fromCallable(() -> eventService.findAfter(runId, cursor.get()))
+        return Mono.fromCallable(() -> {
+                    var rows = eventService.findAfter(runId, cursor.get());
+                    if (rows.isEmpty()) { return List.<CreativeEventEnvelope>of(); }
+                    var publicItems = timeline.publicEvents(runId, rows);
+                    var envelopes = new ArrayList<CreativeEventEnvelope>();
+                    for (int index = 0; index < rows.size(); index++) {
+                        envelopes.add(toEnvelope(rows.get(index), cursor, publicItems.get(index)));
+                    }
+                    return envelopes;
+                })
                 .subscribeOn(mangaBlockingScheduler)
-                .flatMapMany(Flux::fromIterable)
-                .map(event -> toEnvelope(event, cursor));
+                .flatMapMany(Flux::fromIterable);
     }
 
     /** 将持久化事件转换为版本化的 Creative Event Envelope。 */
-    private CreativeEventEnvelope toEnvelope(CreativeEvent event, AtomicLong cursor) {
+    private CreativeEventEnvelope toEnvelope(CreativeEvent event, AtomicLong cursor, CreativeTimelinePage.Item activity) {
         cursor.set(event.getSequenceNo());
         return new CreativeEventEnvelope(
                 event.getSchemaVersion(),
@@ -101,9 +116,20 @@ public class CreativeEventStreamService {
                 event.getEventType(),
                 event.getSource(),
                 event.getCorrelationId(),
-                eventService.payload(event),
-                event.getCreatedAt()
+                publicPayload(event),
+                event.getCreatedAt(), activity
         );
+    }
+
+    /** 临时 Agent 声明含系统提示词，只允许公开标识；其他业务事件沿用既有安全载荷。 */
+    private JsonNode publicPayload(CreativeEvent event) {
+        var payload = eventService.payload(event);
+        if (event.getEventType() == CreativeEventType.DYNAMIC_AGENT_CREATED) {
+            var safe = JsonNodeFactory.instance.objectNode();
+            safe.put("stepId", event.getStepId());
+            return safe;
+        }
+        return payload;
     }
 
     /** 判断事件是否为关闭 SSE 的 Run 终态事件。 */

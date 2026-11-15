@@ -81,6 +81,51 @@
 .task-detail-header .task-status.failed { color: var(--creative-danger); }
 .task-detail-header .task-status.completed { color: var(--creative-success); }
 .execution-timeline { display: grid; gap: 10px; }
+.creative-process { display: grid; gap: 12px; position: relative; }
+.process-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.process-disclosure { min-width: 0; border: 1px solid var(--creative-line); border-radius: 10px; background: var(--workspace-surface); overflow: hidden; }
+.process-disclosure-heading { display: flex; width: 100%; align-items: center; gap: 9px; padding: 13px 15px; text-align: left; border: 0; background: transparent; color: var(--creative-text); cursor: pointer; font: inherit; font-size: 12px; }
+.process-disclosure-heading > svg { flex-shrink: 0; color: var(--creative-accent); }
+.process-disclosure-heading > strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.process-disclosure-heading > small { font-size: 10px; color: var(--creative-muted); }
+.process-disclosure-heading:hover { background: var(--workspace-inset); }
+.process-disclosure-content { display: grid; gap: 10px; padding: 12px 15px 15px; border-top: 1px solid var(--creative-line); min-width: 0; }
+.process-plan { background: transparent; }
+.process-agent { background: var(--workspace-inset); }
+.process-agent .process-tool { background: var(--workspace-surface); }
+.process-agent > .process-disclosure-content { position: relative; border-inline-start: 2px solid var(--creative-line); }
+.process-writing { display: inline-flex; align-items: center; gap: 6px; color: var(--creative-accent); font-size: 11px; }
+.process-disclosure-content p { margin: 0; line-height: 1.8; }
+.process-prose { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+.provider-reasoning { max-height: 260px; overflow: auto; color: var(--creative-muted); }
+.process-state, .process-muted { color: var(--creative-muted); font-size: 11px; }
+.process-state.success { color: var(--creative-success); }
+.process-state.error, .process-error { color: var(--creative-danger); }
+.process-tool.failed { border-color: var(--creative-danger); }
+.process-technical { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 11px; color: var(--creative-muted); }
+.process-technical time { margin-right: 10px; font-variant-numeric: tabular-nums; }
+.process-new-content { position: sticky; bottom: 12px; justify-self: center; border: 1px solid var(--creative-accent); border-radius: 18px; padding: 8px 16px; background: var(--workspace-surface); color: var(--creative-text); cursor: pointer; }
+.process-spinner { animation: process-spin 1s linear infinite; }
+@keyframes process-spin { to { transform: rotate(360deg); } }
+.repair-decisions { display: grid; gap: 12px; margin-bottom: 18px; }
+.repair-decision { padding: 16px; border: 1px solid var(--creative-accent); border-radius: 12px; background: var(--workspace-surface); font-size: 12px; }
+.repair-decision header { display: grid; gap: 5px; }
+.repair-decision header small { color: var(--creative-muted); }
+.repair-decision li { margin: 8px 0; line-height: 1.7; }
+.repair-decision summary { cursor: pointer; padding: 8px 0; }
+.repair-decision textarea { box-sizing: border-box; width: 100%; padding: 10px; resize: vertical; color: var(--creative-text); background: var(--workspace-inset); border: 1px solid var(--creative-line); border-radius: 8px; font: inherit; }
+.repair-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.repair-candidate { display: grid; gap: 12px; max-height: 420px; overflow: auto; }
+.repair-candidate article { padding: 12px; border-bottom: 1px solid var(--creative-line); }
+.repair-candidate small { display: block; margin-top: 6px; color: var(--creative-muted); }
+.repair-candidate p { white-space: pre-wrap; line-height: 1.8; }
+@media (max-width: 640px) {
+  .process-disclosure-content { padding: 9px; }
+  .process-disclosure-heading { padding: 11px 9px; gap: 6px; flex-wrap: wrap; }
+  .process-disclosure-heading > small { display: none; }
+  .process-state { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .process-spinner { animation: none; } }
 .execution-card { overflow: hidden; border: 1px solid #3e2d50; border-radius: 10px; background: #1c1425; }
 .execution-card > summary { display: flex; align-items: center; gap: 10px; padding: 13px 15px; cursor: pointer; list-style: none; }
 .execution-card > summary > svg { flex-shrink: 0; color: #b695e9; }

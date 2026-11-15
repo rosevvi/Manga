@@ -1,15 +1,23 @@
 package com.manga.mapper;
 
+import java.time.LocalDateTime;
+
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.manga.entity.CreativeRun;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import com.manga.agent.api.CreativeConversationHistory;
 
 /**
  * 提供 Creative Run 的所有权、幂等和加锁查询。
  */
 public interface CreativeRunMapper extends BaseMapper<CreativeRun> {
+    /** 只移动执行截止时间，不覆盖已被同事务事件推进的序号或投影水位。 */
+    int updateDeadline(@Param("runId") String runId, @Param("deadline") LocalDateTime deadline, @Param("actor") String actor);
+    /** 一次查询会话最近运行的消息与事实水位，避免逐运行回查。 */
+    List<CreativeConversationHistory.ProjectionWatermark> projectionWatermarks(@Param("conversationId") String conversationId,
+            @Param("limit") int limit);
     /** 用户项目内的章节和分镜手动任务分页。 */
     List<CreativeRun> findManual(@Param("userId") long userId, @Param("projectId") Long projectId,
             @Param("beforeId") Long beforeId, @Param("limit") int limit);

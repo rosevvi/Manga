@@ -26,6 +26,14 @@ public class CreativeGraphRepository {
     private final CreativeRunBudgetMapper budgets;
     private final CreativeStepMapper steps;
     private final CreativeArtifactMapper artifacts;
+    /** 围栏保护结果提交，独立心跳字段不参与更新。 */
+    public boolean saveResult(String stepId, String owner, long epoch, String result, String actor) {
+        return queries.saveResult(stepId, owner, epoch, result, actor) == 1;
+    }
+    /** 围栏保护结果读取审计，避免回写旧租约。 */
+    public boolean recordReads(String stepId, String owner, long epoch, String reads, String actor) {
+        return queries.recordReads(stepId, owner, epoch, reads, actor) == 1;
+    }
 
     /** 一次读取 Run 的全部计划。 */
     public List<CreativeDelegation> plans(String runId) { return queries.plans(runId); }
