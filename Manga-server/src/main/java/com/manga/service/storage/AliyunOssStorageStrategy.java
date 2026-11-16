@@ -46,7 +46,7 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
     private static final Pattern UPLOADED_IMAGE_KEY = Pattern.compile(
             "[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\\.(?:jpe?g|png|webp|gif)");
     /** 生成图片仅允许读取作业 UUID 和写入代次对应的 PNG。 */
-    private static final Pattern GENERATED_IMAGE_KEY = Pattern.compile(
+    private static final Pattern GENERATED_MEDIA_KEY = Pattern.compile(
             "[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}-[1-9][0-9]*\\.(?:png|mp4)");
     /** 预览链接每次随业务响应刷新，避免长期公开对象。 */
     private static final Duration PREVIEW_TTL = Duration.ofHours(1);
@@ -76,26 +76,26 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
 
     /** 在调用方校验业务访问权限后，签署上传者命名空间中的图片。 */
     public String previewUserImage(String url, long ownerId) {
-        return signImage(url, USER_UPLOAD_DIRECTORY + "/" + ownerId, UPLOADED_IMAGE_KEY);
+        return signMedia(url, USER_UPLOAD_DIRECTORY + "/" + ownerId, UPLOADED_IMAGE_KEY);
     }
 
-    /** 只为来自平台产物记录或已采用产物关联的图片签名。 */
-    public String previewGeneratedImage(String url) {
-        return signImage(url, StorageConstants.GENERATED_DIRECTORY, GENERATED_IMAGE_KEY);
+    /** 只为已授权的平台生成图片或视频签署预览地址。 */
+    public String previewGeneratedMedia(String url) {
+        return signMedia(url, StorageConstants.GENERATED_DIRECTORY, GENERATED_MEDIA_KEY);
     }
 
     /** 按已授权产物记录签署附件下载，跨域 OSS 地址也会返回下载响应头。 */
     public String downloadGeneratedMedia(String url) {
-        return signImage(url, StorageConstants.GENERATED_DIRECTORY, GENERATED_IMAGE_KEY, true);
+        return signMedia(url, StorageConstants.GENERATED_DIRECTORY, GENERATED_MEDIA_KEY, true);
     }
 
     /** 重新生成可读链接，仅接受当前 Bucket 中指定目录下的规范对象键。 */
-    private String signImage(String url, String directory, Pattern namePattern) {
-        return signImage(url, directory, namePattern, false);
+    private String signMedia(String url, String directory, Pattern namePattern) {
+        return signMedia(url, directory, namePattern, false);
     }
 
     /** 签名覆盖响应头，不能由浏览器在现有签名后追加下载参数。 */
-    private String signImage(String url, String directory, Pattern namePattern, boolean download) {
+    private String signMedia(String url, String directory, Pattern namePattern, boolean download) {
         if (Objects.isNull(url) || !properties.configured()) {
             return url;
         }

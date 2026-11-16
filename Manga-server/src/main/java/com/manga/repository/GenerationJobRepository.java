@@ -1,12 +1,15 @@
 package com.manga.repository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.manga.agent.generation.GenerationError;
+import com.manga.agent.generation.GenerationJobStatus;
 import com.manga.agent.generation.SubmissionStatus;
 import com.manga.agent.generation.GenerationProviderKey;
+import com.manga.dto.StoryboardVideoArtifact;
 import com.manga.entity.CreativeArtifact;
 import com.manga.entity.GenerationJob;
 import com.manga.mapper.CreativeArtifactMapper;
 import com.manga.mapper.GenerationJobMapper;
+import com.manga.service.storage.GeneratedMediaFormat;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
@@ -43,6 +46,11 @@ public class GenerationJobRepository {
     public List<GenerationJob> visible(long userId, long projectId, String runId, String conversationId,
             Long beforeId, int limit, Long shotId, String mediaKind) {
         return mapper.findVisible(userId, projectId, runId, conversationId, beforeId, limit, shotId, mediaKind);
+    }
+    /** 仅返回用户拥有的成功视频，跳过失败作业、待转存结果和图片。 */
+    public List<StoryboardVideoArtifact> latestStoryboardVideos(long userId, long projectId, Long chapterId) {
+        return mapper.findLatestStoryboardVideos(userId, projectId, chapterId, GenerationJobStatus.SUCCEEDED,
+                GeneratedMediaFormat.MP4.mimeType());
     }
     /** 暴露窄接口以执行跨实例容量判断。 */
     public boolean capacity(GenerationJob job, int providerLimit, int userLimit) {

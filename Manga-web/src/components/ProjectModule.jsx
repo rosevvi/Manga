@@ -1,17 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Check,
   Eye,
-  FolderOpen,
   ImageOff,
   Monitor,
   Palette,
-  Pencil,
-  Plus,
-  Search,
   Shield,
   Sparkles,
-  Trash2,
   Type,
   X,
 } from 'lucide-react'
@@ -27,6 +22,8 @@ import {
 import { useLanguage } from '../i18n/LanguageContext'
 import ImageInput from './ImageInput'
 import MediaImage from './MediaImage'
+import ProjectDirectory from './ProjectDirectory'
+import { useWorkspaceConfirm } from './WorkspaceConfirmDialog'
 import './project-module.css'
 
 const EMPTY_PROJECT = Object.freeze({
@@ -52,7 +49,7 @@ const VISIBILITY_OPTIONS = Object.freeze([
 /** 展示当前用户项目，并提供搜索、创建、编辑与删除入口。 */
 function ProjectModule({ accessToken, projects, loading, error, onProjectsChanged, onOpenProject }) {
   const { translate } = useLanguage()
-  const [query, setQuery] = useState('')
+  const confirm = useWorkspaceConfirm()
   const [editingProject, setEditingProject] = useState(undefined)
   const [form, setForm] = useState(EMPTY_PROJECT)
   const [saving, setSaving] = useState(false)
@@ -70,23 +67,6 @@ function ProjectModule({ accessToken, projects, loading, error, onProjectsChange
       .catch((requestError) => setFormError(requestError.message))
       .finally(() => setPresetsLoading(false))
   }, [accessToken, editingProject])
-
-  const filteredProjects = useMemo(() => {
-    const keyword = query.trim().toLocaleLowerCase()
-    if (!keyword) return projects
-    return projects.filter((project) =>
-      [
-        project.name,
-        project.description,
-        project.genre,
-        project.aspectRatio,
-        project.artStyleName,
-        project.artStyleDescription,
-      ]
-        .filter(Boolean)
-        .some((value) => value.toLocaleLowerCase().includes(keyword)),
-    )
-  }, [projects, query])
 
   const openCreate = () => {
     setEditingProject(null)
@@ -206,7 +186,10 @@ function ProjectModule({ accessToken, projects, loading, error, onProjectsChange
   )
 
   const removeProject = async (project) => {
-    if (!window.confirm(translate('projects.deleteConfirm', { name: project.name }))) return
+    if (!(await confirm({
+      title: translate('confirm.deleteProjectTitle'), message: translate('projects.deleteConfirm', { name: project.name }),
+      confirmLabel: translate('common.delete'), danger: true,
+    }))) return
     try {
       await deleteProject(accessToken, project.id)
       await onProjectsChanged()
@@ -217,82 +200,16 @@ function ProjectModule({ accessToken, projects, loading, error, onProjectsChange
 
   return (
     <section className="workspace-module" aria-labelledby="projects-title">
-      <header className="workspace-heading">
-        <div>
-          <span className="workspace-eyebrow">{translate('projects.eyebrow')}</span>
-          <h1 id="projects-title">{translate('projects.title')}</h1>
-          <p>{translate('projects.description')}</p>
-        </div>
-        <button className="workspace-primary" type="button" onClick={openCreate}>
-          <Plus size={17} />
-          <span>{translate('projects.create')}</span>
-        </button>
-      </header>
-
-      <div className="workspace-toolbar">
-        <label className="workspace-search">
-          <Search size={17} />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={translate('projects.search')}
-          />
-        </label>
-        <span>{translate('projects.count', { count: filteredProjects.length })}</span>
-      </div>
-
-      {error && <div className="workspace-alert">{error}</div>}
-      {formError && editingProject === undefined && <div className="workspace-alert">{formError}</div>}
-      {loading ? (
-        <div className="workspace-state">{translate('common.loading')}</div>
-      ) : filteredProjects.length === 0 ? (
-        <div className="workspace-empty">
-          <span><FolderOpen size={28} /></span>
-          <h2>{translate(query ? 'projects.noResults' : 'projects.empty')}</h2>
-          <p>{translate(query ? 'projects.noResultsHint' : 'projects.emptyHint')}</p>
-          {!query && <button type="button" onClick={openCreate}><Plus size={16} />{translate('projects.create')}</button>}
-        </div>
-      ) : (
-        <div className="project-module-grid">
-          {filteredProjects.map((project) => {
-            const statusClass = `status-${project.status.toLowerCase().replace('_', '-')}`
-            const styleName = project.artStyleName || (project.artStyle === CUSTOM_ART_STYLE ? translate('projects.customArtStyle') : translate('projects.artStyleUnset'))
-            return (
-              <article className="project-module-card" key={project.id}>
-                  <button className="project-module-cover" type="button" onClick={() => onOpenProject(project)}>
-                  <MediaImage src={project.coverPreviewUrl || project.coverUrl} fallback={<ImageOff size={30} />} />
-                  <span className={`workspace-status ${statusClass}`}>
-                    {translate(`projectStatus.${project.status}`)}
-                  </span>
-                </button>
-                <div className="project-module-copy">
-                  <button className="project-module-title" type="button" onClick={() => onOpenProject(project)}>
-                    <strong>{project.name}</strong>
-                    <span>{project.genre || translate('projects.genreUnset')}</span>
-                  </button>
-                  <p>{project.description || translate('projects.descriptionUnset')}</p>
-                  <div className="project-module-meta">
-                    <span><Monitor size={12} />{project.aspectRatio || PROJECT_ASPECT_RATIOS[0].value}</span>
-                    <span><Palette size={12} />{styleName}</span>
-                    <span><Shield size={12} />{translate(`projectVisibility.${project.visibilityScope || PROJECT_VISIBILITY_SCOPE.PRIVATE}`)}</span>
-                  </div>
-                  <div className="project-module-footer">
-                    <span>{translate('projects.shotCount', { count: project.shotCount })}</span>
-                    <div>
-                      <button type="button" aria-label={translate('common.edit')} onClick={() => openEdit(project)}>
-                        <Pencil size={15} />
-                      </button>
-                      <button type="button" aria-label={translate('common.delete')} onClick={() => removeProject(project)}>
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            )
-          })}
-        </div>
-      )}
+      <ProjectDirectory
+        projects={projects}
+        loading={loading}
+        error={error}
+        actionError={editingProject === undefined ? formError : ''}
+        onOpen={onOpenProject}
+        onCreate={openCreate}
+        onEdit={openEdit}
+        onDelete={removeProject}
+      />
 
       {editingProject !== undefined && (
         <div className="workspace-modal-backdrop" role="presentation" onMouseDown={closeEditor}>

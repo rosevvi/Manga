@@ -55,6 +55,7 @@ export const PROJECT_LIMITS = Object.freeze({
   shotSoundEffect: 500,
   shotImageUrl: 1024,
   shotNotes: 2000,
+  shotVideoPrompt: 4000,
 })
 
 export function projectEndpoint(projectId) {

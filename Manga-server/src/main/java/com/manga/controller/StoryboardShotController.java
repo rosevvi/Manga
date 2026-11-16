@@ -7,6 +7,7 @@ import com.manga.dto.StoryboardShotOrderRequest;
 import com.manga.dto.StoryboardShotResponse;
 import com.manga.dto.StoryboardShotUpdateRequest;
 import com.manga.service.StoryboardShotService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,11 +34,13 @@ public class StoryboardShotController {
 
     /** 查询项目分镜镜头列表。 */
     @GetMapping("/{projectId}/storyboard-shots")
+    @Operation(summary = "查询项目分镜列表", description = "videoPreview 为 true 时批量返回每个镜头的最新视频播放地址。")
     public ApiResponse<List<StoryboardShotResponse>> findAll(@PathVariable long projectId,
-            @RequestParam(required = false) Long chapterId) {
+            @RequestParam(required = false) Long chapterId,
+            @RequestParam(defaultValue = "false") boolean videoPreview) {
         log.info("[StoryboardShotController#findAll] request projectId={} subject={}",
                 projectId, SecurityUtils.getCurrentUsername());
-        List<StoryboardShotResponse> result = storyboardShotService.findAll(projectId, chapterId);
+        List<StoryboardShotResponse> result = storyboardShotService.findAll(projectId, chapterId, videoPreview);
         log.info("[StoryboardShotController#findAll] response projectId={} count={}", projectId, result.size());
         return ApiResponse.success(result);
     }

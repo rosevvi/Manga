@@ -23,6 +23,7 @@ import {
 import Dashboard from './components/Dashboard'
 import LanguageSelector from './components/LanguageSelector'
 import LoginModal from './components/LoginModal'
+import { pushWorkspaceHistory } from './components/workspaceHistory'
 import { AUTH_REQUEST_ERROR } from './constants/auth'
 import { APP_ROUTE } from './constants/routes'
 import { useLanguage } from './i18n/LanguageContext'
@@ -156,7 +157,7 @@ function App() {
 
   /** 使用浏览器历史记录切换前端页面。 */
   const navigateToPath = (path) => {
-    window.history.pushState(null, '', path)
+    pushWorkspaceHistory(path)
     setCurrentPath(path)
     window.scrollTo({ top: 0 })
   }

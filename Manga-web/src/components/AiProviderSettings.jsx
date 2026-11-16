@@ -30,6 +30,7 @@ import {
 } from '../api/aiProviderApi'
 import { AI_CAPABILITY_LABELS, AI_CONFIG_LIMITS, AI_PROVIDER_OPTIONS, AI_PROXY_OPTIONS } from '../constants/aiProvider'
 import { useLanguage } from '../i18n/LanguageContext'
+import { useWorkspaceConfirm } from './WorkspaceConfirmDialog'
 import WorkspaceSelect from './WorkspaceSelect'
 import './ai-provider-settings.css'
 import './project-module.css'
@@ -58,6 +59,7 @@ const EMPTY_FORM = Object.freeze({
 /** 管理未来 AI 调用使用的多供应商连接配置。 */
 function AiProviderSettings({ accessToken, isGuest }) {
   const { translate } = useLanguage()
+  const confirm = useWorkspaceConfirm()
   const [configs, setConfigs] = useState([])
   const [providerOptions, setProviderOptions] = useState(AI_PROVIDER_OPTIONS)
   const [loading, setLoading] = useState(false)
@@ -279,7 +281,10 @@ function AiProviderSettings({ accessToken, isGuest }) {
   }
 
   const removeConfig = async (config) => {
-    if (!window.confirm(translate('aiConfig.deleteConfirm', { name: config.name }))) return
+    if (!(await confirm({
+      title: translate('confirm.deleteProviderTitle'), message: translate('aiConfig.deleteConfirm', { name: config.name }),
+      confirmLabel: translate('common.delete'), danger: true,
+    }))) return
     setError('')
     try {
       await deleteAiProviderConfig(accessToken, config.id)

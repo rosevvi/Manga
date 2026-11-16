@@ -52,6 +52,8 @@ public class StoryboardShot {
     private Long imageArtifactId;
     /** 分镜制作备注。 */
     private String notes;
+    /** 自定义视频提示词，null 表示沿用镜头画面内容或标题。 */
+    private String videoPrompt;
     /** 分镜镜头状态。 */
     private StoryboardShotStatus status;
     /** 创建时间。 */

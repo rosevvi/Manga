@@ -17,6 +17,8 @@ import {
   LayoutPanelTop,
   Menu,
   MoreVertical,
+  PanelLeftClose,
+  PanelLeftOpen,
   Play,
   Plus,
   Search,
@@ -41,7 +43,8 @@ import MediaImage from './MediaImage'
 import { OPERATIONS_NAV } from '../api/runtimeOperationsApi'
 import { AGENT_ADMIN_ROLE, AGENT_PROFILE_NAV } from '../constants/agentProfile'
 import ProjectWorkspace from './ProjectWorkspace'
-import { confirmCreativeNavigation } from './useUnsavedChanges'
+import { useConfirmCreativeNavigation } from './useUnsavedChanges'
+import { pushWorkspaceHistory } from './workspaceHistory'
 import MangaAssistant from './MangaAssistant'
 import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
 import { getActiveTasks, getProjects } from '../api/projectApi'
@@ -53,7 +56,6 @@ const SIDEBAR_NAV_ITEMS = [
   { id: 'assets', labelKey: 'dashboard.nav.assets', icon: ImageIcon },
   { id: 'characters', labelKey: 'dashboard.nav.characters', icon: UsersRound },
   { id: 'scenes', labelKey: 'dashboard.nav.scenes', icon: Frame },
-  { id: 'storyboards', labelKey: 'dashboard.nav.storyboards', icon: LayoutPanelTop },
   { id: 'ai-tools', labelKey: 'dashboard.nav.aiTools', icon: WandSparkles },
   { id: 'ai-settings', labelKey: 'dashboard.nav.aiSettings', icon: Settings2 },
   { id: AGENT_PROFILE_NAV, labelKey: 'dashboard.nav.agentProfiles', icon: Sparkles, adminOnly: true },
@@ -131,13 +133,14 @@ const DEFAULT_USER_NAME = 'Sakura'
 /** 通知有活动任务时快速刷新，空闲时减少后台请求。 */
 const ACTIVE_TASK_POLL_MS = 5000
 const IDLE_TASK_POLL_MS = 30000
+const SIDEBAR_PREFERENCE_KEY = 'manga.dashboard.sidebarCollapsed'
 
 function projectRoute(pathname = window.location.pathname) {
   const match = pathname.match(/^\/console\/projects\/(\d+)(?:\/(script\/chapters\/(\d+)|storyboards|script|assets|generation|export))?$/)
   if (!match) return null
   return {
     projectId: Number(match[1]),
-    stage: match[2]?.startsWith('script/chapters') ? 'SCRIPT_CHAPTER' : ['storyboards', 'generation'].includes(match[2]) ? 'STORYBOARD' : match[2] ? match[2].toUpperCase() : 'OVERVIEW',
+    stage: match[2]?.startsWith('script/chapters') ? 'SCRIPT_CHAPTER' : match[2] === 'storyboards' ? 'STORYBOARD' : match[2]?.toUpperCase() || 'OVERVIEW',
     chapterId: match[3] ? Number(match[3]) : null,
   }
 }
@@ -145,10 +148,15 @@ function projectRoute(pathname = window.location.pathname) {
 /** 漫剧系统控制台首页，承载创作入口、项目与作品概览。 */
 function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   const { translate } = useLanguage()
+  const confirmCreativeNavigation = useConfirmCreativeNavigation()
   const initialProjectRoute = projectRoute()
   const [activeNav, setActiveNav] = useState(initialProjectRoute ? 'project' : SIDEBAR_NAV_ITEMS[0].id)
   const [activeFilter, setActiveFilter] = useState(CREATION_FILTERS[0].id)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return window.localStorage.getItem(SIDEBAR_PREFERENCE_KEY) === 'true' }
+    catch { return false }
+  })
   const [projects, setProjects] = useState([])
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [projectsError, setProjectsError] = useState('')
@@ -162,6 +170,13 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   const isGuest = Boolean(authSession?.user?.guest)
   const isAdmin = Boolean(authSession?.user?.roles?.includes(AGENT_ADMIN_ROLE))
   const needsProjectList = activeNav !== 'project' && activeNav !== 'ai-settings' && activeNav !== OPERATIONS_NAV
+  const storyboardOpen = activeNav === 'project' && ['STORYBOARD', 'GENERATION'].includes(projectStage)
+  const highlightedNav = activeNav === 'project' ? 'projects' : activeNav
+
+  useEffect(() => {
+    try { window.localStorage.setItem(SIDEBAR_PREFERENCE_KEY, String(sidebarCollapsed)) }
+    catch { /* 存储不可用时仍可在本次会话中切换。 */ }
+  }, [sidebarCollapsed])
 
   /** 刷新当前用户项目，游客保持只读控制台体验。 */
   const loadProjects = useCallback(async () => {
@@ -230,7 +245,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
         setSelectedProjectId(route.projectId)
         setProjectStage(route.stage)
         setSelectedChapterId(route.chapterId)
-        setActiveNav(route.stage === 'STORYBOARD' ? 'storyboards' : 'project')
+        setActiveNav('project')
       } else setActiveNav('projects')
     }
     window.addEventListener('popstate', handleHistoryChange)
@@ -238,24 +253,25 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   }, [])
 
   /** 切换控制台功能并在窄屏下关闭侧栏。 */
-  const selectNavigation = (navigationId) => {
-    if (!confirmCreativeNavigation()) return
+  const selectNavigation = async (navigationId) => {
+    if (!(await confirmCreativeNavigation())) return
     if (window.location.pathname.startsWith('/console/projects/')) {
-      window.history.pushState(null, '', '/console')
+      pushWorkspaceHistory('/console')
       setProjectStage('OVERVIEW')
     }
     setActiveNav(navigationId)
     setSidebarOpen(false)
   }
 
-  const navigateProject = (project, stage = 'OVERVIEW') => {
-    if (!confirmCreativeNavigation()) return
+  const navigateProject = async (project, stage = 'OVERVIEW') => {
+    if (!(await confirmCreativeNavigation())) return
     setSelectedProjectId(project.id)
     setProjectStage(stage)
     setSelectedChapterId(null)
     const suffix = stage === 'OVERVIEW' ? '' : `/${stage === 'STORYBOARD' ? 'storyboards' : stage.toLowerCase()}`
-    window.history.pushState(null, '', `/console/projects/${encodeURIComponent(project.id)}${suffix}`)
-    setActiveNav(stage === 'STORYBOARD' ? 'storyboards' : 'project')
+    const keepSelection = storyboardOpen && ['STORYBOARD', 'GENERATION'].includes(stage) && project.id === selectedProjectId
+    pushWorkspaceHistory(`/console/projects/${encodeURIComponent(project.id)}${suffix}${keepSelection ? window.location.search : ''}`)
+    setActiveNav('project')
     setSidebarOpen(false)
   }
 
@@ -265,11 +281,11 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   /** 进入指定项目的分镜工作区。 */
   const openStoryboard = (project) => navigateProject(project, 'STORYBOARD')
 
-  const openChapter = (chapterId) => {
-    if (!confirmCreativeNavigation()) return
+  const openChapter = async (chapterId) => {
+    if (!(await confirmCreativeNavigation())) return
     setSelectedChapterId(chapterId)
     setProjectStage('SCRIPT_CHAPTER')
-    window.history.pushState(null, '', `/console/projects/${encodeURIComponent(selectedProjectId)}/script/chapters/${encodeURIComponent(chapterId)}`)
+    pushWorkspaceHistory(`/console/projects/${encodeURIComponent(selectedProjectId)}/script/chapters/${encodeURIComponent(chapterId)}`)
     setActiveNav('project')
   }
 
@@ -278,19 +294,29 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   }
 
   return (
-    <div className="dashboard-shell" data-view={activeNav}>
-      <aside className={sidebarOpen ? 'dashboard-sidebar open' : 'dashboard-sidebar'}>
-          <button className="dashboard-logo" type="button" onClick={() => { if (confirmCreativeNavigation()) onExit() }}>
-          Manga
-          <Sparkles size={12} />
-        </button>
+    <div className="dashboard-shell" data-view={storyboardOpen ? 'storyboards' : activeNav} data-sidebar-collapsed={sidebarCollapsed}>
+      <aside id="dashboard-sidebar" className={sidebarOpen ? 'dashboard-sidebar open' : 'dashboard-sidebar'}>
+        <div className="dashboard-sidebar-header">
+          <button className="dashboard-logo" type="button" aria-label="Manga" title="Manga" onClick={async () => { if (await confirmCreativeNavigation()) onExit() }}>
+            <span>Manga</span><Sparkles size={12} aria-hidden="true" />
+          </button>
+          <button className="dashboard-sidebar-toggle" type="button" aria-controls="dashboard-navigation" aria-expanded={!sidebarCollapsed}
+            aria-label={translate(sidebarCollapsed ? 'dashboard.expandSidebar' : 'dashboard.collapseSidebar')}
+            title={translate(sidebarCollapsed ? 'dashboard.expandSidebar' : 'dashboard.collapseSidebar')}
+            onClick={() => setSidebarCollapsed((value) => !value)}>
+            {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
+        </div>
 
-        <nav className="dashboard-nav" aria-label={translate('dashboard.navigation')}>
+        <nav id="dashboard-navigation" className="dashboard-nav" aria-label={translate('dashboard.navigation')}>
           {SIDEBAR_NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map(({ id, labelKey, icon: Icon }) => (
             <button
-              className={activeNav === id ? 'dashboard-nav-item active' : 'dashboard-nav-item'}
+              className={highlightedNav === id ? 'dashboard-nav-item active' : 'dashboard-nav-item'}
               key={id}
               type="button"
+              aria-current={highlightedNav === id ? 'page' : undefined}
+              aria-label={translate(labelKey)}
+              title={translate(labelKey)}
               onClick={() => selectNavigation(id)}
             >
               <Icon size={17} strokeWidth={1.8} />
@@ -314,7 +340,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
             <button type="button">{translate('dashboard.plan.upgrade')}</button>
           </section>
 
-          <button className="help-button" type="button">
+          <button className="help-button" type="button" aria-label={translate('dashboard.helpDocs')} title={translate('dashboard.helpDocs')}>
             <HelpCircle size={17} fill="currentColor" />
             <span>{translate('dashboard.helpDocs')}</span>
             <ChevronDown size={15} />
@@ -325,7 +351,8 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
       {sidebarOpen && <button className="sidebar-scrim" type="button" aria-label={translate('dashboard.closeMenu')} onClick={() => setSidebarOpen(false)} />}
 
       <header className="dashboard-topbar">
-        <button className="dashboard-menu-button" type="button" aria-label={translate(sidebarOpen ? 'dashboard.closeMenu' : 'dashboard.openMenu')} onClick={() => setSidebarOpen((open) => !open)}>
+        <button className="dashboard-menu-button" type="button" aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen}
+          aria-label={translate(sidebarOpen ? 'dashboard.closeMenu' : 'dashboard.openMenu')} onClick={() => setSidebarOpen((open) => !open)}>
           {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
         <div className="dashboard-top-actions">
@@ -336,14 +363,23 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
           <UserAccountMenu
             authSession={authSession}
             displayName={displayName}
-            onLogout={() => { if (confirmCreativeNavigation()) onLogout() }}
+            onLogout={async () => { if (await confirmCreativeNavigation()) onLogout() }}
             onUserUpdated={onUserUpdated}
           />
         </div>
       </header>
 
       <main className="dashboard-main">
-        {activeNav === 'project' ? (
+        {storyboardOpen ? (
+          <StoryboardModule
+            key={`${authSession?.user?.id}.${selectedProjectId}`}
+            accessToken={accessToken}
+            projectId={selectedProjectId}
+            stage={projectStage}
+            onBackToProjects={() => selectNavigation('projects')}
+            onNavigateStage={navigateProjectStage}
+          />
+        ) : activeNav === 'project' ? (
           <ProjectWorkspace
             key={`${authSession?.user?.id}.${selectedProjectId}`}
             accessToken={accessToken}
@@ -364,15 +400,6 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
             onProjectsChanged={loadProjects}
             onOpenProject={openProject}
           />
-        ) : activeNav === 'storyboards' ? (
-          <StoryboardModule
-            accessToken={accessToken}
-            projects={projects}
-            selectedProjectId={selectedProjectId}
-            onSelectProject={(id) => navigateProject({ id }, 'STORYBOARD')}
-            onBackToProjects={() => selectNavigation('projects')}
-            onNavigateStage={navigateProjectStage}
-          />
         ) : activeNav === 'ai-settings' ? (
           <AiProviderSettings accessToken={accessToken} isGuest={isGuest} />
         ) : activeNav === OPERATIONS_NAV && isAdmin ? (
@@ -391,7 +418,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
 
         <section className="ai-tools-grid" aria-label={translate('dashboard.aiToolsLabel')}>
           {AI_TOOL_ITEMS.map(({ titleKey, descriptionKey, icon: Icon, tone }, index) => (
-            <button className="ai-tool-card" type="button" key={titleKey} onClick={() => index === 1 && selectNavigation('storyboards')}>
+            <button className="ai-tool-card" type="button" key={titleKey} onClick={() => index === 1 && selectNavigation('projects')}>
               <span className={`ai-tool-icon ${tone}`}><Icon size={22} /></span>
               <span className="ai-tool-copy"><strong>{translate(titleKey)}</strong><small>{translate(descriptionKey)}</small></span>
               <ArrowRight className="ai-tool-arrow" size={17} />
@@ -467,7 +494,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
         )}
       </main>
       {!isGuest && <MangaAssistant accessToken={accessToken} userId={authSession?.user?.id} projects={projects}
-        onOpened={needsProjectList ? undefined : loadProjects} projectId={['project', 'storyboards'].includes(activeNav) ? selectedProjectId : null} />}
+        onOpened={needsProjectList ? undefined : loadProjects} projectId={activeNav === 'project' ? selectedProjectId : null} />}
     </div>
   )
 }

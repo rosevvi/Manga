@@ -21,6 +21,7 @@
         <result property="imageUrl" column="image_url"/>
         <result property="imageArtifactId" column="image_artifact_id"/>
         <result property="notes" column="notes"/>
+        <result property="videoPrompt" column="video_prompt"/>
         <result property="status" column="status" javaType="com.manga.common.enums.StoryboardShotStatus"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
@@ -31,7 +32,7 @@
     <select id="findAllByProjectId" resultMap="storyboardShotResultMap">
         SELECT id, project_id, chapter_id, sort_order, shot_number, title, scene_name, shot_type,
                camera_movement, duration_seconds, content, dialogue, sound_effect, image_url, image_artifact_id, notes,
-               status, created_at, updated_at, created_by, updated_by
+               video_prompt, status, created_at, updated_at, created_by, updated_by
         FROM manga_storyboard_shot
         WHERE project_id = #{projectId}
         <if test="chapterId != null">AND chapter_id = #{chapterId}</if>
@@ -41,7 +42,7 @@
     <select id="findByProjectAndId" resultMap="storyboardShotResultMap">
         SELECT id, project_id, chapter_id, sort_order, shot_number, title, scene_name, shot_type,
                camera_movement, duration_seconds, content, dialogue, sound_effect, image_url, image_artifact_id, notes,
-               status, created_at, updated_at, created_by, updated_by
+               video_prompt, status, created_at, updated_at, created_by, updated_by
         FROM manga_storyboard_shot
         WHERE project_id = #{projectId}
           AND id = #{shotId}
@@ -68,6 +69,7 @@
                 OR (image_url IS NULL AND #{shot.imageUrl} IS NULL) THEN image_artifact_id ELSE NULL END,
             image_url = #{shot.imageUrl},
             notes = #{shot.notes},
+            <if test="shot.videoPrompt != null">video_prompt = #{shot.videoPrompt},</if>
             status = #{shot.status},
             updated_by = #{shot.updatedBy}
         WHERE id = #{shot.id}

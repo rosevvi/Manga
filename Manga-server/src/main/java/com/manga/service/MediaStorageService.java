@@ -52,8 +52,8 @@ public class MediaStorageService {
     }
 
     /** 为调用方从受保护产物记录取得的地址生成短期预览链接。 */
-    public String previewGeneratedImage(String url) {
-        return aliyunOss.previewGeneratedImage(url);
+    public String previewGeneratedMedia(String url) {
+        return aliyunOss.previewGeneratedMedia(url);
     }
 
     /** 业务层验证产物所有者后，为本地媒体或 OSS 返回可下载链接。 */

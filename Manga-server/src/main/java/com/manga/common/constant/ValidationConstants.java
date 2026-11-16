@@ -72,6 +72,8 @@ public final class ValidationConstants {
     public static final int SHOT_IMAGE_URL_MAX_LENGTH = 1024;
     /** 分镜备注最大长度。 */
     public static final int SHOT_NOTES_MAX_LENGTH = 2000;
+    /** 镜头视频提示词与生成提案共用的最大字符数。 */
+    public static final int SHOT_VIDEO_PROMPT_MAX_LENGTH = 4000;
     /** 镜头时长最大秒数。 */
     public static final int SHOT_DURATION_MAX_SECONDS = 3600;
     /** 项目名称必填校验提示。 */
@@ -116,6 +118,8 @@ public final class ValidationConstants {
     public static final String SHOT_IMAGE_URL_TOO_LONG = "分镜图片地址不能超过 1024 个字符";
     /** 分镜备注超出长度限制提示。 */
     public static final String SHOT_NOTES_TOO_LONG = "分镜备注不能超过 2000 个字符";
+    /** 镜头视频提示词超长时的错误说明。 */
+    public static final String SHOT_VIDEO_PROMPT_TOO_LONG = "视频提示词不能超过 4000 个字符";
     /** 分镜排序必填校验提示。 */
     public static final String SHOT_ORDER_REQUIRED = "分镜排序列表不能为空";
     /** AI 配置名称最大长度。 */

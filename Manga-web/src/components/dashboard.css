@@ -25,6 +25,20 @@
   background: rgba(2, 2, 3, 0.98);
 }
 
+.dashboard-sidebar-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dashboard-sidebar-toggle {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+.dashboard-sidebar-toggle:hover { color: var(--workspace-accent); background: var(--workspace-accent-surface); }
+
 .dashboard-logo {
   position: relative;
   width: max-content;
@@ -667,6 +681,19 @@
   display: none;
 }
 
+@media (min-width: 821px) {
+  .dashboard-shell[data-sidebar-collapsed=true] { --dashboard-sidebar-width: 63px; }
+  .dashboard-shell[data-sidebar-collapsed=true] .dashboard-sidebar { padding-inline: 8px; }
+  .dashboard-shell[data-sidebar-collapsed=true] .dashboard-sidebar-header { flex-direction: column; gap: 10px; }
+  .dashboard-shell[data-sidebar-collapsed=true] .dashboard-sidebar-toggle { flex: 0 0 auto; }
+  .dashboard-shell[data-sidebar-collapsed=true] .dashboard-logo { display: grid; width: 32px; height: 30px; margin: 0; place-items: center; }
+  .dashboard-shell[data-sidebar-collapsed=true] .dashboard-logo svg { position: static; width: 18px; height: 18px; }
+  .dashboard-shell[data-sidebar-collapsed=true] .dashboard-nav { margin-top: 20px; }
+  .dashboard-shell[data-sidebar-collapsed=true] :is(.dashboard-logo span, .dashboard-nav-item span, .plan-card, .help-button span, .help-button > svg:last-child) { display: none; }
+  .dashboard-shell[data-sidebar-collapsed=true] :is(.dashboard-nav-item, .help-button) { justify-content: center; padding-inline: 0; }
+  .dashboard-shell[data-sidebar-collapsed=true] .dashboard-nav-item::before { left: -8px; }
+}
+
 @media (max-width: 1120px) {
   .ai-tools-grid,
   .recent-project-grid,
@@ -698,6 +725,8 @@
   .dashboard-menu-button {
     display: grid;
   }
+
+  .dashboard-sidebar-toggle { display: none; }
 
   .dashboard-main {
     --dashboard-content-top-space: 82px;

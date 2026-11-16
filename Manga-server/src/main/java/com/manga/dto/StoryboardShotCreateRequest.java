@@ -44,6 +44,9 @@ public record StoryboardShotCreateRequest(
         @Size(max = SHOT_NOTES_MAX_LENGTH, message = SHOT_NOTES_TOO_LONG)
         String notes,
         /** 分镜镜头状态。 */
-        StoryboardShotStatus status
+        StoryboardShotStatus status,
+        /** 自定义视频提示词，可为空以沿用画面内容或标题。 */
+        @Size(max = SHOT_VIDEO_PROMPT_MAX_LENGTH, message = SHOT_VIDEO_PROMPT_TOO_LONG)
+        String videoPrompt
 ) {
 }

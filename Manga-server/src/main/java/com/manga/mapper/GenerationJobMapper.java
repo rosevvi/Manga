@@ -1,6 +1,8 @@
 package com.manga.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.manga.agent.generation.GenerationProviderKey;
+import com.manga.agent.generation.GenerationJobStatus;
+import com.manga.dto.StoryboardVideoArtifact;
 import com.manga.entity.GenerationJob;
 import org.apache.ibatis.annotations.Param;
 import java.time.LocalDateTime;
@@ -18,6 +20,10 @@ public interface GenerationJobMapper extends BaseMapper<GenerationJob> {
             @Param("runId") String runId, @Param("conversationId") String conversationId,
             @Param("beforeId") Long beforeId, @Param("limit") int limit,
             @Param("shotId") Long shotId, @Param("mediaKind") String mediaKind);
+    /** 一次取回每个镜头最近成功发布的视频。 */
+    List<StoryboardVideoArtifact> findLatestStoryboardVideos(@Param("userId") long userId,
+            @Param("projectId") long projectId, @Param("chapterId") Long chapterId,
+            @Param("status") GenerationJobStatus status, @Param("mediaType") String mediaType);
     /** 查询需要跟随 Run 撤销采用权的作业。 */
     List<String> findByRun(@Param("runId") String runId);
     /** 串行化供应商并发准入。 */

@@ -7,7 +7,8 @@ import MediaImage from './MediaImage'
 import GenerationJobsPanel from './GenerationJobsPanel'
 import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
 import { openCreativeTask } from './creativeTaskEvents'
-import useUnsavedChanges from './useUnsavedChanges'
+import useUnsavedChanges, { useDiscardChangesConfirmation } from './useUnsavedChanges'
+import { useWorkspaceConfirm } from './WorkspaceConfirmDialog'
 import { REVISION_CONFLICT_CODE } from '../constants/changeSet'
 import { CREATIVE_OPERATION, CREATIVE_PERMISSION, CREATIVE_RESOURCE } from '../constants/creative'
 import './project-workspace.css'
@@ -15,12 +16,14 @@ import './creative-workbench.css'
 
 const STAGES = [
   ['OVERVIEW', '项目概览', Clapperboard], ['SCRIPT', '剧本', BookOpen], ['STORYBOARD', '分镜', Film],
-  ['ASSETS', '角色与场景', ImageIcon], ['GENERATION', '图片与视频', WandSparkles], ['EXPORT', '合成与导出', FileText],
+  ['ASSETS', '角色与场景', ImageIcon], ['GENERATION', '视频', WandSparkles], ['EXPORT', '合成与导出', FileText],
 ]
 
 /** 项目概览与章节编辑共用紧凑框架，所有 AI 执行、审批与结果均进入任务中心。 */
 export default function ProjectWorkspace({ accessToken, projectId, initialStage = 'OVERVIEW', initialChapterId, onBack, onOpenStoryboard, onNavigateStage, onNavigateChapter }) {
   const { translate } = useLanguage()
+  const confirm = useWorkspaceConfirm()
+  const confirmDiscard = useDiscardChangesConfirmation()
   const [workspace, setWorkspace] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -150,7 +153,7 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
   const project = workspace.project
   const chapters = workspace.script?.chapters || []
   const editorStage = stage === 'SCRIPT' || stage === 'SCRIPT_CHAPTER'
-  const openStage = (value) => value === 'STORYBOARD' || value === 'GENERATION' ? onOpenStoryboard(project) : onNavigateStage?.(value)
+  const openStage = (value) => value === 'STORYBOARD' ? onOpenStoryboard(project) : onNavigateStage?.(value)
   return <section className="workspace-module project-workspace">
     <button className="workspace-back" type="button" onClick={onBack}><ArrowLeft size={14} />全部项目</button>
     <header className="project-workspace-header">
@@ -187,8 +190,8 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
             <button type="button" className="workspace-primary" disabled={busy || !dirty} onClick={save}><Save size={14} />保存</button></>}
           {!chapter && <button type="button" className="workspace-primary" onClick={() => setShowGeneration((value) => !value)}><WandSparkles size={14} />AI 创作章节</button>}
         </div></header>
-        {conflict && <div className="workspace-alert" role="alert">章节已发生变化，当前编辑仍保留。<button type="button" className="workspace-secondary" onClick={() => {
-          if (!window.confirm('重新加载将放弃当前修改，确定继续吗？')) return
+        {conflict && <div className="workspace-alert" role="alert">章节已发生变化，当前编辑仍保留。<button type="button" className="workspace-secondary" onClick={async () => {
+          if (!(await confirmDiscard(translate('confirm.reloadChapter')))) return
           void execute(async () => { const latest = await getProjectChapter(accessToken, projectId, chapter.id); setChapter(latest); setTitle(latest.title || ''); setText(latest.rawContent || ''); setConflict(false) })
         }}>重新加载最新章节</button></div>}
         {showGeneration && <section className="script-import-panel"><h3>AI 创作新章节</h3><textarea rows={4} className="script-raw-input" style={{ minHeight: 120 }} maxLength={12000}
@@ -200,8 +203,11 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
           <label className="workspace-field"><span>正文</span><textarea className="script-raw-input" rows={22} value={text} onChange={(event) => setText(event.target.value)} placeholder="在这里写下故事…" /></label>
           <div className="workbench-action-row"><small className="workbench-muted">{text.length} 字</small>
             <button type="button" className="workspace-primary" disabled={busy || !title.trim() || !text.trim()} onClick={save}><Save size={14} />{chapter ? '保存修改' : '保存新章节'}</button>
-            {chapter && <button type="button" className="workspace-secondary" disabled={busy} onClick={() => {
-              if (!window.confirm('确定删除这个章节吗？')) return
+            {chapter && <button type="button" className="workspace-secondary" disabled={busy} onClick={async () => {
+              if (!(await confirm({
+                title: translate('confirm.deleteChapterTitle'), message: translate('confirm.deleteChapterMessage', { title: chapter.title }),
+                confirmLabel: translate('common.delete'), danger: true,
+              }))) return
               void execute(async () => { await deleteProjectChapter(accessToken, projectId, chapter.id); setChapter(null); setTitle(''); setText(''); await loadWorkspace(); onNavigateStage('SCRIPT') })
             }}><Trash2 size={14} />删除章节</button>}</div>
         </> : <div className="workbench-empty"><BookOpen size={35} /><h2>{chapters.length ? '选择一个章节，继续创作' : '你的故事，从这里开始'}</h2><p>导入 TXT / Markdown 剧本，或手动写下第一章。</p>

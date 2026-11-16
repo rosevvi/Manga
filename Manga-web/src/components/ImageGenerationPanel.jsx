@@ -9,7 +9,9 @@ import { imageProposalInstruction } from './changeSetPreview'
 import './generation.css'
 
 /** 镜头生成表单按媒体类型只列出对应用户配置，所有提交先审批。 */
-export default function ImageGenerationPanel({ accessToken, projectId, shots = [], selectedShot, mediaType = 'IMAGE' }) {
+export default function ImageGenerationPanel({
+  accessToken, projectId, shots = [], selectedShot, mediaType = 'IMAGE', promptOverride, unsavedShot = false,
+}) {
   const video = mediaType === 'VIDEO'
   const [seconds, setSeconds] = useState(5)
   const [aspectRatio, setAspectRatio] = useState('16:9')
@@ -17,7 +19,7 @@ export default function ImageGenerationPanel({ accessToken, projectId, shots = [
   const [optionKey, setOptionKey] = useState('')
   const [shotId, setShotId] = useState('')
   const [size, setSize] = useState(IMAGE_SIZES[0])
-  const [prompt, setPrompt] = useState('')
+  const [localPrompt, setLocalPrompt] = useState('')
   const [runId, setRunId] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -33,14 +35,15 @@ export default function ImageGenerationPanel({ accessToken, projectId, shots = [
     }).catch((failure) => { if (scope.current === expected) setError(failure.message) })
     return () => { scope.current += 1 }
   }, [accessToken, projectId, video])
-  useEffect(() => { setShotId(selectedShot ? String(selectedShot.id) : ''); setPrompt(selectedShot?.content || selectedShot?.title || '') }, [selectedShot?.id])
+  useEffect(() => { setShotId(selectedShot ? String(selectedShot.id) : ''); setLocalPrompt(selectedShot?.content || selectedShot?.title || '') }, [selectedShot?.id])
+  const prompt = promptOverride ?? localPrompt
   const selected = options[Number(optionKey)]
   const imageSizes = selected?.sizes?.length ? selected.sizes : IMAGE_SIZES
   const selectedSize = imageSizes.includes(size) ? size : imageSizes[0]
   /** 视频直接使用已选参数创建提案；图片保留 Director 提案流程。 */
   const submit = async (event) => {
     event.preventDefault()
-    if (busy || !selected || !shotId || !prompt.trim()) return
+    if (unsavedShot || busy || !selected || !shotId || !prompt.trim()) return
     const expected = scope.current
     setBusy(true); setError('')
     try {
@@ -65,7 +68,7 @@ export default function ImageGenerationPanel({ accessToken, projectId, shots = [
       {!selectedShot && <div className="image-generation-field"><span>镜头：</span><WorkspaceSelect label="目标镜头" value={shotId} onChange={(id) => {
         setShotId(id)
         const shot = shots.find((item) => String(item.id) === String(id))
-        setPrompt(shot?.content || shot?.title || '')
+        setLocalPrompt(shot?.content || shot?.title || '')
       }} options={shots.map((shot) => ({ value: String(shot.id), label: `${shot.shotNumber} · ${shot.title}` }))} /></div>}
       <div className="image-generation-field">
         <span>模型：</span>
@@ -91,14 +94,16 @@ export default function ImageGenerationPanel({ accessToken, projectId, shots = [
         <WorkspaceSelect label="尺寸" value={selectedSize} onChange={setSize}
           options={imageSizes.map((value) => ({ value, label: value }))} />
       </div>}
-      <label className="image-generation-prompt">
+      {promptOverride === undefined && <label className="image-generation-prompt">
         <span>提示词：</span>
-        <textarea required rows={3} maxLength={IMAGE_PROMPT_MAX_LENGTH} value={prompt} onChange={(event) => setPrompt(event.target.value)} />
-      </label>
+        <textarea required rows={3} maxLength={IMAGE_PROMPT_MAX_LENGTH} value={localPrompt} onChange={(event) => setLocalPrompt(event.target.value)} />
+      </label>}
       <small>{selected
         ? (video ? '生成单个 720P MP4。' : '生成单张 PNG。')
         : '请在 AI 配置页启用对应类型的模型。'}</small>
-      <button className="workspace-primary" type="submit" disabled={busy || !shotId || !prompt.trim() || !selected}>
+      {unsavedShot && <small>保存镜头修改后可生成视频。</small>}
+      {!unsavedShot && promptOverride === '' && <small>请先在镜头详情中填写并保存视频提示词。</small>}
+      <button className="workspace-primary" type="submit" disabled={unsavedShot || busy || !shotId || !prompt.trim() || !selected}>
         {busy ? '创建提案中…' : video ? '创建视频生成提案' : '创建图片生成提案'}
       </button>
     </form>

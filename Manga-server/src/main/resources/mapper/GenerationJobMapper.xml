@@ -10,6 +10,13 @@
             <result property="adoptedBy" column="artifact_adopted_by"/>
         </association>
     </resultMap>
+    <resultMap id="storyboardVideoArtifact" type="com.manga.dto.StoryboardVideoArtifact">
+        <constructor>
+            <arg column="shot_id" javaType="java.lang.Long"/>
+            <arg column="job_id" javaType="java.lang.String"/>
+            <arg column="url" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
     <select id="find" resultType="com.manga.entity.GenerationJob">
         SELECT id, job_id, run_id, step_id, change_set_id, user_id,
                (SELECT s.kind FROM manga_creative_change_set s
@@ -19,6 +26,21 @@
                lease_until, attempts, next_action_at, submitted_at, finished_at, reconciled_by,
                reconciled_at, reconciliation_note, created_at, updated_at, created_by, updated_by
         FROM manga_generation_job WHERE job_id = #{jobId}
+    </select>
+    <select id="findLatestStoryboardVideos" resultMap="storyboardVideoArtifact">
+        SELECT video.shot_id, video.job_id, video.url
+        FROM (
+            SELECT j.shot_id, j.job_id, a.url,
+                   ROW_NUMBER() OVER (PARTITION BY j.shot_id ORDER BY j.id DESC) AS video_rank
+            FROM manga_generation_job j
+            JOIN manga_creative_artifact a ON a.job_id = j.job_id
+                 AND a.user_id = j.user_id AND a.project_id = j.project_id AND a.shot_id = j.shot_id
+            JOIN manga_storyboard_shot shot ON shot.id = j.shot_id AND shot.project_id = j.project_id
+            WHERE j.user_id = #{userId} AND j.project_id = #{projectId}
+              AND j.status = #{status} AND a.media_type = #{mediaType}
+            <if test="chapterId != null">AND shot.chapter_id = #{chapterId}</if>
+        ) video
+        WHERE video.video_rank = 1
     </select>
     <select id="lock" resultType="com.manga.entity.GenerationJob">
         SELECT id, job_id, run_id, step_id, change_set_id, user_id,

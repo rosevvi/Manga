@@ -11,8 +11,10 @@ import com.manga.dto.StoryboardShotOrderRequest;
 import com.manga.dto.StoryboardShotResponse;
 import com.manga.dto.StoryboardShotUpdateRequest;
 import com.manga.dto.StoryboardImageSnapshot;
+import com.manga.dto.StoryboardVideoArtifact;
 import com.manga.agent.changeset.ChangeSetResponseCode;
 import com.manga.entity.StoryboardShot;
+import com.manga.repository.GenerationJobRepository;
 import com.manga.repository.StoryboardShotRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +25,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.manga.common.constant.StoryboardConstants.SHOT_NUMBER_FORMAT;
 
@@ -38,6 +43,7 @@ public class StoryboardShotService {
     private final ProjectWorkflowService workflowService;
     private final ProjectRevisionService revisionService;
     private final MediaStorageService mediaStorageService;
+    private final GenerationJobRepository generationJobs;
     /** 预览采用时读取同一项目版本下的当前图片，客户端不能自行指定原图。 */
     @Transactional
     public StoryboardImageSnapshot imageSnapshot(long projectId, long shotId, long userId) {
@@ -62,11 +68,19 @@ public class StoryboardShotService {
         return project.getRevision() + 1;
     }
 
-    /** 查询项目分镜镜头列表。 */
-    public List<StoryboardShotResponse> findAll(long projectId, Long chapterId) {
-        var project = projectService.requireAccessibleProject(projectId, SecurityUtils.requireCurrentUserId());
+    /** 视频工作台一次读取全部镜头的已发布视频，其他调用沿用参考图预览。 */
+    public List<StoryboardShotResponse> findAll(long projectId, Long chapterId, boolean videoPreview) {
+        long userId = SecurityUtils.requireCurrentUserId();
+        var project = projectService.requireAccessibleProject(projectId, userId);
+        Map<Long, StoryboardVideoArtifact> videos = videoPreview
+                ? generationJobs.latestStoryboardVideos(userId, projectId, chapterId).stream()
+                        .collect(Collectors.toMap(StoryboardVideoArtifact::shotId, Function.identity()))
+                : Map.of();
         return storyboardShotRepository.findAllByProjectId(projectId, chapterId).stream()
-                .map(shot -> toResponse(shot, previewImage(shot, project.getOwnerUserId()))).toList();
+                .map(shot -> videoPreview
+                        ? toResponse(shot, null, previewVideo(videos.get(shot.getId())))
+                        : toResponse(shot, previewImage(shot, project.getOwnerUserId())))
+                .toList();
     }
 
     /** 按显式用户范围查询分镜，供异步助手工具调用。 */
@@ -98,6 +112,7 @@ public class StoryboardShotService {
                 .soundEffect(normalize(request.soundEffect()))
                 .imageUrl(normalize(request.imageUrl()))
                 .notes(normalize(request.notes()))
+                .videoPrompt(stripVideoPrompt(request.videoPrompt()))
                 .status(request.status() == null ? StoryboardShotStatus.DRAFT : request.status())
                 .createdBy(actor)
                 .updatedBy(actor)
@@ -131,6 +146,7 @@ public class StoryboardShotService {
                 .soundEffect(normalize(request.soundEffect()))
                 .imageUrl(normalize(request.imageUrl()))
                 .notes(normalize(request.notes()))
+                .videoPrompt(stripVideoPrompt(request.videoPrompt()))
                 .status(request.status() == null ? current.getStatus() : request.status())
                 .updatedBy(SecurityUtils.requireCurrentUsername())
                 .build();
@@ -225,17 +241,33 @@ public class StoryboardShotService {
     /** 根据采用记录区分受平台保护的生成图片和用户上传的参考图。 */
     private String previewImage(StoryboardShot shot, long ownerId) {
         return Objects.nonNull(shot.getImageArtifactId())
-                ? mediaStorageService.previewGeneratedImage(shot.getImageUrl())
+                ? mediaStorageService.previewGeneratedMedia(shot.getImageUrl())
                 : mediaStorageService.previewUserImage(shot.getImageUrl(), ownerId);
+    }
+
+    /** 仅对仓储返回的授权产物签署播放地址。 */
+    private StoryboardShotResponse.VideoPreview previewVideo(StoryboardVideoArtifact artifact) {
+        if (Objects.isNull(artifact)) return null;
+        return new StoryboardShotResponse.VideoPreview(artifact.jobId(), mediaStorageService.previewGeneratedMedia(artifact.url()));
     }
 
     /** 将分镜镜头转换为响应对象，供浏览器预览的凭证由调用方提供。 */
     private StoryboardShotResponse toResponse(StoryboardShot shot, String imagePreviewUrl) {
+        return toResponse(shot, imagePreviewUrl, null);
+    }
+
+    /** 按调用方授权的媒体类型组装镜头预览。 */
+    private StoryboardShotResponse toResponse(StoryboardShot shot, String imagePreviewUrl, StoryboardShotResponse.VideoPreview videoPreview) {
         return new StoryboardShotResponse(
                 shot.getId(), shot.getProjectId(), shot.getChapterId(), shot.getSortOrder(), shot.getShotNumber(), shot.getTitle(),
                 shot.getSceneName(), shot.getShotType(), shot.getCameraMovement(), shot.getDurationSeconds(),
                 shot.getContent(), shot.getDialogue(), shot.getSoundEffect(), shot.getImageUrl(), shot.getNotes(),
-                shot.getStatus(), shot.getCreatedAt(), shot.getUpdatedAt(), imagePreviewUrl);
+                shot.getStatus(), shot.getCreatedAt(), shot.getUpdatedAt(), imagePreviewUrl, videoPreview, shot.getVideoPrompt());
+    }
+
+    /** 保留空字符串，区分显式清空和未提供自定义提示词。 */
+    private String stripVideoPrompt(String value) {
+        return Objects.isNull(value) ? null : value.strip();
     }
 
     /** 去除字符串首尾空白并处理空值。 */

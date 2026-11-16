@@ -43,6 +43,15 @@ public record StoryboardShotResponse(
         /** 最后更新时间。 */
         LocalDateTime updatedAt,
         /** 分镜图片短期预览地址，编辑时使用稳定的 imageUrl。 */
-        String imagePreviewUrl
+        String imagePreviewUrl,
+        /** 当前用户为此镜头生成的最近可预览视频。 */
+        VideoPreview videoPreview,
+        /** 自定义视频提示词，缺省时沿用镜头画面内容或标题。 */
+        String videoPrompt
 ) {
+    /** 分镜工作台播放及下载所需的最小信息。 */
+    public record VideoPreview(
+            /** 用于重新申请附件下载地址。 */ String jobId,
+            /** 平台本地地址或短期签名播放地址。 */ String url
+    ) { }
 }

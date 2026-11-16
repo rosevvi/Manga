@@ -64,7 +64,7 @@ public class GenerationJobQueryService {
                 job.getProjectId(), job.getShotId(), job.getProvider(), job.getMediaKind(), job.getStatus(), job.getProgress(),
                 Boolean.TRUE.equals(job.getCancelRequested()),
                 job.getErrorCode(), job.getErrorMessage(), Objects.isNull(artifact) ? null : artifact.getId(),
-                Objects.isNull(artifact) ? null : mediaStorageService.previewGeneratedImage(artifact.getUrl()),
+                Objects.isNull(artifact) ? null : mediaStorageService.previewGeneratedMedia(artifact.getUrl()),
                 job.getCreatedAt(), job.getSubmittedAt(), job.getFinishedAt(),
                 job.getUpdatedAt(), job.getReconciliationNote(), Objects.isNull(artifact) ? null : artifact.getAdoptedAt(),
                 Objects.isNull(artifact) ? null : artifact.getAdoptedBy());

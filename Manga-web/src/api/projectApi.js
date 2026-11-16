@@ -152,8 +152,10 @@ export function deleteProject(accessToken, projectId) {
   return authorizedRequest(accessToken, projectEndpoint(projectId), { method: 'DELETE' })
 }
 
-export function getStoryboardShots(accessToken, projectId) {
-  return authorizedRequest(accessToken, storyboardShotsEndpoint(projectId))
+/** 视频工作台批量加载每个镜头的短期播放地址。 */
+export function getStoryboardShots(accessToken, projectId, { videoPreview = false } = {}) {
+  const endpoint = storyboardShotsEndpoint(projectId)
+  return authorizedRequest(accessToken, videoPreview ? `${endpoint}?videoPreview=true` : endpoint)
 }
 
 export function createStoryboardShot(accessToken, projectId, shot) {
