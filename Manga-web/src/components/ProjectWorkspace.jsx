@@ -1,20 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { BookOpen, FileText, Film, LoaderCircle, Plus, Save, Trash2, WandSparkles } from 'lucide-react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { BookOpen, FileSearch, FileText, Film, LoaderCircle, Plus, Save, Trash2, WandSparkles } from 'lucide-react'
 import { getProjectChapter, getProjectWorkspace, importProjectChapter, importProjectScript, saveProjectChapter, deleteProjectChapter } from '../api/projectApi'
 import { createManualRun } from '../api/creativeRunApi'
 import { useLanguage } from '../i18n/LanguageContext'
 import GenerationJobsPanel from './GenerationJobsPanel'
 import ProjectStudioHeader from './ProjectStudioHeader'
+import ScriptAnalysisReport from './ScriptAnalysisReport'
 import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
 import { openCreativeTask } from './creativeTaskEvents'
 import useUnsavedChanges, { useDiscardChangesConfirmation } from './useUnsavedChanges'
+import useProjectScriptAnalysis from './useProjectScriptAnalysis'
 import { useWorkspaceConfirm } from './WorkspaceConfirmDialog'
 import { REVISION_CONFLICT_CODE } from '../constants/changeSet'
 import { CREATIVE_OPERATION, CREATIVE_PERMISSION, CREATIVE_RESOURCE } from '../constants/creative'
 import './project-workspace.css'
 import './creative-workbench.css'
 
-/** 项目概览与章节编辑共用紧凑框架，所有 AI 执行、审批与结果均进入任务中心。 */
+const SCRIPT_VIEW = Object.freeze({ REPORT: 'report', SOURCE: 'source' })
+
+/** 项目概览与剧本共用工作台，剧本页可切换章节原文和解析报告。 */
 export default function ProjectWorkspace({ accessToken, projectId, initialStage = 'OVERVIEW', initialChapterId, onBack, onNavigateStage, onNavigateChapter }) {
   const { translate } = useLanguage()
   const confirm = useWorkspaceConfirm()
@@ -31,10 +35,18 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
   const [instruction, setInstruction] = useState('')
   const [showImport, setShowImport] = useState(false)
   const [mobileView, setMobileView] = useState('content')
+  const [scriptView, setScriptView] = useState(() => initialChapterId ? SCRIPT_VIEW.SOURCE : SCRIPT_VIEW.REPORT)
+  const [analysisStarting, setAnalysisStarting] = useState(false)
+  const [analysisStartError, setAnalysisStartError] = useState('')
+  const scriptViewId = useId()
   const scope = useRef(0)
   const current = useRef(null)
   current.current = { chapter, title, text }
   const stage = initialChapterId ? 'SCRIPT_CHAPTER' : initialStage
+  const editorStage = stage === 'SCRIPT' || stage === 'SCRIPT_CHAPTER'
+  const scriptId = editorStage ? workspace?.script?.id : null
+  const analysis = useProjectScriptAnalysis(accessToken, projectId, scriptId)
+  const canStartAnalysis = Boolean(scriptId && !analysis.loading && !analysis.running && !analysisStarting)
   const dirty = chapter ? title !== (chapter.title || '') || text !== (chapter.rawContent || '') : Boolean(title || text)
   useUnsavedChanges(dirty)
 
@@ -54,6 +66,7 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
     let stopped = false
     setChapter(null); setTitle(''); setText(''); setConflict(false)
     if (!initialChapterId) return undefined
+    setScriptView(SCRIPT_VIEW.SOURCE)
     getProjectChapter(accessToken, projectId, initialChapterId).then((result) => {
       if (!stopped) { setChapter(result); setTitle(result.title || ''); setText(result.rawContent || '') }
     }).catch((failure) => { if (!stopped) setError(failure.message) })
@@ -123,14 +136,35 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
     })
   }
 
-  /** 手动推进不依赖会话，操作目标与权限明确冻结到新 Run。 */
+  /** 解析独立受理，只读取整部剧本；完成结果留在当前工作区。 */
+  const startAnalysis = async () => {
+    if (!canStartAnalysis) return
+    setScriptView(SCRIPT_VIEW.REPORT)
+    setMobileView('content')
+    setAnalysisStarting(true)
+    setAnalysisStartError('')
+    try {
+      const run = await createManualRun(accessToken, {
+        requestId: globalThis.crypto.randomUUID(),
+        projectId,
+        operationType: CREATIVE_OPERATION.PARSE_SCRIPT,
+        target: { resourceType: CREATIVE_RESOURCE.SCRIPT, resourceId: scriptId },
+        instruction: translate('script.analysisInstruction'),
+        permissionPolicy: CREATIVE_PERMISSION.READ_ONLY,
+      })
+      analysis.track(run)
+    } catch (failure) {
+      setAnalysisStartError(failure.message)
+    } finally {
+      setAnalysisStarting(false)
+    }
+  }
+
+  /** 生成与审批任务仍从任务中心查看。 */
   const startTask = (operationType) => execute(async () => {
     let target
     let prompt
-    if (operationType === CREATIVE_OPERATION.PARSE_SCRIPT) {
-      target = { resourceType: CREATIVE_RESOURCE.SCRIPT, resourceId: workspace.script.id }
-      prompt = translate('script.analysisInstruction')
-    } else if (operationType === CREATIVE_OPERATION.GENERATE_CHAPTER_STORYBOARD) {
+    if (operationType === CREATIVE_OPERATION.GENERATE_CHAPTER_STORYBOARD) {
       target = { resourceType: CREATIVE_RESOURCE.CHAPTER, resourceId: chapter.id }
       prompt = `为章节《${chapter.title}》生成分镜`
     } else {
@@ -138,13 +172,11 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
       prompt = instruction.trim()
     }
     const run = await createManualRun(accessToken, { requestId: globalThis.crypto.randomUUID(), projectId, operationType,
-      target, instruction: prompt, permissionPolicy: operationType === CREATIVE_OPERATION.PARSE_SCRIPT
-        ? CREATIVE_PERMISSION.READ_ONLY : CREATIVE_PERMISSION.PROPOSE_CHANGES })
+      target, instruction: prompt, permissionPolicy: CREATIVE_PERMISSION.PROPOSE_CHANGES })
     openCreativeTask(run.runId, projectId)
     setShowGeneration(false)
   })
 
-  const editorStage = stage === 'SCRIPT' || stage === 'SCRIPT_CHAPTER'
   const project = workspace?.project
   const chapters = workspace?.script?.chapters || []
   const shotCount = workspace?.storyboardShotCount || 0
@@ -152,7 +184,17 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
   const openNewChapter = async () => {
     if (initialChapterId && !(await onNavigateStage('SCRIPT'))) return
     setShowImport(true)
+    setScriptView(SCRIPT_VIEW.SOURCE)
     setMobileView('content')
+  }
+
+  const selectScriptViewFromKeyboard = (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    const next = event.key === 'Home' || event.key !== 'End' && scriptView === SCRIPT_VIEW.SOURCE
+      ? SCRIPT_VIEW.REPORT : SCRIPT_VIEW.SOURCE
+    setScriptView(next)
+    document.getElementById(`${scriptViewId}-tab-${next}`).focus()
   }
 
   return <section className="workspace-module project-studio">
@@ -160,12 +202,15 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
       summary={[`${chapters.length} 章`, editorStage ? chapter?.title : `${shotCount} 个镜头`].filter(Boolean).join(' · ')} onBack={onBack}
       onNavigateStage={(value) => { if (value !== stage) onNavigateStage(value) }}>
       {editorStage ? <>
-        <button type="button" className="workspace-secondary" disabled={busy || !workspace?.script?.id}
-          onClick={() => startTask(CREATIVE_OPERATION.PARSE_SCRIPT)}><WandSparkles size={15} />解析剧本</button>
+        <button type="button" className="workspace-secondary" disabled={!canStartAnalysis}
+          onClick={startAnalysis}>
+          {analysisStarting || analysis.running ? <><LoaderCircle size={15} className="spin" />解析中</> : <><WandSparkles size={15} />解析剧本</>}
+        </button>
         {chapter ? <button type="button" className="workspace-primary" disabled={busy || dirty}
           title={dirty ? '请先保存章节，再生成分镜' : ''} onClick={() => startTask(CREATIVE_OPERATION.GENERATE_CHAPTER_STORYBOARD)}><Film size={15} />生成分镜</button>
           : <button type="button" className="workspace-primary" disabled={busy || !project} onClick={() => {
-            setShowGeneration((value) => !value); setMobileView('content')
+            setShowGeneration((value) => scriptView === SCRIPT_VIEW.SOURCE ? !value : true)
+            setScriptView(SCRIPT_VIEW.SOURCE); setMobileView('content')
           }}><WandSparkles size={15} />AI 创作章节</button>}
       </> : <>
         <button type="button" className="workspace-secondary" onClick={() => onNavigateStage('STORYBOARD')}><Film size={15} />进入分镜</button>
@@ -174,7 +219,7 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
     </ProjectStudioHeader>
     {error && <div className="workspace-alert" role="alert">{error}</div>}
     <div className="workbench-tabs studio-mobile-tabs" role="group" aria-label={editorStage ? '剧本工作区' : '概览工作区'}>
-      {[['directory', '章节目录'], ['content', editorStage ? '剧本正文' : '项目详情']].map(([value, label]) => <button type="button" key={value}
+      {[['directory', '章节目录'], ['content', editorStage ? '剧本内容' : '项目详情']].map(([value, label]) => <button type="button" key={value}
         className={mobileView === value ? 'active' : ''} aria-pressed={mobileView === value}
         onClick={() => setMobileView(value)}>{label}</button>)}
     </div>
@@ -185,14 +230,33 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
           {workspace && !chapters.length && <p className="studio-directory-empty">暂无章节</p>}
           {chapters.map((item) => <button type="button" key={item.id} className="studio-chapter-row"
             aria-current={String(item.id) === String(initialChapterId) || undefined} onClick={async () => {
-              if (await onNavigateChapter(item.id)) setMobileView('content')
+              if (await onNavigateChapter(item.id)) {
+                setScriptView(SCRIPT_VIEW.SOURCE)
+                setMobileView('content')
+              }
             }}>
             <BookOpen size={15} aria-hidden="true" /><strong title={item.title}>{item.title}</strong><small>{item.sceneCount || 0} 场景 · {item.rawContentLength || 0} 字</small>
           </button>)}
         </div>
         {editorStage && <button type="button" className="workspace-secondary studio-directory-create" disabled={!project || busy} onClick={openNewChapter}><Plus size={15} />新增章节</button>}
       </aside>
-      {editorStage ? <section className="project-content-panel script-editor-main" aria-label="剧本编辑"><header><div><h2>{chapter ? chapter.title : '剧本创作'}</h2>{chapter && <small>{`第 ${chapter.chapterNumber} 章 · ${dirty ? '有未保存修改' : '已保存'}`}</small>}</div>
+      {editorStage ? <section className="project-content-panel script-editor-main" aria-label="剧本编辑">
+        <div className="workbench-tabs script-view-tabs" role="tablist" aria-label="剧本视图" onKeyDown={selectScriptViewFromKeyboard}>
+          {[[SCRIPT_VIEW.REPORT, '解析报告', FileSearch], [SCRIPT_VIEW.SOURCE, '原文', FileText]].map(([value, label, Icon]) => <button
+            type="button" role="tab" key={value} id={`${scriptViewId}-tab-${value}`}
+            aria-controls={`${scriptViewId}-panel-${value}`} aria-selected={scriptView === value}
+            className={scriptView === value ? 'active' : ''} tabIndex={scriptView === value ? 0 : -1}
+            onClick={() => setScriptView(value)}><Icon size={14} aria-hidden="true" />{label}</button>)}
+        </div>
+        <div role="tabpanel" id={`${scriptViewId}-panel-${SCRIPT_VIEW.REPORT}`}
+          aria-labelledby={`${scriptViewId}-tab-${SCRIPT_VIEW.REPORT}`} hidden={scriptView !== SCRIPT_VIEW.REPORT}>
+          {analysisStartError && <div className="workspace-alert" role="alert">{analysisStartError}</div>}
+          {scriptView === SCRIPT_VIEW.REPORT && <ScriptAnalysisReport analysis={analysis} starting={analysisStarting}
+            canStart={canStartAnalysis} onStart={startAnalysis} />}
+        </div>
+        <div className="script-source" role="tabpanel" id={`${scriptViewId}-panel-${SCRIPT_VIEW.SOURCE}`}
+          aria-labelledby={`${scriptViewId}-tab-${SCRIPT_VIEW.SOURCE}`} hidden={scriptView !== SCRIPT_VIEW.SOURCE}>
+        <header><div><h2>{chapter ? chapter.title : '剧本创作'}</h2>{chapter && <small>{`第 ${chapter.chapterNumber} 章 · ${dirty ? '有未保存修改' : '已保存'}`}</small>}</div>
         <div className="workbench-action-row">
           <label className="workspace-secondary chapter-import-label"><FileText size={14} />导入剧本<input type="file" disabled={busy || !project} accept=".txt,.md,text/plain,text/markdown" onChange={importFull} /></label>
           {chapter && <button type="button" className="workspace-primary" disabled={busy || !dirty} onClick={save}><Save size={14} />保存</button>}
@@ -223,6 +287,7 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
             <button type="button" className="workspace-secondary" disabled={busy} onClick={openNewChapter}><Plus size={14} />手动新增章节</button>
           </>}
         </div>}
+        </div>
       </section> : <section className="project-content-panel" aria-label="项目详情">
         {loading && <div className="workspace-state"><LoaderCircle size={18} className="spin" />正在加载项目概览…</div>}
         {workspace && <>

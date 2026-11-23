@@ -2,6 +2,8 @@ package com.manga.repository;
 
 import java.time.LocalDateTime;
 
+import com.manga.agent.domain.CreativeOperationType;
+import com.manga.agent.domain.CreativeRunStatus;
 import com.manga.entity.CreativeRun;
 import com.manga.mapper.CreativeRunMapper;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,12 @@ public class CreativeRunRepository {
     /** 查询项目内最新活动的手动生成任务。 */
     public Optional<CreativeRun> findActiveManual(long userId, Long projectId) {
         return Optional.ofNullable(mapper.findActiveManual(userId, projectId));
+    }
+
+    /** 返回指定用户、项目和操作目标下最新的手动任务。 */
+    public Optional<CreativeRun> findLatestManualForTarget(long userId, long projectId, long targetId,
+            CreativeOperationType operationType, CreativeRunStatus status) {
+        return Optional.ofNullable(mapper.findLatestManualForTarget(userId, projectId, targetId, operationType, status));
     }
     /** 查找需要推进消息投影的会话 Run。 */
     public List<String> findUnprojected(String conversationId, int limit) {

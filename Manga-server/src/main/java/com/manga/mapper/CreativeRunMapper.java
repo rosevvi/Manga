@@ -3,6 +3,8 @@ package com.manga.mapper;
 import java.time.LocalDateTime;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.manga.agent.domain.CreativeOperationType;
+import com.manga.agent.domain.CreativeRunStatus;
 import com.manga.entity.CreativeRun;
 import org.apache.ibatis.annotations.Param;
 
@@ -23,6 +25,10 @@ public interface CreativeRunMapper extends BaseMapper<CreativeRun> {
             @Param("beforeId") Long beforeId, @Param("limit") int limit);
     /** 查询最新未结束的手动生成任务，不受历史游标限制。 */
     CreativeRun findActiveManual(@Param("userId") long userId, @Param("projectId") Long projectId);
+    /** 按业务目标读取最新手动任务，可限定终态。 */
+    CreativeRun findLatestManualForTarget(@Param("userId") long userId, @Param("projectId") long projectId,
+            @Param("targetId") long targetId, @Param("operationType") CreativeOperationType operationType,
+            @Param("status") CreativeRunStatus status);
     /** 查询尚有事件未投影的 Run，支持限定会话。 */
     List<String> findUnprojected(@Param("conversationId") String conversationId, @Param("limit") int limit);
     /** 查询会话的当前活动 Run。 */

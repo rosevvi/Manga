@@ -36,10 +36,10 @@ function useRevealedText(text, streaming) {
 }
 
 /** 使用同一安全 Markdown 渲染历史和实时正文，流动光标只在接收期间出现。 */
-export default memo(function AssistantMarkdown({ text = '', streaming = false }) {
+export default memo(function AssistantMarkdown({ text = '', streaming = false, fallback }) {
   const visible = useRevealedText(text, streaming)
   return <div className={`assistant-markdown${streaming ? ' streaming' : ''}`}>
-    <Suspense fallback={<div className="process-prose">{visible}</div>}>
+    <Suspense fallback={fallback ?? <div className="process-prose">{visible}</div>}>
       <MarkdownRenderer text={visible} />
     </Suspense>
   </div>

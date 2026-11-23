@@ -184,10 +184,10 @@
 .overview-stats dd { margin: 6px 0 0; color: var(--creative-text); font-size: clamp(15px, 2cqi, 22px); font-weight: 600; }
 .overview-artifacts { margin-top: 20px; }
 .overview-artifacts h2 { margin: 0 0 12px; font-size: 15px; }
-.script-editor-main > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
-.script-editor-main > header > div:first-child { min-width: 0; overflow-wrap: anywhere; }
-.script-editor-main > header h2 { margin: 0 0 6px; font-size: 18px; }
-.script-editor-main > header small { font-size: 11px; color: var(--creative-muted); }
+.script-source > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.script-source > header > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.script-source > header h2 { margin: 0 0 6px; font-size: 18px; }
+.script-source > header small { font-size: 11px; color: var(--creative-muted); }
 .script-editor-main .script-raw-input { box-sizing: border-box; min-height: 340px; font-size: 13px; line-height: 2; }
 .script-editor-main .workspace-field { margin: 16px 0; }
 .script-editor-main .script-import-panel { margin: 16px 0 0; }

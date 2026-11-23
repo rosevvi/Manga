@@ -150,6 +150,8 @@ public final class CreativeRuntimeMessages {
     public static final String AGENT_STEP_STATE_SESSION_REQUIRED = "Agent Step 缺少状态会话标识";
     /** 完整 Agent 输出无法序列化为 Step 结果时的故障消息。 */
     public static final String AGENT_STEP_OUTPUT_SERIALIZATION_FAILED = "Agent Step 输出序列化失败";
+    /** 剧本工作台无法读取已持久化的最终解析结果。 */
+    public static final String SCRIPT_ANALYSIS_RESULT_INVALID = "剧本解析报告内容无效";
     /** Step 租约失效或 owner epoch 围栏校验失败时的中断消息。 */
     public static final String AGENT_STEP_OWNER_LEASE_LOST = "Agent Step 执行租约已丢失";
     /** 心跳配置的租约时长为空或非正数时的校验消息。 */

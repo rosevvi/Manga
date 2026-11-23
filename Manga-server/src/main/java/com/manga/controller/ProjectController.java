@@ -1,5 +1,7 @@
 package com.manga.controller;
 
+import com.manga.agent.api.ProjectScriptAnalysis;
+import com.manga.agent.application.ProjectScriptAnalysisQueryService;
 import com.manga.common.api.ApiResponse;
 import com.manga.common.security.SecurityUtils;
 import com.manga.dto.ArtStylePresetResponse;
@@ -20,6 +22,7 @@ import com.manga.service.ScriptTaskService;
 import com.manga.service.ProjectWorkflowService;
 import com.manga.service.ProjectService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -42,11 +45,13 @@ import java.util.List;
 @Slf4j
 @RequiredArgsConstructor
 public class ProjectController {
+    private static final String SCRIPT_ANALYSIS_PATH = "/{projectId}/script/analysis";
 
     private final ProjectService projectService;
     private final ProjectScriptService scriptService;
     private final ProjectWorkflowService workflowService;
     private final ScriptTaskService scriptTaskService;
+    private final ProjectScriptAnalysisQueryService scriptAnalysis;
 
     /** 查询当前用户可访问的项目列表。 */
     @GetMapping
@@ -117,6 +122,16 @@ public class ProjectController {
                 projectId, SecurityUtils.getCurrentUsername());
         ProjectScriptResponse result = scriptService.find(projectId);
         log.info("[ProjectController#findScript] response projectId={} present={}", projectId, result != null);
+        return ApiResponse.success(result);
+    }
+
+    /** 查询用户最近一次解析状态与已完成报告。 */
+    @GetMapping(SCRIPT_ANALYSIS_PATH)
+    public ApiResponse<ProjectScriptAnalysis> findScriptAnalysis(@PathVariable @Positive long projectId) {
+        long userId = SecurityUtils.requireCurrentUserId();
+        log.debug("Script analysis requested userId={} projectId={}", userId, projectId);
+        ProjectScriptAnalysis result = scriptAnalysis.find(projectId, userId);
+        log.debug("Script analysis returned userId={} projectId={} hasReport={}", userId, projectId, result.report() != null);
         return ApiResponse.success(result);
     }
 

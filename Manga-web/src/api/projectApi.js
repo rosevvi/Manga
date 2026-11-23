@@ -52,6 +52,11 @@ export function getProjectScript(accessToken, projectId) {
   return authorizedRequest(accessToken, projectScriptEndpoint(projectId))
 }
 
+/** 读取当前剧本最近的解析进度与已持久化报告。 */
+export function getProjectScriptAnalysis(accessToken, projectId) {
+  return authorizedRequest(accessToken, `${projectScriptEndpoint(projectId)}/analysis`)
+}
+
 export function saveProjectScript(accessToken, projectId, script) {
   return authorizedRequest(accessToken, projectScriptEndpoint(projectId), {
     method: 'PUT',

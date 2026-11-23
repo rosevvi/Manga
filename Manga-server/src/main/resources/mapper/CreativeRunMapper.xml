@@ -151,4 +151,12 @@
           AND status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED')
         ORDER BY id DESC LIMIT 1
     </select>
+    <select id="findLatestManualForTarget" resultMap="creativeRunResultMap">
+        SELECT id, run_id, status, finished_at, error_message
+        FROM manga_creative_run
+        WHERE user_id = #{userId} AND project_id = #{projectId} AND target_id = #{targetId}
+          AND trigger_source = 'MANUAL' AND operation_type = #{operationType}
+        <if test="status != null">AND status = #{status}</if>
+        ORDER BY id DESC LIMIT 1
+    </select>
 </mapper>
