@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowDown, ArrowUp, AudioLines, BookOpen, ChevronLeft, ChevronRight, Clapperboard, FileText, Film,
-  Image as ImageIcon, MessageSquare, Pencil, Plus, Save, Trash2, Video, WandSparkles, X,
+  ArrowDown, ArrowUp, AudioLines, ChevronLeft, ChevronRight, FileText, Film,
+  Image as ImageIcon, MessageSquare, Pencil, Plus, Save, Trash2, WandSparkles, X,
 } from 'lucide-react'
 import { createStoryboardShot, deleteStoryboardShot, getProjectWorkspace, getStoryboardShots, reorderStoryboardShots, updateStoryboardShot } from '../api/projectApi'
 import { createManualRun } from '../api/creativeRunApi'
@@ -15,8 +15,8 @@ import { useWorkspaceConfirm } from './WorkspaceConfirmDialog'
 import { pushWorkspaceHistory, replaceWorkspaceHistory } from './workspaceHistory'
 import StoryboardDirectory from './StoryboardDirectory'
 import StoryboardMediaPreview, { StoryboardVideoThumbnail } from './StoryboardMediaPreview'
+import ProjectStudioHeader from './ProjectStudioHeader'
 import WorkspaceSelect from './WorkspaceSelect'
-import MediaImage from './MediaImage'
 import './project-module.css'
 import './project-workspace.css'
 import './creative-workbench.css'
@@ -59,7 +59,7 @@ function restoredSelection() {
 
 /** 分镜工作台：目录、镜头编辑、媒体生成和底部镜头条共用一份服务端快照。 */
 export default function StoryboardModule({ accessToken, projectId, stage, onBackToProjects, onNavigateStage }) {
-  const { locale, translate } = useLanguage()
+  const { translate } = useLanguage()
   const confirm = useWorkspaceConfirm()
   const confirmCreativeNavigation = useConfirmCreativeNavigation()
   const [project, setProject] = useState(null)
@@ -271,49 +271,19 @@ export default function StoryboardModule({ accessToken, projectId, stage, onBack
   const currentIndex = shots.findIndex((shot) => shot.id === selectedShot?.id)
   const openedChapter = chapters.find((item) => String(item.id) === String(chapterId))
   const railFilters = [[ALL, '全部'], ...Object.entries(SHOT_STATUS_LABELS)]
-  const updated = project?.updatedAt
-  return <section className="workspace-module storyboard-studio">
-    <nav className="storyboard-breadcrumb" aria-label="当前位置">
-      <button type="button" onClick={onBackToProjects}>项目</button><ChevronRight size={13} aria-hidden="true" />
-      {project && <><button type="button" onClick={() => onNavigateStage('OVERVIEW')}>{project.name}</button><ChevronRight size={13} aria-hidden="true" /></>}
-      <span aria-current="page">{stage === 'GENERATION' ? '视频' : '分镜'}</span>
-    </nav>
-    <header className="workbench-project-header storyboard-project-header">
-      <div className="project-workspace-cover">
-        <MediaImage src={project?.coverPreviewUrl || project?.coverUrl} fallback={<Clapperboard size={24} aria-hidden="true" />} />
-      </div>
-      <div className="storyboard-project-title">
-        <h1>{project?.name || '分镜工作台'}</h1>
-        <div className="storyboard-project-meta">
-          <small>{[project?.genre, `${shots.length} 个镜头`, openedChapter?.title].filter(Boolean).join(' · ')}</small>
-          {Number.isFinite(Date.parse(updated)) && <time dateTime={updated} title={translate('projects.recent')}>
-            {new Date(updated).toLocaleString(locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-          </time>}
-          {project?.status && <span className={`workspace-status status-${project.status.toLowerCase().replaceAll('_', '-')}`}>
-            {translate(`projectStatus.${project.status}`)}
-          </span>}
-        </div>
-      </div>
-      <div className="storyboard-project-actions">
-        <button type="button" className="workspace-secondary" onClick={() => openCreativeTask(undefined, projectId)}>项目管理助手</button>
-        <button type="button" className="workspace-secondary" disabled={!chapterId || saving || dirty}
-          title={openedChapter ? `为《${openedChapter.title}》生成分镜` : '请选择剧本章节'} onClick={generateChapter}>
-          <WandSparkles size={15} />生成分镜
-        </button>
-        <button type="button" className="workspace-primary" disabled={!project || saving} onClick={create}><Plus size={15} />新增镜头</button>
-      </div>
-    </header>
-    <nav className="workflow-stepper storyboard-workflow" aria-label="项目创作阶段">
-      {[
-        ['OVERVIEW', '项目概览', Clapperboard], ['SCRIPT', '剧本', BookOpen],
-        ['STORYBOARD', '分镜', Film], ['GENERATION', '视频', Video],
-      ].map(([value, label, Icon]) => <button type="button" key={value}
-        className={value === stage ? 'workflow-step active' : 'workflow-step'} aria-current={value === stage ? 'page' : undefined}
-        onClick={() => { if (value !== stage) onNavigateStage(value); else if (value === 'GENERATION') setMobileView('media') }}>
-        <Icon size={15} aria-hidden="true" />{label}
-      </button>)}
-      {loading && <small role="status" className="storyboard-loading">正在刷新…</small>}
-    </nav>
+  return <section className="workspace-module project-studio">
+    <ProjectStudioHeader project={project} projectId={projectId} stage={stage} loading={loading}
+      summary={[`${shots.length} 个镜头`, openedChapter?.title].filter(Boolean).join(' · ')} onBack={onBackToProjects}
+      onNavigateStage={(value) => {
+        if (value !== stage) onNavigateStage(value)
+        else if (value === 'GENERATION') setMobileView('media')
+      }}>
+      <button type="button" className="workspace-secondary" disabled={!chapterId || saving || dirty}
+        title={openedChapter ? `为《${openedChapter.title}》生成分镜` : '请选择剧本章节'} onClick={generateChapter}>
+        <WandSparkles size={15} />生成分镜
+      </button>
+      <button type="button" className="workspace-primary" disabled={!project || saving} onClick={create}><Plus size={15} />新增镜头</button>
+    </ProjectStudioHeader>
     {error && <div className="workspace-alert" role="alert">{error}</div>}
     <div className="workbench-tabs studio-mobile-tabs" role="group" aria-label="分镜工作区">
       {[
@@ -321,7 +291,7 @@ export default function StoryboardModule({ accessToken, projectId, stage, onBack
       ].map(([value, label]) => <button type="button" className={mobileView === value ? 'active' : ''} aria-pressed={mobileView === value}
         key={value} onClick={() => setMobileView(value)}>{label}</button>)}
     </div>
-    <div className="storyboard-studio-layout" data-view={mobileView}>
+    <div className="project-studio-layout storyboard-studio-layout" data-view={mobileView}>
       <StoryboardDirectory groups={chapterGroups} allChapters={ALL} chapter={selection.chapter}
         selectedShot={selectedShot} chapterOf={chapterOf}
         onChapterChange={chooseChapter} onShotChange={chooseShot}

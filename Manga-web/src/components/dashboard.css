@@ -268,11 +268,11 @@
   padding: var(--dashboard-content-top-space) 32px var(--dashboard-content-bottom-space);
 }
 
-.dashboard-shell[data-view="storyboards"] {
+.dashboard-shell[data-view="project-studio"] {
   --dashboard-topbar-height: 56px;
 }
 
-.dashboard-shell[data-view="storyboards"] > .dashboard-main {
+.dashboard-shell[data-view="project-studio"] > .dashboard-main {
   --dashboard-content-top-space: calc(var(--dashboard-topbar-height) + 6px);
 }
 

@@ -17,19 +17,19 @@ export default function StoryboardDirectory({
     setClosed(closed === id ? null : id)
   }
 
-  return <aside className="storyboard-directory" aria-label="分镜目录">
-    <header className="storyboard-directory-heading">
+  return <aside className="studio-directory" aria-label="分镜目录">
+    <header className="studio-directory-heading">
       <strong>分镜目录</strong><span>{groups.length} 组</span>
     </header>
-    <div className="storyboard-directory-scroll">
-      <button type="button" className="storyboard-chapter-row" aria-pressed={chapter === allChapters}
+    <div className="studio-directory-scroll">
+      <button type="button" className="studio-chapter-row" aria-pressed={chapter === allChapters}
         onClick={async () => { if (await onChapterChange(allChapters)) setClosed(null) }}>
         <Film size={15} aria-hidden="true" /><strong>全部镜头</strong>
       </button>
       {groups.map(({ id, title, shots }) => {
         const expanded = activeChapter === id && closed !== id
         return <div key={id}>
-          <button type="button" className="storyboard-chapter-row" aria-expanded={expanded}
+          <button type="button" className="studio-chapter-row" aria-expanded={expanded}
             data-selected={chapter === id} onClick={() => toggleChapter(id)}>
             {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
             <Folder size={15} aria-hidden="true" /><strong>{title}</strong><small>{shots.length}</small>
@@ -43,12 +43,12 @@ export default function StoryboardDirectory({
                   <span>{shot.title || '未命名镜头'}</span>
                 </button>
               </li>)}
-            {shots.length === 0 && <li className="storyboard-directory-empty">本章暂无镜头</li>}
+            {shots.length === 0 && <li className="studio-directory-empty">本章暂无镜头</li>}
           </ul>}
         </div>
       })}
     </div>
-    <button type="button" className="workspace-secondary storyboard-directory-create" onClick={onCreate} disabled={saving}>
+    <button type="button" className="workspace-secondary studio-directory-create" onClick={onCreate} disabled={saving}>
       <Plus size={15} />新增镜头
     </button>
   </aside>

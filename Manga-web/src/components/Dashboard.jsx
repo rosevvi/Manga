@@ -134,13 +134,19 @@ const DEFAULT_USER_NAME = 'Sakura'
 const ACTIVE_TASK_POLL_MS = 5000
 const IDLE_TASK_POLL_MS = 30000
 const SIDEBAR_PREFERENCE_KEY = 'manga.dashboard.sidebarCollapsed'
+const PROJECT_ROUTE_STAGES = {
+  script: 'SCRIPT',
+  storyboards: 'STORYBOARD',
+  generation: 'GENERATION',
+}
 
 function projectRoute(pathname = window.location.pathname) {
+  // 已分享的旧阶段链接仍可打开对应项目的概览。
   const match = pathname.match(/^\/console\/projects\/(\d+)(?:\/(script\/chapters\/(\d+)|storyboards|script|assets|generation|export))?$/)
   if (!match) return null
   return {
     projectId: Number(match[1]),
-    stage: match[2]?.startsWith('script/chapters') ? 'SCRIPT_CHAPTER' : match[2] === 'storyboards' ? 'STORYBOARD' : match[2]?.toUpperCase() || 'OVERVIEW',
+    stage: match[3] ? 'SCRIPT_CHAPTER' : PROJECT_ROUTE_STAGES[match[2]] ?? 'OVERVIEW',
     chapterId: match[3] ? Number(match[3]) : null,
   }
 }
@@ -264,7 +270,7 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
   }
 
   const navigateProject = async (project, stage = 'OVERVIEW') => {
-    if (!(await confirmCreativeNavigation())) return
+    if (!(await confirmCreativeNavigation())) return false
     setSelectedProjectId(project.id)
     setProjectStage(stage)
     setSelectedChapterId(null)
@@ -273,28 +279,27 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
     pushWorkspaceHistory(`/console/projects/${encodeURIComponent(project.id)}${suffix}${keepSelection ? window.location.search : ''}`)
     setActiveNav('project')
     setSidebarOpen(false)
+    return true
   }
 
   /** 进入指定项目详情工作区。 */
   const openProject = (project) => navigateProject(project)
 
-  /** 进入指定项目的分镜工作区。 */
-  const openStoryboard = (project) => navigateProject(project, 'STORYBOARD')
-
   const openChapter = async (chapterId) => {
-    if (!(await confirmCreativeNavigation())) return
+    if (!(await confirmCreativeNavigation())) return false
     setSelectedChapterId(chapterId)
     setProjectStage('SCRIPT_CHAPTER')
     pushWorkspaceHistory(`/console/projects/${encodeURIComponent(selectedProjectId)}/script/chapters/${encodeURIComponent(chapterId)}`)
     setActiveNav('project')
+    return true
   }
 
   const navigateProjectStage = (stage) => {
-    if (selectedProjectId) navigateProject({ id: selectedProjectId }, stage)
+    return selectedProjectId ? navigateProject({ id: selectedProjectId }, stage) : false
   }
 
   return (
-    <div className="dashboard-shell" data-view={storyboardOpen ? 'storyboards' : activeNav} data-sidebar-collapsed={sidebarCollapsed}>
+    <div className="dashboard-shell" data-view={activeNav === 'project' ? 'project-studio' : activeNav} data-sidebar-collapsed={sidebarCollapsed}>
       <aside id="dashboard-sidebar" className={sidebarOpen ? 'dashboard-sidebar open' : 'dashboard-sidebar'}>
         <div className="dashboard-sidebar-header">
           <button className="dashboard-logo" type="button" aria-label="Manga" title="Manga" onClick={async () => { if (await confirmCreativeNavigation()) onExit() }}>
@@ -387,7 +392,6 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
             initialStage={projectStage}
             initialChapterId={selectedChapterId}
             onBack={() => selectNavigation('projects')}
-            onOpenStoryboard={openStoryboard}
             onNavigateStage={navigateProjectStage}
             onNavigateChapter={openChapter}
           />

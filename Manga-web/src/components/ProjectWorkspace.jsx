@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, BookOpen, ChevronRight, Clapperboard, FileText, Film, Image as ImageIcon, LoaderCircle, Plus, Save, Trash2, WandSparkles } from 'lucide-react'
+import { BookOpen, FileText, Film, LoaderCircle, Plus, Save, Trash2, WandSparkles } from 'lucide-react'
 import { getProjectChapter, getProjectWorkspace, importProjectChapter, importProjectScript, saveProjectChapter, deleteProjectChapter } from '../api/projectApi'
 import { createManualRun } from '../api/creativeRunApi'
 import { useLanguage } from '../i18n/LanguageContext'
-import MediaImage from './MediaImage'
 import GenerationJobsPanel from './GenerationJobsPanel'
+import ProjectStudioHeader from './ProjectStudioHeader'
 import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
 import { openCreativeTask } from './creativeTaskEvents'
 import useUnsavedChanges, { useDiscardChangesConfirmation } from './useUnsavedChanges'
@@ -14,13 +14,8 @@ import { CREATIVE_OPERATION, CREATIVE_PERMISSION, CREATIVE_RESOURCE } from '../c
 import './project-workspace.css'
 import './creative-workbench.css'
 
-const STAGES = [
-  ['OVERVIEW', '项目概览', Clapperboard], ['SCRIPT', '剧本', BookOpen], ['STORYBOARD', '分镜', Film],
-  ['ASSETS', '角色与场景', ImageIcon], ['GENERATION', '视频', WandSparkles], ['EXPORT', '合成与导出', FileText],
-]
-
 /** 项目概览与章节编辑共用紧凑框架，所有 AI 执行、审批与结果均进入任务中心。 */
-export default function ProjectWorkspace({ accessToken, projectId, initialStage = 'OVERVIEW', initialChapterId, onBack, onOpenStoryboard, onNavigateStage, onNavigateChapter }) {
+export default function ProjectWorkspace({ accessToken, projectId, initialStage = 'OVERVIEW', initialChapterId, onBack, onNavigateStage, onNavigateChapter }) {
   const { translate } = useLanguage()
   const confirm = useWorkspaceConfirm()
   const confirmDiscard = useDiscardChangesConfirmation()
@@ -35,6 +30,7 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
   const [showGeneration, setShowGeneration] = useState(false)
   const [instruction, setInstruction] = useState('')
   const [showImport, setShowImport] = useState(false)
+  const [mobileView, setMobileView] = useState('content')
   const scope = useRef(0)
   const current = useRef(null)
   current.current = { chapter, title, text }
@@ -148,47 +144,58 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
     setShowGeneration(false)
   })
 
-  if (loading) return <div className="workspace-state"><LoaderCircle size={18} className="spin" />正在加载创作工作台…</div>
-  if (!workspace) return <div role="alert" className="workspace-alert">{error || '项目暂不可用'}</div>
-  const project = workspace.project
-  const chapters = workspace.script?.chapters || []
   const editorStage = stage === 'SCRIPT' || stage === 'SCRIPT_CHAPTER'
-  const openStage = (value) => value === 'STORYBOARD' ? onOpenStoryboard(project) : onNavigateStage?.(value)
-  return <section className="workspace-module project-workspace">
-    <button className="workspace-back" type="button" onClick={onBack}><ArrowLeft size={14} />全部项目</button>
-    <header className="project-workspace-header">
-      <div className="project-workspace-cover"><MediaImage src={project.coverPreviewUrl || project.coverUrl} fallback={<Clapperboard size={23} />} /></div>
-      <div className="project-workspace-heading"><h1>{project.name}</h1><p>{project.description || '从剧本、分镜到最终成片'}</p></div>
-      <button type="button" className="workspace-secondary" onClick={() => openCreativeTask(undefined, projectId)}>项目管理助手</button>
-    </header>
-    <nav className="workflow-stepper">{STAGES.map(([value, label, Icon]) => <button type="button" key={value}
-      className={stage === value || value === 'SCRIPT' && stage === 'SCRIPT_CHAPTER' ? 'workflow-step active' : 'workflow-step'} onClick={() => openStage(value)}>
-      <Icon size={15} />{label}<ChevronRight size={12} /></button>)}</nav>
+  const project = workspace?.project
+  const chapters = workspace?.script?.chapters || []
+  const shotCount = workspace?.storyboardShotCount || 0
+
+  const openNewChapter = async () => {
+    if (initialChapterId && !(await onNavigateStage('SCRIPT'))) return
+    setShowImport(true)
+    setMobileView('content')
+  }
+
+  return <section className="workspace-module project-studio">
+    <ProjectStudioHeader project={project} projectId={projectId} stage={editorStage ? 'SCRIPT' : 'OVERVIEW'} loading={loading}
+      summary={[`${chapters.length} 章`, editorStage ? chapter?.title : `${shotCount} 个镜头`].filter(Boolean).join(' · ')} onBack={onBack}
+      onNavigateStage={(value) => { if (value !== stage) onNavigateStage(value) }}>
+      {editorStage ? <>
+        <button type="button" className="workspace-secondary" disabled={busy || !workspace?.script?.id}
+          onClick={() => startTask(CREATIVE_OPERATION.PARSE_SCRIPT)}><WandSparkles size={15} />解析剧本</button>
+        {chapter ? <button type="button" className="workspace-primary" disabled={busy || dirty}
+          title={dirty ? '请先保存章节，再生成分镜' : ''} onClick={() => startTask(CREATIVE_OPERATION.GENERATE_CHAPTER_STORYBOARD)}><Film size={15} />生成分镜</button>
+          : <button type="button" className="workspace-primary" disabled={busy || !project} onClick={() => {
+            setShowGeneration((value) => !value); setMobileView('content')
+          }}><WandSparkles size={15} />AI 创作章节</button>}
+      </> : <>
+        <button type="button" className="workspace-secondary" onClick={() => onNavigateStage('STORYBOARD')}><Film size={15} />进入分镜</button>
+        <button type="button" className="workspace-primary" onClick={() => onNavigateStage('SCRIPT')}><BookOpen size={15} />进入剧本</button>
+      </>}
+    </ProjectStudioHeader>
     {error && <div className="workspace-alert" role="alert">{error}</div>}
-    {stage === 'OVERVIEW' && <>
-      <div className="overview-stats"><article><small>剧本章节</small><strong>{chapters.length}</strong></article><article><small>镜头数量</small><strong>{workspace.storyboardShotCount || 0}</strong></article>
-        <article><small>剧本状态</small><strong style={{ fontSize: 18 }}>{workspace.script ? '已创建' : '待创作'}</strong></article></div>
-      <div className="overview-columns"><section className="overview-section"><h2>剧本与章节</h2>
-        {chapters.slice(0, 6).map((item) => <button type="button" className="overview-chapter" key={item.id} onClick={() => onNavigateChapter(item.id)}><BookOpen size={16} /><strong>{item.title}</strong><small>{item.sceneCount || 0} 场景</small><ChevronRight size={14} /></button>)}
-        {!chapters.length && <p>从导入剧本或创作第一章开始。</p>}
-        <div className="workbench-action-row" style={{ marginTop: 18 }}><button type="button" className="workspace-primary" onClick={() => openStage('SCRIPT')}><BookOpen size={14} />进入剧本</button>
-          <button type="button" className="workspace-secondary" onClick={() => onOpenStoryboard(project)}><Film size={14} />进入分镜</button></div></section>
-        <section className="overview-section"><h2>项目创作流程</h2><p>整理章节，生成分镜提案，审批后进入镜头工作区，为每个镜头选择图片和视频模型。</p></section></div>
-      <section className="overview-section" style={{ marginTop: 16 }}><h2>最近生成产物</h2><GenerationJobsPanel accessToken={accessToken} projectId={projectId} compact /></section>
-    </>}
-    {editorStage && <div className="script-editor-layout">
-      <aside className="chapter-directory"><header><strong>章节目录</strong><span>{chapters.length} 章</span></header>
-        {chapters.map((item) => <button type="button" key={item.id} className={String(item.id) === String(initialChapterId) ? 'chapter-item active' : 'chapter-item'} onClick={() => onNavigateChapter(item.id)}>
-          <BookOpen size={15} /><span><strong>{item.title}</strong><small>{item.sceneCount || 0} 场景 · {item.rawContentLength || 0} 字</small></span></button>)}
-        <button type="button" className="task-new" onClick={() => { setShowImport(true); if (initialChapterId) onNavigateStage('SCRIPT') }}><Plus size={14} />新增章节</button>
+    <div className="workbench-tabs studio-mobile-tabs" role="group" aria-label={editorStage ? '剧本工作区' : '概览工作区'}>
+      {[['directory', '章节目录'], ['content', editorStage ? '剧本正文' : '项目详情']].map(([value, label]) => <button type="button" key={value}
+        className={mobileView === value ? 'active' : ''} aria-pressed={mobileView === value}
+        onClick={() => setMobileView(value)}>{label}</button>)}
+    </div>
+    <div className="project-studio-layout project-content-layout" data-view={mobileView}>
+      <aside className="studio-directory" aria-label="章节目录">
+        <header className="studio-directory-heading"><strong>章节目录</strong><span>{chapters.length} 章</span></header>
+        <div className="studio-directory-scroll">
+          {workspace && !chapters.length && <p className="studio-directory-empty">暂无章节</p>}
+          {chapters.map((item) => <button type="button" key={item.id} className="studio-chapter-row"
+            aria-current={String(item.id) === String(initialChapterId) || undefined} onClick={async () => {
+              if (await onNavigateChapter(item.id)) setMobileView('content')
+            }}>
+            <BookOpen size={15} aria-hidden="true" /><strong title={item.title}>{item.title}</strong><small>{item.sceneCount || 0} 场景 · {item.rawContentLength || 0} 字</small>
+          </button>)}
+        </div>
+        {editorStage && <button type="button" className="workspace-secondary studio-directory-create" disabled={!project || busy} onClick={openNewChapter}><Plus size={15} />新增章节</button>}
       </aside>
-      <main className="script-editor-main"><header><div><h2>{chapter ? chapter.title : '剧本创作'}</h2><small>{chapter ? `第 ${chapter.chapterNumber} 章 · ${dirty ? '有未保存修改' : '已保存'}` : '选择章节编辑，或导入一部新的剧本'}</small></div>
+      {editorStage ? <section className="project-content-panel script-editor-main" aria-label="剧本编辑"><header><div><h2>{chapter ? chapter.title : '剧本创作'}</h2>{chapter && <small>{`第 ${chapter.chapterNumber} 章 · ${dirty ? '有未保存修改' : '已保存'}`}</small>}</div>
         <div className="workbench-action-row">
-          <label className="workspace-secondary chapter-import-label"><FileText size={14} />导入剧本<input type="file" disabled={busy} accept=".txt,.md,text/plain,text/markdown" onChange={importFull} /></label>
-          <button type="button" className="workspace-secondary" disabled={busy || !workspace.script?.id} onClick={() => startTask(CREATIVE_OPERATION.PARSE_SCRIPT)}><WandSparkles size={14} />解析剧本</button>
-          {chapter && <><button type="button" className="workspace-secondary" disabled={busy || dirty} title={dirty ? '请先保存章节，再生成分镜' : ''} onClick={() => startTask(CREATIVE_OPERATION.GENERATE_CHAPTER_STORYBOARD)}><Film size={14} />生成分镜</button>
-            <button type="button" className="workspace-primary" disabled={busy || !dirty} onClick={save}><Save size={14} />保存</button></>}
-          {!chapter && <button type="button" className="workspace-primary" onClick={() => setShowGeneration((value) => !value)}><WandSparkles size={14} />AI 创作章节</button>}
+          <label className="workspace-secondary chapter-import-label"><FileText size={14} />导入剧本<input type="file" disabled={busy || !project} accept=".txt,.md,text/plain,text/markdown" onChange={importFull} /></label>
+          {chapter && <button type="button" className="workspace-primary" disabled={busy || !dirty} onClick={save}><Save size={14} />保存</button>}
         </div></header>
         {conflict && <div className="workspace-alert" role="alert">章节已发生变化，当前编辑仍保留。<button type="button" className="workspace-secondary" onClick={async () => {
           if (!(await confirmDiscard(translate('confirm.reloadChapter')))) return
@@ -200,7 +207,7 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
             <button type="button" className="workspace-secondary" onClick={() => setShowGeneration(false)}>收起</button></div></section>}
         {chapter || showImport ? <>
           <label className="workspace-field"><span>章节标题</span><input className="script-inline-input" maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-          <label className="workspace-field"><span>正文</span><textarea className="script-raw-input" rows={22} value={text} onChange={(event) => setText(event.target.value)} placeholder="在这里写下故事…" /></label>
+          <label className="workspace-field"><span>正文</span><textarea className="script-raw-input" rows={12} value={text} onChange={(event) => setText(event.target.value)} placeholder="在这里写下故事…" /></label>
           <div className="workbench-action-row"><small className="workbench-muted">{text.length} 字</small>
             <button type="button" className="workspace-primary" disabled={busy || !title.trim() || !text.trim()} onClick={save}><Save size={14} />{chapter ? '保存修改' : '保存新章节'}</button>
             {chapter && <button type="button" className="workspace-secondary" disabled={busy} onClick={async () => {
@@ -210,10 +217,27 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
               }))) return
               void execute(async () => { await deleteProjectChapter(accessToken, projectId, chapter.id); setChapter(null); setTitle(''); setText(''); await loadWorkspace(); onNavigateStage('SCRIPT') })
             }}><Trash2 size={14} />删除章节</button>}</div>
-        </> : <div className="workbench-empty"><BookOpen size={35} /><h2>{chapters.length ? '选择一个章节，继续创作' : '你的故事，从这里开始'}</h2><p>导入 TXT / Markdown 剧本，或手动写下第一章。</p>
-          <button type="button" className="workspace-secondary" onClick={() => setShowImport(true)}><Plus size={14} />手动新增章节</button></div>}
-      </main>
-    </div>}
-    {!['OVERVIEW', 'SCRIPT', 'SCRIPT_CHAPTER'].includes(stage) && <section className="workbench-empty"><Clapperboard size={30} /><h2>{stage === 'ASSETS' ? '角色与场景' : '合成与导出'}</h2><p>此项业务能力尚未开放，先完成剧本和分镜创作。</p></section>}
+        </> : <div className="workbench-empty">
+          {loading ? <div className="workspace-state"><LoaderCircle size={18} className="spin" />正在加载剧本…</div> : project && <>
+            <BookOpen size={35} /><h2>{chapters.length ? '选择一个章节，继续创作' : '你的故事，从这里开始'}</h2><p>导入 TXT / Markdown 剧本，或手动写下第一章。</p>
+            <button type="button" className="workspace-secondary" disabled={busy} onClick={openNewChapter}><Plus size={14} />手动新增章节</button>
+          </>}
+        </div>}
+      </section> : <section className="project-content-panel" aria-label="项目详情">
+        {loading && <div className="workspace-state"><LoaderCircle size={18} className="spin" />正在加载项目概览…</div>}
+        {workspace && <>
+          {project.description && <p className="overview-description">{project.description}</p>}
+          <dl className="overview-stats">
+            <div><dt>剧本章节</dt><dd>{chapters.length}</dd></div>
+            <div><dt>镜头数量</dt><dd>{shotCount}</dd></div>
+            <div><dt>剧本状态</dt><dd>{workspace.script ? '已创建' : '待创作'}</dd></div>
+          </dl>
+          <section className="overview-artifacts">
+            <h2>最近生成产物</h2>
+            <GenerationJobsPanel accessToken={accessToken} projectId={projectId} compact />
+          </section>
+        </>}
+      </section>}
+    </div>
   </section>
 }
