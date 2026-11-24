@@ -55,11 +55,11 @@ public class ProjectScriptAnalysisQueryService {
                 completed.map(this::readReport).orElse(null));
     }
 
-    /** 只展示已完成根步骤的最终正文，重试过程与供应商分析不会混入报告。 */
+    /** 根 Agent 最终正文由完成事务保存到 output_json；result_json 是 Worker 提交的结构化结果。 */
     private ProjectScriptAnalysis.Report readReport(CreativeRun run) {
         return steps.findByRunId(run.getRunId()).stream()
                 .filter(step -> Objects.isNull(step.getParentStepId()) && step.getStatus() == CreativeStepStatus.COMPLETED)
-                .map(CreativeStep::getResultJson)
+                .map(CreativeStep::getOutputJson)
                 .filter(StringUtils::hasText)
                 .map(this::readContent)
                 .filter(StringUtils::hasText)

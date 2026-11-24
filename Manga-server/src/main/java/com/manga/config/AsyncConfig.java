@@ -16,6 +16,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
@@ -30,7 +32,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 @EnableAsync
 @EnableScheduling
 @RequiredArgsConstructor
-public class AsyncConfig implements AsyncConfigurer {
+public class AsyncConfig implements AsyncConfigurer, WebMvcConfigurer {
 
     private final AsyncExecutorProperties properties;
     private final MdcTaskDecorator taskDecorator;
@@ -104,6 +106,12 @@ public class AsyncConfig implements AsyncConfigurer {
     @Override
     public Executor getAsyncExecutor() {
         return mangaCommonTaskExecutor();
+    }
+
+    /** Spring MVC 的 SSE 响应写入使用受控线程池。 */
+    @Override
+    public void configureAsyncSupport(AsyncSupportConfigurer configurer) {
+        configurer.setTaskExecutor(mangaCommonTaskExecutor());
     }
 
     /** 返回异步任务未捕获异常处理器。 */

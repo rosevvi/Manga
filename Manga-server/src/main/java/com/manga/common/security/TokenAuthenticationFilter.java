@@ -12,11 +12,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -33,6 +35,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtDecoder jwtDecoder;
     private final SecurityErrorResponseWriter errorResponseWriter;
+    private final RequestAttributeSecurityContextRepository requestSecurityContextRepository;
 
     /** 解析 Bearer Token 并建立认证上下文。 */
     @Override
@@ -60,7 +63,10 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
             UsernamePasswordAuthenticationToken authentication =
                     UsernamePasswordAuthenticationToken.authenticated(principal, null, authorities);
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            SecurityContext context = SecurityContextHolder.createEmptyContext();
+            context.setAuthentication(authentication);
+            SecurityContextHolder.setContext(context);
+            requestSecurityContextRepository.saveContext(context, request, response);
         } catch (JwtException | IllegalArgumentException exception) {
             SecurityContextHolder.clearContext();
             reject(request, response, exception.getClass().getSimpleName());

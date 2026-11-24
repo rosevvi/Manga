@@ -45,7 +45,7 @@ class ProjectScriptAnalysisQueryServiceTests {
         var completed = CreativeRun.builder().runId("previous-analysis")
                 .status(CreativeRunStatus.COMPLETED).finishedAt(finishedAt).build();
         var root = CreativeStep.builder().status(CreativeStepStatus.COMPLETED)
-                .resultJson("{\"content\":\"## 故事主线\"}").build();
+                .outputJson("{\"content\":\"## 故事主线\"}").build();
         when(scripts.findByProjectId(PROJECT_ID)).thenReturn(Optional.of(ProjectScript.builder().id(SCRIPT_ID).build()));
         when(runs.findLatestManualForTarget(USER_ID, PROJECT_ID, SCRIPT_ID, CreativeOperationType.PARSE_SCRIPT, null))
                 .thenReturn(Optional.of(running));
