@@ -18,6 +18,13 @@ export const STORYBOARD_SHOT_STATUS = Object.freeze({
   COMPLETED: 'COMPLETED',
 })
 
+/** 剧本章节关联资产的稳定分类。 */
+export const CHAPTER_ASSET_CATEGORY = Object.freeze({
+  CHARACTER: 'characters',
+  SCENE: 'scenes',
+  PROP: 'props',
+})
+
 export const PROJECT_VISIBILITY_SCOPE = Object.freeze({
   PUBLIC: 'PUBLIC',
   PRIVATE: 'PRIVATE',
