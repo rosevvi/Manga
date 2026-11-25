@@ -215,6 +215,20 @@ public class AliyunOssStorageStrategy implements StorageStrategy {
         requireConfigured(); GeneratedMediaNames.require(reference, getType(), generatedNamespace());
         storeNamedBytes(data, StorageConstants.GENERATED_DIRECTORY, reference.format().extension(), reference.name());
     }
+    /** 使用 OSS SDK 和登记对象键读取参考图，避免依赖临时预览地址。 */
+    @Override
+    public byte[] readGenerated(GeneratedMediaReference reference, int byteLimit) {
+        requireConfigured();
+        GeneratedMediaNames.require(reference, getType(), generatedNamespace());
+        String key = buildObjectKey(StorageConstants.GENERATED_DIRECTORY, reference.format().extension(), reference.name());
+        try (var stream = ossClient().getObject(properties.bucketName(), key).getObjectContent()) {
+            byte[] bytes = stream.readNBytes(byteLimit + 1);
+            if (bytes.length == 0 || bytes.length > byteLimit) throw new IllegalArgumentException(StorageConstants.GENERATED_REFERENCE_INVALID);
+            return bytes;
+        } catch (IOException exception) {
+            throw new IllegalStateException(StorageConstants.GENERATED_REFERENCE_INVALID, exception);
+        }
+    }
     /** 幂等删除已登记对象，不使用用户提交的 URL 作为对象键。 */
     @Override
     public void deleteGenerated(GeneratedMediaReference reference) {

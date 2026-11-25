@@ -27,6 +27,7 @@ import com.manga.entity.GenerationJob;
 import com.manga.entity.GenerationMediaObject;
 import com.manga.repository.GenerationMediaObjectRepository;
 import com.manga.service.storage.GeneratedMediaReference;
+import com.manga.service.ProjectAssetService;
 import com.manga.repository.CreativeDispatchOutboxRepository;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.CreativeStepRepository;
@@ -66,11 +67,13 @@ public class GenerationJobService {
     private final ApplicationEventPublisher publisher;
     private final GenerationMediaObjectRepository media;
     private final GenerationCleanupProperties cleanupProperties;
+    private final ProjectAssetService assets;
 
     /** 批准事务内创建单次提交意图；模型或连接配置变化要求重新生成预览。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean enqueue(CreativeChangeSet proposal, long userId, String actor) {
         Long shotId;
+        Long targetVisualId = null;
         Long configId;
         GenerationProviderKey provider;
         GenerationConfigSnapshot snapshot;
@@ -88,6 +91,12 @@ public class GenerationJobService {
                 var image = codec.read(proposal.getPayloadJson(), ImageGenerationChange.class);
                 if (!image.equals(imageConfigs.canonicalize(image, userId))) return false;
                 shotId = image.shotId();
+                if (shotId == null) {
+                    CreativeRun run = runs.lockByRunId(proposal.getRunId());
+                    if (run.getOperationType() != CreativeOperationType.GENERATE_ASSET_IMAGE
+                            || !image.equals(assets.generationSettings(proposal.getProjectId(), run.getTargetId(), userId))) return false;
+                    targetVisualId = run.getTargetId();
+                }
                 configId = image.configId();
                 provider = image.provider();
                 snapshot = image.configSnapshot();
@@ -100,7 +109,7 @@ public class GenerationJobService {
         String config = snapshot == null ? null : codec.write(snapshot);
         jobs.create(GenerationJob.builder().jobId(UUID.randomUUID().toString()).runId(proposal.getRunId())
                 .stepId(proposal.getStepId()).changeSetId(proposal.getChangeSetId()).userId(userId)
-                .projectId(proposal.getProjectId()).shotId(shotId).provider(provider).configId(configId)
+                .projectId(proposal.getProjectId()).shotId(shotId).targetVisualId(targetVisualId).provider(provider).configId(configId)
                 .configSnapshotJson(config).requestJson(codec.write(approved)).status(GenerationJobStatus.PENDING_SUBMISSION)
                 .ownerEpoch(0L).cancelRequested(false).attempts(0).nextActionAt(LocalDateTime.now())
                 .createdBy(actor).updatedBy(actor).build());
@@ -192,9 +201,12 @@ public class GenerationJobService {
         if (Boolean.TRUE.equals(job.getCancelRequested()) || run.getStatus().isTerminal()
                 || run.getStatus() == CreativeRunStatus.CANCEL_REQUESTED) terminal(job, GenerationJobStatus.CANCELLED, null);
         else {
-            jobs.createArtifact(CreativeArtifact.builder().jobId(job.getJobId()).runId(job.getRunId()).stepId(job.getStepId())
+            CreativeArtifact artifact = CreativeArtifact.builder().jobId(job.getJobId()).runId(job.getRunId()).stepId(job.getStepId())
                     .changeSetId(job.getChangeSetId()).userId(job.getUserId()).projectId(job.getProjectId()).shotId(job.getShotId())
-                    .url(object.getUrl()).mediaObjectId(mediaObjectId).mediaType(object.reference().format().mimeType()).byteSize(bytes).sha256(digest).createdBy(actor()).updatedBy(actor()).build());
+                    .url(object.getUrl()).mediaObjectId(mediaObjectId).mediaType(object.reference().format().mimeType())
+                    .byteSize(bytes).sha256(digest).createdBy(actor()).updatedBy(actor()).build();
+            jobs.createArtifact(artifact);
+            if (job.getTargetVisualId() != null) assets.publishCurrent(job.getProjectId(), job.getTargetVisualId(), artifact.getId(), actor());
             media.publish(mediaObjectId, actor());
             terminal(job, GenerationJobStatus.SUCCEEDED, null);
         }
@@ -221,7 +233,8 @@ public class GenerationJobService {
         GenerationJob job = jobs.lock(claim.getJobId());
         if (!owned(job, claim)) return;
         if (job.getStatus() == GenerationJobStatus.SUBMITTING) {
-            if (error == GenerationError.AUTHENTICATION || error == GenerationError.REJECTED || error == GenerationError.RATE_LIMIT) {
+            if (error == GenerationError.AUTHENTICATION || error == GenerationError.REJECTED || error == GenerationError.RATE_LIMIT
+                    || error == GenerationError.REFERENCE_UNAVAILABLE || error == GenerationError.REFERENCES_UNSUPPORTED) {
                 terminal(job, GenerationJobStatus.FAILED, error); jobs.submission(job.getJobId(), SubmissionStatus.DONE, actor());
             } else unknown(job, GenerationError.SUBMISSION_UNKNOWN);
         } else if (job.getStatus() == GenerationJobStatus.MATERIALIZING && error == GenerationError.PROTOCOL) {
@@ -312,7 +325,7 @@ public class GenerationJobService {
                 : job.getStatus() == GenerationJobStatus.CANCELLED ? CreativeEventType.JOB_CANCELLED : CreativeEventType.JOB_FAILED);
         CreativeRun run = runs.lockByRunId(job.getRunId());
         if (run.getStatus().isTerminal() || run.getStatus() == CreativeRunStatus.CANCEL_REQUESTED) return;
-        String sessionId = run.getOperationType() == CreativeOperationType.GENERATE_SHOT_VIDEO ? null : identifiers.nextStateSessionId();
+        String sessionId = run.getOperationType().usesManualMediaProposal() ? null : identifiers.nextStateSessionId();
         if (!steps.resumeJob(job.getStepId(), sessionId, codec.write(summary(job)), ChangeSetConstants.RESUME_MAX_ATTEMPTS, actor())) return;
         run.setDeadlineAt(LocalDateTime.now().plus(runtime.runTimeout())); run.setUpdatedBy(actor()); runs.update(run);
         if (Objects.nonNull(sessionId)) sessions.register(run, sessionId);

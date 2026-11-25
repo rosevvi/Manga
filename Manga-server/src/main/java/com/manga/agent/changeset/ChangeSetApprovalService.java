@@ -74,7 +74,7 @@ public class ChangeSetApprovalService {
         ChangeSetKind required = switch (operation) {
             case GENERATE_SCRIPT_CHAPTER -> ChangeSetKind.SCRIPT;
             case GENERATE_CHAPTER_STORYBOARD -> ChangeSetKind.STORYBOARD;
-            case GENERATE_SHOT_IMAGE -> ChangeSetKind.IMAGE_GENERATION;
+            case GENERATE_SHOT_IMAGE, GENERATE_ASSET_IMAGE -> ChangeSetKind.IMAGE_GENERATION;
             case GENERATE_SHOT_VIDEO -> ChangeSetKind.VIDEO_GENERATION;
             default -> null;
         };
@@ -249,7 +249,7 @@ public class ChangeSetApprovalService {
     private void resume(CreativeRun run, CreativeChangeSet proposal, String actor) {
         // 前面的审批事件已推进 sequence/cursor，更新 deadline 前必须重新读取，不能覆盖事件水位。
         run = runs.lockByRunId(run.getRunId());
-        String sessionId = run.getOperationType() == CreativeOperationType.GENERATE_SHOT_VIDEO ? null : identifiers.nextStateSessionId();
+        String sessionId = run.getOperationType().usesManualMediaProposal() ? null : identifiers.nextStateSessionId();
         CreativeStepStateMachine.requireTransition(CreativeStepStatus.WAITING_APPROVAL, CreativeStepStatus.READY);
         if (!steps.resumeApproval(proposal.getStepId(), sessionId, proposal.getResultJson(), ChangeSetConstants.RESUME_MAX_ATTEMPTS, actor)) {
             throw new BusinessException(ChangeSetResponseCode.STATE_CONFLICT, HttpStatus.CONFLICT);

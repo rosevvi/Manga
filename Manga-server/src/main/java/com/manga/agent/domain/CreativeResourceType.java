@@ -15,5 +15,7 @@ public enum CreativeResourceType {
     CHAPTER,
 
     /** 单个分镜镜头。 */
-    STORYBOARD_SHOT
+    STORYBOARD_SHOT,
+    /** 项目资产的独立图片项。 */
+    ASSET_VISUAL
 }

@@ -48,7 +48,7 @@ export default function CreativeRunDetails({ accessToken, runId, assistantFallba
     try {
       const conversational = run.triggerSource === CREATIVE_TRIGGER.CONVERSATION
       const prompt = proposal?.kind === CHANGE_SET_KIND.VIDEO_GENERATION ? JSON.stringify(proposal.proposed)
-        : proposal?.kind === CHANGE_SET_KIND.IMAGE_GENERATION ? imageProposalInstruction(proposal.proposed)
+        : proposal?.kind === CHANGE_SET_KIND.IMAGE_GENERATION && proposal.proposed.shotId != null ? imageProposalInstruction(proposal.proposed)
           : proposal ? regenerationInstruction(proposal) : conversational ? originalInstruction
             : `重新执行${creativeTaskName(run)}。读取当前目标的最新内容，生成提案并等待审批。`
       if (!prompt?.trim()) return

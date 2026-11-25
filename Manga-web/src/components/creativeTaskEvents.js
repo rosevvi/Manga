@@ -15,6 +15,7 @@ export const RUN_STATUS_LABEL = Object.freeze({
 
 export function creativeTaskName(run) {
   const names = { ASSISTANT_CHAT: '漫剧创作对话', PARSE_SCRIPT: '剧本解析', GENERATE_SCRIPT_CHAPTER: '生成章节',
-    GENERATE_CHAPTER_STORYBOARD: '生成章节分镜', GENERATE_SHOT_IMAGE: '生成镜头图片', GENERATE_SHOT_VIDEO: '生成镜头视频' }
+    GENERATE_CHAPTER_STORYBOARD: '生成章节分镜', GENERATE_SHOT_IMAGE: '生成镜头图片', GENERATE_SHOT_VIDEO: '生成镜头视频',
+    GENERATE_ASSET_IMAGE: '生成资产图片' }
   return `${names[run?.operationType] || '创作任务'}${run?.targetId ? ` · #${run.targetId}` : ''}`
 }

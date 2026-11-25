@@ -112,9 +112,10 @@ function GenerationCard({ job, accessToken, onChanged, onImageRegenerate, canReg
     } finally { if (mounted.current) setBusy(false) }
   }
   const video = job.mediaKind === CHANGE_SET_KIND.VIDEO_GENERATION
-  const inlineImage = !video && onImageRegenerate && (job.artifactUrl || job.status === 'FAILED')
+  const shotImage = !video && job.shotId != null
+  const inlineImage = shotImage && onImageRegenerate && (job.artifactUrl || job.status === 'FAILED')
   return <article className="generation-card">
-    <header><strong>镜头 #{job.shotId} · {job.provider}</strong><span>{GENERATION_STATUS_LABEL[job.status] || job.status}</span></header>
+    <header><strong>{job.shotId == null ? '资产图片' : `镜头 #${job.shotId}`} · {job.provider}</strong><span>{GENERATION_STATUS_LABEL[job.status] || job.status}</span></header>
     {job.progress != null && <progress max="100" value={job.progress} aria-label={`生成进度 ${job.progress}%`} />}
     <small>{job.progress != null ? `${job.progress}% · ` : ''}耗时 {elapsed} 秒 · 更新于 {job.updatedAt?.replace('T', ' ')}</small>
     {job.cancelRequested && <p>已撤销结果采用，供应商可能继续执行。</p>}
@@ -123,7 +124,7 @@ function GenerationCard({ job, accessToken, onChanged, onImageRegenerate, canReg
     {inlineImage && <TaskImageResultActions accessToken={accessToken} job={job} onRegenerate={onImageRegenerate}
       canRegenerate={canRegenerate} onAdopted={() => { onChanged(); onAdopted?.() }} />}
     {job.artifactUrl && !inlineImage && <GeneratedMediaPreview accessToken={accessToken} job={job} src={job.artifactUrl} video={video} />}
-    {job.artifactUrl && !video && !inlineImage && <button className="workspace-secondary" type="button" disabled={busy} onClick={previewAdoption}>用作镜头图片</button>}
+    {job.artifactUrl && shotImage && !inlineImage && <button className="workspace-secondary" type="button" disabled={busy} onClick={previewAdoption}>用作镜头图片</button>}
     {job.adoptedAt && <small>最近采用：{job.adoptedAt.replace('T', ' ')} · 用户 #{job.adoptedBy}</small>}
     {adoption && <section className="generation-adoption" aria-label="确认采用图片">
       <strong>替换镜头「{adoption.target.title}」的图片</strong>

@@ -9,7 +9,6 @@ import ScriptChapterWorkspace from './ScriptChapterWorkspace'
 import { CREATIVE_PROJECT_CHANGED } from './creativeProjectEvents'
 import { openCreativeTask } from './creativeTaskEvents'
 import useUnsavedChanges, { useDiscardChangesConfirmation } from './useUnsavedChanges'
-import { CHAPTER_ASSET_PREVIEW } from './scriptChapterAssetPreview'
 import { useWorkspaceConfirm } from './WorkspaceConfirmDialog'
 import { REVISION_CONFLICT_CODE } from '../constants/changeSet'
 import { CREATIVE_OPERATION, CREATIVE_PERMISSION, CREATIVE_RESOURCE } from '../constants/creative'
@@ -36,7 +35,6 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
   const [showImport, setShowImport] = useState(false)
   const [mobileView, setMobileView] = useState('content')
   const [scriptView, setScriptView] = useState(SCRIPT_VIEW.OVERVIEW)
-  const [chapterAssetDrafts, setChapterAssetDrafts] = useState({})
   const scope = useRef(0)
   const current = useRef(null)
   current.current = { chapter, title, text }
@@ -216,12 +214,8 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
         </div>
         {editorStage && <button type="button" className="workspace-secondary studio-directory-create" disabled={!project || busy} onClick={openNewChapter}><Plus size={15} />新增章节</button>}
       </aside>
-      {showChapterOverview ? <ScriptChapterWorkspace key={selectedChapterId} chapter={selectedChapter}
-        project={project} assets={chapterAssetDrafts[selectedChapterId] || CHAPTER_ASSET_PREVIEW}
-        onAssetsChange={(update) => setChapterAssetDrafts((current) => ({
-          ...current,
-          [selectedChapterId]: update(current[selectedChapterId] || CHAPTER_ASSET_PREVIEW),
-        }))}
+      {showChapterOverview ? <ScriptChapterWorkspace key={`${projectId}:${selectedChapterId}`} chapter={selectedChapter}
+        project={project} projectId={projectId} accessToken={accessToken}
         onShowAssets={() => setMobileView('assets')}
         onOpenSource={() => { setScriptView(SCRIPT_VIEW.SOURCE); setMobileView('content') }} />
         : editorStage ? <section className="project-content-panel script-editor-main script-source" aria-label="剧本原文">

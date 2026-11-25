@@ -45,6 +45,8 @@ public class GenerationJob {
     private Long projectId;
     /** 目标镜头。 */
     private Long shotId;
+    /** 项目资产图的目标图片项。 */
+    private Long targetVisualId;
     /** 供应商路由。 */
     private GenerationProviderKey provider;
     /** 用户供应商配置，Fake 为空。 */

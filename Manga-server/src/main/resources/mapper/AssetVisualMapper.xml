@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manga.mapper.AssetVisualMapper">
+    <select id="lock" resultType="com.manga.entity.AssetVisual">
+        SELECT id, project_asset_id, visual_kind, display_name, current_artifact_id, prompt, negative_prompt,
+               image_width, image_height, provider, model_config_id, model_name, created_at, updated_at, created_by, updated_by
+        FROM manga_asset_visual WHERE id = #{id} FOR UPDATE
+    </select>
+    <select id="busyVisualIds" resultType="long">
+        SELECT DISTINCT target_id
+        FROM manga_creative_run
+        WHERE project_id = #{projectId} AND target_type = 'ASSET_VISUAL'
+          AND operation_type = 'GENERATE_ASSET_IMAGE' AND status IN ('QUEUED','ACTIVE','WAITING','CANCEL_REQUESTED')
+          AND target_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+</mapper>

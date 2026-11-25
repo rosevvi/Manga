@@ -43,6 +43,7 @@ import com.manga.repository.CreativeStepRepository;
 import com.manga.repository.ProjectScriptRepository;
 import com.manga.repository.StoryboardShotRepository;
 import com.manga.service.ProjectRevisionService;
+import com.manga.service.ProjectAssetService;
 import com.manga.service.ProjectService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -93,6 +94,7 @@ public class RunAdmissionService {
     private final ProjectRevisionService revisions;
     private final StoryboardShotRepository shots;
     private final CreativeRunBudgetService budgets;
+    private final ProjectAssetService assets;
 
     /**
      * 幂等受理会话或手动创作请求。新请求会原子创建 Run、READY 根 Step 和 Dispatch Outbox，
@@ -147,6 +149,13 @@ public class RunAdmissionService {
                 || shots.findByProjectAndId(projectId, command.target().resourceId()).isEmpty())) {
             throw new BusinessException(CreativeRuntimeResponseCode.TARGET_RESOURCE_INVALID, HttpStatus.BAD_REQUEST);
         }
+        if (command.operationType() == CreativeOperationType.GENERATE_ASSET_IMAGE) {
+            if (command.target().resourceType() != CreativeResourceType.ASSET_VISUAL
+                    || !command.permissionPolicy().allows(AgentPermissionPolicy.PROPOSE_CHANGES)) {
+                throw new BusinessException(CreativeRuntimeResponseCode.TARGET_RESOURCE_INVALID, HttpStatus.BAD_REQUEST);
+            }
+            assets.admitGeneration(projectId, command.target().resourceId(), command.userId());
+        }
         AgentStepConfiguration agentStep = Objects.isNull(sandbox) ? resolveAgentStep(command, projectId)
                 : new AgentStepConfiguration(sandbox, identifierGenerator.nextStateSessionId());
         CreativeRun run = createRun(command, conversation, projectId, requestFingerprint);
@@ -194,10 +203,11 @@ public class RunAdmissionService {
         return CreativeStep.builder()
                 .stepId(identifierGenerator.nextStepId())
                 .runId(run.getRunId())
-                .stepType(Objects.isNull(agentStep)
-                        ? (command.operationType() == CreativeOperationType.GENERATE_SHOT_VIDEO
-                                ? CreativeStepType.VIDEO_PROPOSAL : CreativeStepType.ROOT_WORKFLOW)
-                        : CreativeStepType.AGENT_INVOCATION)
+                .stepType(Objects.isNull(agentStep) ? switch (command.operationType()) {
+                    case GENERATE_SHOT_VIDEO -> CreativeStepType.VIDEO_PROPOSAL;
+                    case GENERATE_ASSET_IMAGE -> CreativeStepType.ASSET_IMAGE_PROPOSAL;
+                    default -> CreativeStepType.ROOT_WORKFLOW;
+                } : CreativeStepType.AGENT_INVOCATION)
                 .status(CreativeStepStatus.READY)
                 .delegationDepth(0).delegationRound(0).reservedEpoch(-1L)
                 .scheduleVersion(1L)

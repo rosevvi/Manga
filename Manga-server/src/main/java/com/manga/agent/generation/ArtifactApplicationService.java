@@ -54,7 +54,7 @@ public class ArtifactApplicationService {
     }
     /** 归属检查使用认证用户，禁止跨项目选择产物。 */
     private GenerationJob requireJob(String id, long userId) {
-        return jobs.find(id).filter(job -> job.getUserId() == userId)
+        return jobs.find(id).filter(job -> job.getUserId() == userId && job.getShotId() != null)
                 .orElseThrow(() -> new BusinessException(GenerationError.NOT_FOUND, HttpStatus.NOT_FOUND));
     }
     /** 只有已经转存的成功产物可以采用，取消和未知作业都不提供采用入口。 */

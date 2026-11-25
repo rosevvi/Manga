@@ -21,7 +21,7 @@
         SELECT id, job_id, run_id, step_id, change_set_id, user_id,
                (SELECT s.kind FROM manga_creative_change_set s
                 WHERE s.change_set_id = manga_generation_job.change_set_id) AS media_kind,
-               project_id, shot_id, provider, config_id, status, provider_job_id,
+               project_id, shot_id, target_visual_id, provider, config_id, status, provider_job_id,
                progress, cancel_requested, error_code, error_message, owner_instance_id, owner_epoch,
                lease_until, attempts, next_action_at, submitted_at, finished_at, reconciled_by,
                reconciled_at, reconciliation_note, created_at, updated_at, created_by, updated_by
@@ -46,7 +46,7 @@
         SELECT id, job_id, run_id, step_id, change_set_id, user_id,
                (SELECT s.kind FROM manga_creative_change_set s
                 WHERE s.change_set_id = manga_generation_job.change_set_id) AS media_kind,
-               project_id, shot_id, provider, config_id, config_snapshot_json, request_json,
+               project_id, shot_id, target_visual_id, provider, config_id, config_snapshot_json, request_json,
                status, provider_job_id, progress, cancel_requested, result_base64, result_url, error_code,
                error_message, owner_instance_id, owner_epoch, lease_until, attempts, next_action_at,
                submitted_at, finished_at, reconciled_by, reconciled_at, reconciliation_note, created_at,
@@ -61,7 +61,7 @@
     </select>
     <select id="findVisible" resultMap="jobListing">
         SELECT j.id, j.job_id, j.run_id, j.step_id, j.change_set_id, j.user_id, s.kind AS media_kind,
-               j.project_id, j.shot_id, j.provider, j.status, j.progress, j.cancel_requested,
+               j.project_id, j.shot_id, j.target_visual_id, j.provider, j.status, j.progress, j.cancel_requested,
                j.error_code, j.error_message, j.submitted_at, j.finished_at, j.reconciliation_note,
                j.created_at, j.updated_at,
                a.id AS artifact_id, a.url AS artifact_url, a.adopted_at AS artifact_adopted_at, a.adopted_by AS artifact_adopted_by

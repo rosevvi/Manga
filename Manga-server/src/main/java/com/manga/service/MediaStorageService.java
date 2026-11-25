@@ -70,6 +70,10 @@ public class MediaStorageService {
     }
     /** 写入已登记位置，禁止客户端上传任意删除或写入地址。 */
     public void storeGeneratedBytes(byte[] data, GeneratedMediaReference reference) { requireStrategy(reference).writeGenerated(data, reference); }
+    /** 读取已经授权的登记对象，供图片模型使用真实参考图内容。 */
+    public byte[] readGeneratedBytes(GeneratedMediaReference reference, int byteLimit) {
+        return requireStrategy(reference).readGenerated(reference, byteLimit);
+    }
     /** 回收只操作引用指定的策略，不跟随当前默认存储切换。 */
     public void deleteGenerated(GeneratedMediaReference reference) { requireStrategy(reference).deleteGenerated(reference); }
     /** 解析登记的存储策略，未知策略交由退避处理。 */

@@ -74,6 +74,8 @@ public class ChangeSetProposalService {
         Object payload;
         Long chapterId;
         Long mediaShotId = null;
+        boolean assetImage = run.getOperationType() == CreativeOperationType.GENERATE_ASSET_IMAGE;
+        if (assetImage && kind != ChangeSetKind.IMAGE_GENERATION) throw new BusinessException(ChangeSetResponseCode.INVALID);
         if (kind == ChangeSetKind.SCRIPT) {
             ScriptChangeSet script = codec.validate(input, ScriptChangeSet.class);
             payload = script;
@@ -91,7 +93,8 @@ public class ChangeSetProposalService {
             ImageGenerationChange image = imageConfigs.canonicalize(codec.validate(input, ImageGenerationChange.class), run.getUserId());
             payload = image;
             mediaShotId = image.shotId();
-            chapterId = mediaChapter(run, mediaShotId);
+            if (assetImage != (mediaShotId == null)) throw new BusinessException(ChangeSetResponseCode.INVALID);
+            chapterId = assetImage ? null : mediaChapter(run, mediaShotId);
         }
         if ((run.getOperationType() == CreativeOperationType.GENERATE_CHAPTER_STORYBOARD
                 && (kind != ChangeSetKind.STORYBOARD || !Objects.equals(chapterId, run.getTargetId())))
@@ -115,6 +118,9 @@ public class ChangeSetProposalService {
             before = Objects.isNull(current) ? null : new ScriptChangeSet(chapterId, current.title(), current.synopsis(), current.rawContent(), current.scenes());
         } else if (kind == ChangeSetKind.STORYBOARD) {
             before = storyboards.findAllForUser(project.getId(), run.getUserId(), chapterId);
+        } else if (assetImage) {
+            // 资产图片设置保存在关系型字段中，提案无需额外复制资产资料。
+            before = null;
         } else {
             before = shots.findByProjectAndId(project.getId(), mediaShotId).orElseThrow();
         }

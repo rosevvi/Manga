@@ -10,7 +10,7 @@ import jakarta.validation.constraints.Size;
 /** 图片提案 Schema v1；服务端冻结用户配置，审批后才可提交生成作业。 */
 @JsonIgnoreProperties({"estimatedCost", "currency"})
 public record ImageGenerationChange(
-    /** 当前项目内的镜头。 */ @NotNull @Positive Long shotId,
+    /** 镜头图的目标镜头，资产图由运行的图片项目标定位。 */ @Positive Long shotId,
     /** 供应商实现。 */ @NotNull GenerationProviderKey provider,
     /** 真实供应商使用的用户配置；Fake 可为空。 */ @Positive Long configId,
     /** 服务端允许的模型。 */ @NotBlank @Size(max=100) String model,

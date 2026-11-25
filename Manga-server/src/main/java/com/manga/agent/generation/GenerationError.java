@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum GenerationError implements ResponseCode {
     /** 非法生成参数或缺少模型配置。 */ INVALID("GENERATION_INVALID", "生成参数不合法，或供应商和模型尚未配置"),
+    /** 所选模型未提供参考图入口。 */ REFERENCES_UNSUPPORTED("GENERATION_REFERENCES_UNSUPPORTED", "请选择支持参考图的图片模型"),
+    /** 文件输入在开始请求前无法读取或超过大小限制。 */ REFERENCE_UNAVAILABLE("GENERATION_REFERENCE_UNAVAILABLE", "参考图无法读取或文件总大小超限"),
     /** 无权限访问。 */ NOT_FOUND("GENERATION_NOT_FOUND", "生成作业不存在或无权访问"),
     /** 状态竞争。 */ STATE("GENERATION_STATE_CONFLICT", "作业状态已变化，请刷新后重试"),
     /** 供应商明确拒绝。 */ REJECTED("GENERATION_REJECTED", "供应商拒绝生成请求，请检查模型、权限和参数"),

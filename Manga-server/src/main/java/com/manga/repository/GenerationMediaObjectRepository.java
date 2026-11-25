@@ -14,6 +14,11 @@ public class GenerationMediaObjectRepository {
     private final GenerationMediaObjectMapper mapper;
     /** 查询对象元数据。 */
     public Optional<GenerationMediaObject> find(long id) { return Optional.ofNullable(mapper.selectById(id)); }
+
+    /** 批量读取服务端登记的文件位置。 */
+    public java.util.List<GenerationMediaObject> findAll(java.util.Collection<Long> ids) {
+        return ids.isEmpty() ? java.util.List.of() : mapper.selectByIds(ids);
+    }
     /** 必须遵守 Run→Job→Object 锁顺序。 */
     public GenerationMediaObject lock(long id) { return mapper.lock(id); }
     /** 在写文件前登记回收责任。 */

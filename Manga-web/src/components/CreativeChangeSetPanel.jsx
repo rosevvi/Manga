@@ -124,7 +124,8 @@ function ProposalCard({ proposal, onDecide, onRegenerate }) {
           <div><small>批准后</small><pre>{difference.next || '（空）'}</pre></div></div>
       </details>)}</div>
       : media ? <div className="image-generation-preview">
-        <dl><dt>目标镜头</dt><dd>#{proposal.proposed.shotId} · {proposal.before?.title}</dd>
+        <dl>{proposal.proposed.shotId == null ? <><dt>生成对象</dt><dd>项目资产图片</dd></>
+          : <><dt>目标镜头</dt><dd>#{proposal.proposed.shotId} · {proposal.before?.title}</dd></>}
           <dt>供应商 / 模型</dt><dd>{video ? 'Agnes' : proposal.proposed.provider} / {proposal.proposed.model}</dd>
           <dt>配置</dt><dd>{proposal.proposed.configId ? `#${proposal.proposed.configId}` : '流程模拟器'}</dd>
           {proposal.proposed.configSnapshot?.baseUrl && <><dt>生成端点</dt><dd>{proposal.proposed.configSnapshot.baseUrl}</dd></>}
@@ -132,7 +133,7 @@ function ProposalCard({ proposal, onDecide, onRegenerate }) {
         <p>批准后提交生成。已提交的作业可能无法远程取消。</p>
         <details open><summary>批准的画面提示词</summary><pre>{proposal.proposed.prompt}</pre></details>
         {video ? <p>生成结果将在任务内提供播放和下载。</p>
-          : <p>生成完成后，可在这条任务里预览并设为分镜参考图。</p>}
+          : <p>{proposal.proposed.shotId == null ? '生成成功后，图片会更新到剧本页对应的资产。' : '生成完成后，可在这条任务里预览并设为分镜参考图。'}</p>}
       </div>
       : <div><p>保留已有 {proposal.before?.length || 0} 个镜头，追加 {proposal.proposed.shots.length} 个草稿。</p>
         {proposal.proposed.shots.map((shot, index) => <details key={index} open={index === 0}>

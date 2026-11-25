@@ -18,7 +18,9 @@ public enum CreativeWorkflowType {
     /** 图片提案、生成审批、外部作业与产物转存。 */
     SHOT_IMAGE,
     /** 镜头视频审批及外部生成。 */
-    SHOT_VIDEO;
+    SHOT_VIDEO,
+    /** 项目资产图的审批、生成和原位替换。 */
+    ASSET_IMAGE;
 
     /** 根据稳定业务操作选择对应的工作流类型。 */
     public static CreativeWorkflowType fromOperation(CreativeOperationType operationType) {
@@ -29,6 +31,7 @@ public enum CreativeWorkflowType {
             case GENERATE_SCRIPT_CHAPTER -> SCRIPT_CHAPTER;
             case GENERATE_SHOT_IMAGE -> SHOT_IMAGE;
             case GENERATE_SHOT_VIDEO -> SHOT_VIDEO;
+            case GENERATE_ASSET_IMAGE -> ASSET_IMAGE;
         };
     }
 }

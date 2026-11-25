@@ -19,6 +19,8 @@ public interface StorageStrategy {
     GeneratedMediaReference generatedReference(String jobId, long epoch, GeneratedMediaFormat format);
     /** 校验引用后写入已登记位置。 */
     void writeGenerated(byte[] data, GeneratedMediaReference reference);
+    /** 按服务端登记位置读取有界图片输入。 */
+    byte[] readGenerated(GeneratedMediaReference reference, int byteLimit);
     /** 幂等删除受限生成对象，不能删除任意路径或 URL。 */
     void deleteGenerated(GeneratedMediaReference reference);
 }

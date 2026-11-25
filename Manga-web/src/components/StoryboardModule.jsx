@@ -14,6 +14,7 @@ import useUnsavedChanges, { useConfirmCreativeNavigation } from './useUnsavedCha
 import { useWorkspaceConfirm } from './WorkspaceConfirmDialog'
 import { pushWorkspaceHistory, replaceWorkspaceHistory } from './workspaceHistory'
 import StoryboardDirectory from './StoryboardDirectory'
+import StoryboardAssetImage from './StoryboardAssetImage'
 import StoryboardMediaPreview, { StoryboardVideoThumbnail } from './StoryboardMediaPreview'
 import ProjectStudioHeader from './ProjectStudioHeader'
 import WorkspaceSelect from './WorkspaceSelect'
@@ -325,6 +326,8 @@ export default function StoryboardModule({ accessToken, projectId, stage, onBack
         </header>
         <ShotDetailsFields shot={editing ? form : selectedShot} chapters={chapters}
           editing={editing} saving={saving} onChange={update} />
+        {!editing && selectedShot && <StoryboardAssetImage key={selectedShot.id} shot={selectedShot}
+          accessToken={accessToken} projectId={projectId} onAdopted={load} />}
       </form> : <div className="shot-detail-editor workbench-empty"><Film size={34} /><h2>让文字变成镜头</h2><p>选择章节生成分镜提案，或手动添加第一个镜头。</p><button type="button" className="workspace-primary" disabled={!project || saving} onClick={create}><Plus size={14} />新增镜头</button></div>}
       <aside className="shot-media-preview" ref={mediaPreview} aria-label="镜头视频" data-active={stage === 'GENERATION'}>
         <StoryboardMediaPreview key={selectedShot?.id} accessToken={accessToken}

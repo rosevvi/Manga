@@ -34,7 +34,7 @@ public class ImageGenerationConfigService {
             GenerationProviderKey provider = route(config.getProviderType(), config.getDefaultModel(), config.getBaseUrl());
             if (Objects.nonNull(provider)) {
                 result.add(new ImageGenerationOption(provider, config.getId(), config.getName(), config.getDefaultModel(),
-                        ImageGenerationSize.options(provider)));
+                        ImageGenerationSize.options(provider), supportsReferences(provider, config.getBaseUrl())));
             }
         }
         result.add(new ImageGenerationOption(GenerationProviderKey.FAKE, null, "流程验证（FAKE）", GenerationConstants.FAKE_MODEL,
@@ -56,6 +56,19 @@ public class ImageGenerationConfigService {
         return new ImageGenerationChange(input.shotId(), input.provider(),
                 input.provider() == GenerationProviderKey.FAKE ? null : input.configId(), input.model(), input.prompt().trim(),
                 input.width(), input.height(), snapshot);
+    }
+
+    /** 参考图在官方图片编辑端点发送，兼容网关继续按已支持的文生图能力运行。 */
+    public boolean supportsReferences(GenerationProviderKey provider, GenerationConfigSnapshot snapshot) {
+        return snapshot != null && supportsReferences(provider, snapshot.baseUrl());
+    }
+
+    private boolean supportsReferences(GenerationProviderKey provider, String address) {
+        if (provider != GenerationProviderKey.OPENAI || address == null) return false;
+        URI endpoint = URI.create(address);
+        return "api.openai.com".equalsIgnoreCase(endpoint.getHost())
+                && (endpoint.getPort() == -1 || endpoint.getPort() == 443)
+                && Set.of("", "/", "/v1", "/v1/").contains(endpoint.getPath());
     }
 
     /** 校验配置归属、启用、供应商和模型，拒绝使用错误的凭据或端点。 */

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Check, X } from 'lucide-react'
 import ChapterAssetImage from './ChapterAssetImage'
+import { CHAPTER_IMAGE_LIMITS } from './scriptChapterAssetImages'
 
 /** 在当前资产的图片分组中多选参考图，确认后回写详情抽屉。 */
 export default function ScriptAssetReferencePicker({ assetName, groups, selectedIds, onClose, onConfirm }) {
@@ -39,7 +40,8 @@ export default function ScriptAssetReferencePicker({ assetName, groups, selected
         <h3>{group.title}</h3>
         <div className="script-reference-options">
           {group.images.map((image) => <button type="button" key={image.id} className="chapter-image-button"
-            aria-pressed={selection.has(image.id)} onClick={() => toggle(image.id)}>
+            aria-pressed={selection.has(image.id)}
+            disabled={!selection.has(image.id) && selection.size >= CHAPTER_IMAGE_LIMITS.references} onClick={() => toggle(image.id)}>
             <span className="chapter-image-frame">
               <ChapterAssetImage preview={image.preview} />
               {selection.has(image.id) && <span className="script-reference-selected"><Check size={12} aria-hidden="true" /></span>}

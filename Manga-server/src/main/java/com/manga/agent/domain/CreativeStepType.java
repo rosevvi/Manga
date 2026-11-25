@@ -15,5 +15,7 @@ public enum CreativeStepType {
     AGENT_INVOCATION,
 
     /** 精确使用用户已提交的媒体参数创建提案，无需模型推理。 */
-    VIDEO_PROPOSAL
+    VIDEO_PROPOSAL,
+    /** 从项目资产图片项读取设置并创建提案。 */
+    ASSET_IMAGE_PROPOSAL
 }

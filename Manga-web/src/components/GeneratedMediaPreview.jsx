@@ -11,7 +11,7 @@ export default function GeneratedMediaPreview({ accessToken, job, src, video = f
   const [error, setError] = useState('')
   const dialog = useRef(null)
   const previewUrl = resolveMediaUrl(src)
-  const label = `镜头 ${job.shotId} 的生成${video ? '视频' : '图片'}`
+  const label = job.shotId == null ? '生成的资产图片' : `镜头 ${job.shotId} 的生成${video ? '视频' : '图片'}`
 
   useEffect(() => {
     if (!expanded) return

@@ -18,5 +18,12 @@ public enum CreativeOperationType {
     /** 为单个镜头提交待审批图片生成提案。 */
     GENERATE_SHOT_IMAGE,
     /** 为单个镜头提交视频提案。 */
-    GENERATE_SHOT_VIDEO
+    GENERATE_SHOT_VIDEO,
+    /** 为项目资产图片项发起生成提案。 */
+    GENERATE_ASSET_IMAGE;
+
+    /** 页面已经提供结构化参数的操作，无需创建 Agent 会话。 */
+    public boolean usesManualMediaProposal() {
+        return this == GENERATE_SHOT_VIDEO || this == GENERATE_ASSET_IMAGE;
+    }
 }

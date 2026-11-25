@@ -14,6 +14,7 @@ public final class GenerationConstants {
     /** 固定质量，保证审批预览和实际请求一致。 */ public static final String QUALITY = "medium";
     /** 平台只接收 PNG，避免下载外部任意 URL。 */ public static final String FORMAT = StorageConstants.GENERATED_FORMAT;
     /** OpenAI 图片生成相对路径。 */ public static final String IMAGE_PATH = "/images/generations";
+    /** 以图片为输入的 OpenAI 编辑端点。 */ public static final String IMAGE_EDIT_PATH = "/images/edits";
     /** 图片 API 的请求追踪头；不是幂等承诺。 */ public static final String CLIENT_REQUEST_ID = "X-Client-Request-Id";
     /** 作业列表单页上限。 */ public static final int PAGE_SIZE = 25;
     /** 无引用对象回收的调度配置。 */ public static final String CLEANUP_INTERVAL = "${manga.creative.generation.cleanup.scan-interval:10m}";

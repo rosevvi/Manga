@@ -92,6 +92,23 @@ public class LocalStorageStrategy implements StorageStrategy {
         GeneratedMediaNames.require(reference, getType(), generatedNamespace());
         storeNamedBytes(data, StorageConstants.GENERATED_DIRECTORY, reference.format().extension(), reference.name());
     }
+    /** 读取固定生成目录下的登记文件，拒绝软链接和超限输入。 */
+    @Override
+    public byte[] readGenerated(GeneratedMediaReference reference, int byteLimit) {
+        GeneratedMediaNames.require(reference, getType(), generatedNamespace());
+        Path directory = resolveBaseDirectory().resolve(StorageConstants.GENERATED_DIRECTORY).normalize();
+        Path target = directory.resolve(reference.name() + "." + reference.format().extension());
+        if (Files.isSymbolicLink(directory) || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IllegalArgumentException(StorageConstants.GENERATED_REFERENCE_INVALID);
+        }
+        try (var stream = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {
+            byte[] bytes = stream.readNBytes(byteLimit + 1);
+            if (bytes.length == 0 || bytes.length > byteLimit) throw new IllegalArgumentException(StorageConstants.GENERATED_REFERENCE_INVALID);
+            return bytes;
+        } catch (IOException exception) {
+            throw new IllegalStateException(StorageConstants.GENERATED_REFERENCE_INVALID, exception);
+        }
+    }
     /** 只删除固定生成目录内登记的普通文件，不递归删除目录。 */
     @Override
     public void deleteGenerated(GeneratedMediaReference reference) {

@@ -45,7 +45,7 @@ abstract class SynchronousImageProvider implements GenerationProvider {
         if (input.provider() != key() || !Objects.equals(input.model(), config.defaultModel())) {
             throw new GenerationException(GenerationError.AUTHENTICATION);
         }
-        Object request = requestBody(input);
+        ImageRequest request = prepareRequest(job, input);
         AiProviderProxySettings proxy = new AiProviderProxySettings(config.proxyType(), config.proxyHost(),
                 Objects.requireNonNullElse(config.proxyPort(), 0), config.proxyUsername(), config.proxyPassword());
         String base = config.baseUrl().replaceAll("/+$", "");
@@ -58,11 +58,11 @@ abstract class SynchronousImageProvider implements GenerationProvider {
             result = clients.createBoundedWebClient(base, proxy.toExternalProxySettings(), properties.httpTimeout(),
                             properties.maxMediaBytes() * 2)
                     .mutate().codecs(configurer -> configurer.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(boundedMapper))).build()
-                    .post().uri(GenerationConstants.IMAGE_PATH)
+                    .post().uri(request.path())
                     .header(HttpHeaders.AUTHORIZATION, AiProviderConstants.BEARER_PREFIX + config.apiKey())
                     .header(GenerationConstants.CLIENT_REQUEST_ID, job.getJobId())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(request)
+                    .contentType(request.contentType())
+                    .bodyValue(request.body())
                     .exchangeToMono(response -> {
                         int status = response.statusCode().value();
                         if (response.statusCode().is2xxSuccessful()) return response.bodyToMono(ImageResponse.class);
@@ -94,6 +94,13 @@ abstract class SynchronousImageProvider implements GenerationProvider {
 
     /** 把已审批参数映射为具体供应商的请求体。 */
     protected abstract Object requestBody(ImageGenerationChange input);
+
+    /** 默认沿用文生图，支持参考图的供应商可准备专用请求。 */
+    protected ImageRequest prepareRequest(GenerationJob job, ImageGenerationChange input) {
+        return new ImageRequest(GenerationConstants.IMAGE_PATH, MediaType.APPLICATION_JSON, requestBody(input));
+    }
+
+    protected record ImageRequest(String path, MediaType contentType, Object body) {}
 
     /** 只提取媒体，忽略不需要的供应商字段。 */
     @JsonIgnoreProperties(ignoreUnknown = true)
