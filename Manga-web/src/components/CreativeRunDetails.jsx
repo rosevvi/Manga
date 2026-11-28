@@ -16,6 +16,17 @@ import './project-workspace.css'
 import './project-module.css'
 import './creative-workbench.css'
 
+/** 在历史回答旁恢复执行过程，正文继续由消息历史展示。 */
+export function ConversationTurnHistory({ accessToken, runId }) {
+  const { run, graph, events, error, refreshRef } = useCreativeRunActivity(accessToken, runId, { historyOnly: true })
+  return <div className="chat-history-activity">
+    {error && <p role="alert" className="workspace-alert">{error}
+      <button type="button" className="message-execution-link" onClick={() => refreshRef.current?.()}>重试读取</button></p>}
+    {!error && !run && <p className="process-muted" role="status">正在读取本轮过程…</p>}
+    <CreativeExecutionTimeline runId={runId} graph={graph} events={events} run={run} conversationView historyOnly />
+  </div>
+}
+
 /** 对话内展示回复和业务操作，显式打开执行记录时展示运行详情。 */
 export default function CreativeRunDetails({ accessToken, runId, assistantFallback, originalInstruction, onRunChanged, onChanged, onRegenerate,
   conversationView = false, stopInComposer = false }) {

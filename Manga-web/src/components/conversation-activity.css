@@ -1,0 +1,98 @@
+.chat-thought { min-width: 0; color: var(--creative-muted); }
+.chat-thought-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.chat-thought[data-streaming] .chat-thought-toggle { color: var(--creative-accent); }
+.chat-thought-toggle:hover { background: var(--workspace-inset); border-color: var(--creative-line); }
+.chat-activity-chevron { flex-shrink: 0; transition: transform 150ms ease; color: var(--creative-muted); }
+[aria-expanded="false"] > .chat-activity-chevron { transform: rotate(-90deg); }
+.chat-thought-viewport {
+  max-height: 168px;
+  margin: 4px 0 3px 16px;
+  padding: 2px 12px;
+  border-inline-start: 2px solid var(--creative-line);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.conversation-process .chat-thought-viewport .assistant-markdown { color: inherit; font-size: 12px; line-height: 1.7; }
+
+.chat-tool {
+  --chat-tool-tone: var(--creative-accent);
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--chat-tool-tone) 27%, var(--creative-line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--chat-tool-tone) 6%, var(--workspace-surface));
+}
+.chat-tool[data-status="success"] { --chat-tool-tone: var(--creative-success); }
+.chat-tool[data-status="error"], .chat-tool[data-status="denied"] { --chat-tool-tone: var(--creative-danger); }
+.chat-tool[data-status="interrupted"] { --chat-tool-tone: var(--creative-muted); }
+.chat-tool-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--creative-text);
+  font: inherit;
+  font-size: 12px;
+  text-align: start;
+  cursor: pointer;
+}
+.chat-tool-toggle:hover { background: color-mix(in srgb, var(--chat-tool-tone) 7%, transparent); }
+.chat-tool-toggle strong { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.chat-tool-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--chat-tool-tone) 12%, transparent);
+  color: var(--chat-tool-tone);
+}
+.chat-tool-status { display: inline-flex; align-items: center; gap: 4px; color: var(--chat-tool-tone); font-size: 11px; }
+.chat-tool-result, .chat-tool-meta { margin: 0 12px 10px 46px; color: var(--creative-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.chat-tool:not([data-expanded]) .chat-tool-result { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.chat-tool-result[role="alert"] { color: var(--creative-danger); }
+.chat-tool-meta { padding-top: 8px; border-top: 1px solid var(--creative-line); }
+.chat-tool-meta p { margin: 0 0 3px; }
+.chat-tool-meta > div { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; }
+
+.chat-assistant-turn { display: grid; gap: 8px; min-width: 0; margin-block: 4px 24px; }
+.chat-assistant-heading { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--creative-text); }
+.chat-assistant-heading svg { color: var(--creative-accent); }
+.chat-assistant-heading .message-execution-link { margin-inline-start: auto; }
+.chat-user-turn {
+  width: fit-content;
+  max-width: min(86%, 640px);
+  margin: 0 0 20px auto;
+  padding: 11px 16px;
+  border: 1px solid color-mix(in srgb, var(--creative-accent) 26%, var(--creative-line));
+  border-radius: 13px 13px 4px 13px;
+  background: color-mix(in srgb, var(--creative-accent) 9%, var(--workspace-surface));
+  color: var(--creative-text);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.chat-user-turn p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-user-turn:has(p:empty) { display: none; }
+.chat-assistant-turn .conversation-process { margin: 0; gap: 8px; }
+.chat-assistant-turn .message-execution-link { justify-self: start; }
+.chat-assistant-turn .chat-history-activity:empty { display: none; }
+.chat-reply-block { min-width: 0; padding: 4px 0; }
+.chat-reply-block .assistant-markdown { line-height: 1.75; }
+@media (prefers-reduced-motion: reduce) { .chat-activity-chevron { transition: none; } }

@@ -110,85 +110,12 @@
   margin-top: auto;
 }
 
-.plan-card {
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 9px;
-  background: linear-gradient(145deg, rgba(16, 12, 24, 0.98), rgba(12, 11, 16, 0.98));
-}
-
-.plan-title-row,
-.plan-credits {
-  display: flex;
-  align-items: center;
-}
-
-.plan-title-row {
-  gap: 8px;
-  font-size: 12px;
-}
-
-.plan-title-row > svg {
-  margin-left: auto;
-  color: #9d5cf5;
-}
-
-.plan-gem {
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  border-radius: 6px;
-  background: rgba(145, 55, 255, 0.17);
-  color: #a552ff;
-  box-shadow: 0 0 14px rgba(149, 68, 255, 0.32);
-}
-
-.plan-progress {
-  height: 3px;
-  margin: 15px 0 14px;
-  border-radius: 99px;
-  background: #29242f;
-  overflow: hidden;
-}
-
-.plan-progress span {
-  width: 62.4%;
-  height: 100%;
-  display: block;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #6831ff, #b44cff);
-}
-
-.plan-credits {
-  justify-content: space-between;
-  color: #8f8c95;
-  font-size: 10px;
-}
-
-.plan-credits strong {
-  color: #cac6d0;
-  font-weight: 500;
-}
-
-.plan-card > button {
-  width: 100%;
-  min-height: 34px;
-  margin-top: 14px;
-  border-radius: 7px;
-  background: linear-gradient(105deg, #4a16f5, #9f3ef4);
-  color: #fff;
-  font-size: 11px;
-  cursor: pointer;
-}
-
 .help-button {
   width: 100%;
   min-height: 46px;
   display: flex;
   align-items: center;
   gap: 11px;
-  margin-top: 17px;
   padding: 0 15px;
   border-top: 1px solid rgba(255, 255, 255, 0.075);
   background: transparent;
@@ -689,7 +616,7 @@
   .dashboard-shell[data-sidebar-collapsed=true] .dashboard-logo { display: grid; width: 32px; height: 30px; margin: 0; place-items: center; }
   .dashboard-shell[data-sidebar-collapsed=true] .dashboard-logo svg { position: static; width: 18px; height: 18px; }
   .dashboard-shell[data-sidebar-collapsed=true] .dashboard-nav { margin-top: 20px; }
-  .dashboard-shell[data-sidebar-collapsed=true] :is(.dashboard-logo span, .dashboard-nav-item span, .plan-card, .help-button span, .help-button > svg:last-child) { display: none; }
+  .dashboard-shell[data-sidebar-collapsed=true] :is(.dashboard-logo span, .dashboard-nav-item span, .help-button span, .help-button > svg:last-child) { display: none; }
   .dashboard-shell[data-sidebar-collapsed=true] :is(.dashboard-nav-item, .help-button) { justify-content: center; padding-inline: 0; }
   .dashboard-shell[data-sidebar-collapsed=true] .dashboard-nav-item::before { left: -8px; }
 }

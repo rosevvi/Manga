@@ -5,12 +5,8 @@ import {
   ChevronDown,
   CirclePlay,
   Clapperboard,
-  Diamond,
   FolderOpen,
-  Frame,
-  GalleryVerticalEnd,
   Grid2X2,
-  Heart,
   HelpCircle,
   Home,
   Image as ImageIcon,
@@ -24,9 +20,7 @@ import {
   Search,
   Settings2,
   Sparkles,
-  Trash2,
   UserRoundCheck,
-  UsersRound,
   Video,
   WandSparkles,
   X,
@@ -54,15 +48,10 @@ const SIDEBAR_NAV_ITEMS = [
   { id: 'home', labelKey: 'dashboard.nav.home', icon: Home },
   { id: 'projects', labelKey: 'dashboard.nav.projects', icon: FolderOpen },
   { id: 'assets', labelKey: 'dashboard.nav.assets', icon: ImageIcon },
-  { id: 'characters', labelKey: 'dashboard.nav.characters', icon: UsersRound },
-  { id: 'scenes', labelKey: 'dashboard.nav.scenes', icon: Frame },
   { id: 'ai-tools', labelKey: 'dashboard.nav.aiTools', icon: WandSparkles },
   { id: 'ai-settings', labelKey: 'dashboard.nav.aiSettings', icon: Settings2 },
   { id: AGENT_PROFILE_NAV, labelKey: 'dashboard.nav.agentProfiles', icon: Sparkles, adminOnly: true },
   { id: OPERATIONS_NAV, labelKey: 'dashboard.nav.runtimeOperations', icon: Grid2X2, adminOnly: true },
-  { id: 'creations', labelKey: 'dashboard.nav.creations', icon: GalleryVerticalEnd },
-  { id: 'favorites', labelKey: 'dashboard.nav.favorites', icon: Heart },
-  { id: 'trash', labelKey: 'dashboard.nav.trash', icon: Trash2 },
 ]
 
 const AI_TOOL_ITEMS = [
@@ -331,20 +320,6 @@ function Dashboard({ authSession, onExit, onLogout, onUserUpdated }) {
         </nav>
 
         <div className="dashboard-sidebar-bottom">
-          <section className="plan-card" aria-label={translate('dashboard.plan.current')}>
-            <div className="plan-title-row">
-              <span className="plan-gem"><Diamond size={15} fill="currentColor" /></span>
-              <strong>{translate('dashboard.plan.name')}</strong>
-              <ChevronDown size={15} />
-            </div>
-            <div className="plan-progress"><span /></div>
-            <div className="plan-credits">
-              <span>{translate('dashboard.plan.credits')}</span>
-              <strong>6,240 / 10,000</strong>
-            </div>
-            <button type="button">{translate('dashboard.plan.upgrade')}</button>
-          </section>
-
           <button className="help-button" type="button" aria-label={translate('dashboard.helpDocs')} title={translate('dashboard.helpDocs')}>
             <HelpCircle size={17} fill="currentColor" />
             <span>{translate('dashboard.helpDocs')}</span>

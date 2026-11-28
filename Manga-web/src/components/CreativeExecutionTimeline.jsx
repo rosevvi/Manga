@@ -3,8 +3,9 @@ import { Bot, CheckCircle2, ChevronDown, ChevronRight, LoaderCircle, Wrench } fr
 import { CREATIVE_STEP_STATUS_LABEL } from '../constants/collaboration'
 import { CREATIVE_TERMINAL_STATUSES } from '../constants/changeSet'
 import { CREATIVE_TOOL_LABEL } from '../constants/creative'
-import { isAgentActivity, orderedExecutionSections, timelineCards } from './creativeTimeline'
+import { groupConversationThoughts, isAgentActivity, orderedExecutionSections, timelineCards } from './creativeTimeline'
 import AssistantMarkdown, { AssistantThinking } from './AssistantMarkdown'
+import { ConversationThought, ConversationToolResult } from './ConversationActivity'
 
 const ACTIVE = new Set(['RUNNING', 'READY', 'WAITING_CHILDREN', 'WAITING_APPROVAL', 'WAITING_JOB', 'WAITING_REPAIR_CONFIRMATION'])
 const TERMINAL_EVENTS = new Set(['RUN_COMPLETED', 'RUN_FAILED', 'RUN_CANCELLED'])
@@ -14,7 +15,7 @@ const TECHNICAL_LABEL = { RUN_ACCEPTED: '任务已受理', RUN_STARTED: '任务�
   REPAIR_CONFIRMATION_REQUIRED: '等待确认修订', REPAIR_CONFIRMATION_DECIDED: '修订确认已处理' }
 
 /** 按计划、Agent 与工具组织服务端事实；手动折叠状态不会被增量更新覆盖。 */
-export default function CreativeExecutionTimeline({ runId, graph, events, run, assistantFallback, conversationView = false }) {
+export default function CreativeExecutionTimeline({ runId, graph, events, run, assistantFallback, conversationView = false, historyOnly = false }) {
   const storageKey = `manga.execution-folds.${runId}`
   const [folds, setFolds] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}') }
@@ -25,7 +26,7 @@ export default function CreativeExecutionTimeline({ runId, graph, events, run, a
   const follow = useRef(true)
   const scroller = useRef(null)
   const observedHeight = useRef(0)
-  const cards = timelineCards(events, true, run)
+  const cards = timelineCards(events, !historyOnly, run)
   const hasAssistantText = cards.some((item) => item.type === 'CONTENT_DELTA' && !item.parentStepId)
   const nodes = new Map((graph?.nodes || []).filter((node) => node.profile).map((node) => [node.stepId, node]))
   for (const event of events) {
@@ -41,7 +42,7 @@ export default function CreativeExecutionTimeline({ runId, graph, events, run, a
     }
   }
   const sections = orderedExecutionSections([...nodes.values()].filter((node) => !node.planId), plans, cards)
-  const terminal = CREATIVE_TERMINAL_STATUSES.has(run?.status) || events.some((item) => TERMINAL_EVENTS.has(item.type))
+  const terminal = historyOnly || CREATIVE_TERMINAL_STATUSES.has(run?.status) || events.some((item) => TERMINAL_EVENTS.has(item.type))
   const waitingForReply = conversationView && !terminal && !assistantFallback
     && !sections.some((section) => section.plan || section.items?.length)
 
@@ -63,8 +64,10 @@ export default function CreativeExecutionTimeline({ runId, graph, events, run, a
   }
 
   useEffect(() => {
+    if (historyOnly) return undefined
     const element = anchor.current?.closest('.task-center-scroll')
-    if (!element) return undefined
+    const detail = anchor.current?.closest('.task-detail')
+    if (!element || !detail) return undefined
     scroller.current = element
     const onScroll = () => {
       follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80
@@ -72,7 +75,6 @@ export default function CreativeExecutionTimeline({ runId, graph, events, run, a
     }
     element.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
-    const detail = anchor.current.closest('.task-detail')
     const observer = new ResizeObserver(() => {
       const height = detail.getBoundingClientRect().height
       if (height > observedHeight.current) {
@@ -83,25 +85,37 @@ export default function CreativeExecutionTimeline({ runId, graph, events, run, a
     })
     observer.observe(detail)
     return () => { observer.disconnect(); element.removeEventListener('scroll', onScroll) }
-  }, [])
+  }, [historyOnly])
 
   useEffect(() => {
-    if (!events.length) return
+    if (historyOnly || !events.length) return
     if (follow.current) {
       const frame = requestAnimationFrame(() => { if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight })
       return () => cancelAnimationFrame(frame)
     }
     setNewContent(true)
-  }, [events])
+  }, [events, historyOnly])
 
   const renderCard = (item, latestToolId, streaming) => {
-    if (item.type === 'CONTENT_DELTA') return <AssistantMarkdown key={item.id} text={item.resultSummary} streaming={streaming} />
+    if (item.type === 'CONTENT_DELTA') return <div key={item.id} className={conversationView ? 'chat-reply-block' : undefined}>
+      <AssistantMarkdown text={item.resultSummary} streaming={streaming} />
+    </div>
     if (item.type === 'REASONING_DELTA') {
-      return disclosure(`reasoning:${item.id}`, <><Bot size={14} /><strong>供应商分析</strong></>,
+      const id = `reasoning:${item.id}`
+      if (conversationView) {
+        const open = folds[id] ?? streaming
+        return <ConversationThought key={id} item={item} streaming={streaming} open={open} onToggle={() => setExpanded(id, !open)} />
+      }
+      return disclosure(id, <><Bot size={14} /><strong>供应商分析</strong></>,
         <AssistantMarkdown text={item.resultSummary} streaming={streaming} />, streaming, 'process-reasoning')
     }
     const working = item.status === 'RUNNING'
-    return disclosure(`tool:${item.stepId}:${item.ownerEpoch}:${item.actionId}`, <>
+    const toolId = `tool:${item.stepId}:${item.ownerEpoch}:${item.actionId}`
+    if (conversationView) {
+      const open = folds[toolId] ?? false
+      return <ConversationToolResult key={toolId} item={item} open={open} onToggle={() => setExpanded(toolId, !open)} />
+    }
+    return disclosure(toolId, <>
       {working ? <LoaderCircle size={15} className="process-spinner" /> : <Wrench size={15} />}
       <strong>{item.actionLabel || CREATIVE_TOOL_LABEL[item.actionName] || item.actionName}</strong>
       {item.callCount > 1 && <small>第 {item.callCount} 次调用</small>}
@@ -123,7 +137,9 @@ export default function CreativeExecutionTimeline({ runId, graph, events, run, a
       ? ({ STEP_STARTED: 'RUNNING', STEP_COMPLETED: 'COMPLETED', STEP_FAILED: 'FAILED' })[lastStatus.type] : node.status
     const active = current && ACTIVE.has(status)
     const latestToolId = items.findLast((item) => item.type.startsWith('TOOL_'))?.id
-    const renderedItems = items.map((item) => renderCard(item, latestToolId, !terminal && current && status === 'RUNNING' && items.at(-1)?.id === item.id))
+    const visibleItems = conversationView ? groupConversationThoughts(items) : items
+    const renderedItems = visibleItems.map((item, index) => renderCard(item, latestToolId,
+      !terminal && current && status === 'RUNNING' && index === visibleItems.length - 1))
     // 根步骤的可见正文属于聊天；工具卡片和协作步骤继续使用各自的边界。
     if (conversationView && !node.parentStepId && !node.planId) {
       return items.length ? <div className="assistant-inline-response" key={id}>{renderedItems}</div> : null
@@ -155,14 +171,14 @@ export default function CreativeExecutionTimeline({ runId, graph, events, run, a
       try { sessionStorage.setItem(storageKey, JSON.stringify(next)) } catch { /* 仅影响刷新后的折叠恢复。 */ }
     }}>全部收起</button></div>}
     {waitingForReply && <AssistantThinking />}
-    {assistantFallback && !hasAssistantText && <div className={conversationView ? 'assistant-inline-response' : undefined}>
-      <AssistantMarkdown text={assistantFallback} /></div>}
     {sections.map(({ id, plan, node, items, current }) => {
       if (node) return renderAgent(node, items, id, current)
       const workers = [...nodes.values()].filter((node) => node.planId === plan.planId)
       return disclosure(id, <strong>{plan.round ? `第 ${plan.round} 轮 · ` : ''}{plan.title}</strong>, workers.map((worker) => renderAgent(worker)),
         workers.some((node) => ACTIVE.has(node.status)), 'process-plan')
     })}
+    {assistantFallback && !hasAssistantText && <div className={conversationView ? 'chat-reply-block' : undefined}>
+      <AssistantMarkdown text={assistantFallback} /></div>}
     {!conversationView && disclosure('technical', '任务与调度记录', <ol className="process-technical">{events.filter((item) =>
       !['CONTENT_DELTA', 'REASONING_DELTA'].includes(item.type) && !item.type.startsWith('TOOL_')).map((item) =>
       <li key={item.id}><time>{item.occurredAt?.slice(11, 19)}</time> {TECHNICAL_LABEL[item.type] || item.actionName || item.type}

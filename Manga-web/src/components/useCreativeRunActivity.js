@@ -6,6 +6,7 @@ import { notifyCreativeProjectChanged } from './creativeProjectEvents'
 
 /** 快照补充结构，SSE 直接推进事件；二者独立，慢快照不会阻止正文更新。 */
 export default function useCreativeRunActivity(accessToken, runId, callbacks) {
+  const historyOnly = callbacks?.historyOnly === true
   const [run, setRun] = useState(null)
   const [graph, setGraph] = useState(null)
   const [events, setEvents] = useState([])
@@ -74,14 +75,14 @@ export default function useCreativeRunActivity(accessToken, runId, callbacks) {
               latestGraph = value; setGraph(value)
               if (sequence.cursor < value.throughSequence) void replay()
             }),
-            getRepairDecisions(accessToken, runId).then((value) => { if (!stopped) setRepairs(value) }),
+            historyOnly ? Promise.resolve() : getRepairDecisions(accessToken, runId).then((value) => { if (!stopped) setRepairs(value) }),
           ])
           if (!stopped) setError('')
         } while (snapshotAgain && !stopped)
       } catch (failure) { if (!stopped) setError(failure.message) }
       finally {
         snapshotPending = false
-        if (!stopped && (!terminal || sequence.cursor < (latestGraph?.throughSequence || 0))) {
+        if (!historyOnly && !stopped && (!terminal || sequence.cursor < (latestGraph?.throughSequence || 0))) {
           window.clearTimeout(timer); timer = window.setTimeout(snapshot, 3000)
         }
       }
@@ -104,12 +105,13 @@ export default function useCreativeRunActivity(accessToken, runId, callbacks) {
     }
 
     refreshRef.current = async () => { await Promise.all([snapshot(), replay()]) }
-    void snapshot(); void replay(); void connect()
+    void snapshot(); void replay()
+    if (!historyOnly) void connect()
     return () => {
       stopped = true; controller?.abort(); window.clearTimeout(timer); window.clearTimeout(reconnect)
       window.clearTimeout(wakeTimer); refreshRef.current = null
     }
-  }, [accessToken, runId])
+  }, [accessToken, historyOnly, runId])
 
   return { run, graph, events, repairs, error, setError, appliedSequence, refreshRef }
 }

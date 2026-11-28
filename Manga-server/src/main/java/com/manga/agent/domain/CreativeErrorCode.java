@@ -34,6 +34,7 @@ public enum CreativeErrorCode {
     /** 供应商数据流超过无响应时限。 */ MODEL_IDLE_TIMEOUT,
     /** 模型密钥无效或权限不足。 */ MODEL_AUTHENTICATION_FAILED,
     /** 供应商限流。 */ MODEL_RATE_LIMITED,
+    /** 模型请求的网络连接失败或提前中断。 */ MODEL_CONNECTION_FAILED,
     /** 模型响应不符合协议。 */ MODEL_PROTOCOL_ERROR,
     /** 执行权失联且已发出模型请求，禁止自动重复执行。 */ MODEL_RESULT_UNCERTAIN,
     /** 手动生成结束时未产出所需业务提案。 */

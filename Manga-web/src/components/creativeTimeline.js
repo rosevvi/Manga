@@ -121,3 +121,18 @@ export function orderedExecutionSections(rootNodes, plans, cards) {
 export function isAgentActivity(type) {
   return type === 'CONTENT_DELTA' || type === 'REASONING_DELTA' || type.startsWith('TOOL_')
 }
+
+/** 合并同一段连续思考，工具调用、回复和执行代次划分思考段落。 */
+export function groupConversationThoughts(items) {
+  const groups = []
+  for (const item of items) {
+    const last = groups.at(-1)
+    if (item.type === 'REASONING_DELTA' && last?.type === item.type && last.stepId === item.stepId
+      && last.ownerEpoch === item.ownerEpoch && last.replyId === item.replyId) {
+      groups[groups.length - 1] = { ...last, resultSummary: (last.resultSummary || '') + (item.resultSummary || '') }
+    } else {
+      groups.push(item)
+    }
+  }
+  return groups
+}

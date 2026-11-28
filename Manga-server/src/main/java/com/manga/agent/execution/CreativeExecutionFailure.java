@@ -5,8 +5,12 @@ import com.manga.agent.domain.CreativeRuntimeMessages;
 import com.manga.agent.harness.AgentRuntimeException;
 import io.agentscope.core.model.ModelHttpException;
 import io.agentscope.core.model.transport.HttpTransportException;
+import java.io.EOFException;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.Objects;
 import java.util.concurrent.TimeoutException;
+import javax.net.ssl.SSLException;
 import reactor.core.Exceptions;
 
 /** 将异常链转换为稳定且不包含供应商响应或凭据的公开错误。 */
@@ -23,13 +27,16 @@ public final class CreativeExecutionFailure {
     public static final String AUTHENTICATION = "模型认证失败，请检查所选文本模型的密钥和权限";
     /** 供应商限流后的处理提示。 */
     public static final String RATE_LIMIT = "供应商限流，请稍后重新生成或调整模型配置";
+    /** 模型请求建立失败或流式响应在传输过程中断开。 */
+    public static final String CONNECTION = "与模型服务的连接中断，请稍后重试";
     /** 供应商返回异常协议后的处理提示。 */
     public static final String PROTOCOL = "模型服务返回异常，请检查模型名称、协议和供应商状态";
     private CreativeExecutionFailure() { }
 
-    /** 优先保留领域错误，只按类型和 HTTP 状态归类第三方失败。 */
+    /** 优先保留领域错误，区分模型传输故障与其他内部连接异常。 */
     public static AgentRuntimeException classify(Throwable failure) {
         Throwable current = failure;
+        boolean modelTransport = false;
         for (int depth = 0; Objects.nonNull(current) && depth < 16; depth++, current = current.getCause()) {
             if (current instanceof AgentRuntimeException domain) return domain;
             if (Exceptions.isOverflow(current)) return new AgentRuntimeException(CreativeErrorCode.EVENT_BACKPRESSURE_OVERFLOW, BACKPRESSURE, failure);
@@ -44,6 +51,11 @@ public final class CreativeExecutionFailure {
                         RATE_LIMIT, failure);
                 return new AgentRuntimeException(CreativeErrorCode.MODEL_PROTOCOL_ERROR,
                         PROTOCOL, failure);
+            }
+            modelTransport |= current instanceof ModelHttpException || current instanceof HttpTransportException;
+            if (modelTransport && (current instanceof SocketException || current instanceof UnknownHostException
+                    || current instanceof SSLException || current instanceof EOFException)) {
+                return new AgentRuntimeException(CreativeErrorCode.MODEL_CONNECTION_FAILED, CONNECTION, failure);
             }
             if (current.getCause() == current) break;
         }

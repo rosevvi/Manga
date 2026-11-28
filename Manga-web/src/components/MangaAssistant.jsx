@@ -7,7 +7,7 @@ import { CREATIVE_MESSAGE_ROLE, CREATIVE_PERMISSION } from '../constants/creativ
 import { CREATIVE_TERMINAL_STATUSES } from '../constants/changeSet'
 import { OPEN_CREATIVE_TASK } from './creativeTaskEvents'
 import AssistantMarkdown, { AssistantThinking } from './AssistantMarkdown'
-import CreativeRunDetails from './CreativeRunDetails'
+import CreativeRunDetails, { ConversationTurnHistory } from './CreativeRunDetails'
 import WorkspaceSelect from './WorkspaceSelect'
 import ProjectTaskConversation from './ProjectTaskConversation'
 import useCreativeTaskActivity from './useCreativeTaskActivity'
@@ -34,6 +34,7 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
   const [activityVersion, setActivityVersion] = useState(0)
   const [lastRunId, setLastRunId] = useState(null)
   const [linkedRunId, setLinkedRunId] = useState(null)
+  const [historyRunId, setHistoryRunId] = useState(null)
   const [linkedSnapshot, setLinkedSnapshot] = useState(null)
   const [messages, setMessages] = useState([])
   const [nextBeforeId, setNextBeforeId] = useState(null)
@@ -69,6 +70,7 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
     setTaskProjectId(null)
     if (boundProject !== undefined) setWorkspace(boundProject)
     setLinkedRunId(null)
+    setHistoryRunId(null)
     setLastRunId(null)
     setMessages([])
     setActiveRun(null)
@@ -247,6 +249,7 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
   }
 
   const detailRunId = linkedRunId || activeRun?.runId || lastRunId || messages.at(-1)?.runId
+  const inlineRun = Boolean(conversationId) && !linkedRunId
   const assistantFallback = messages.filter((message) => message.runId === detailRunId && message.role === CREATIVE_MESSAGE_ROLE.ASSISTANT)
     .map((message) => message.content).filter(Boolean).join('\n\n')
   const originalInstruction = messages.find((message) =>
@@ -293,23 +296,34 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
               {!taskProjectId && !messages.length && !detailRunId && <div className="workbench-empty"><Bot size={36} /><h2>今天要创作什么？</h2>
                 {submitting ? <AssistantThinking label="正在提交" /> : <p>{loading ? '正在恢复会话…' : '选择项目后，可以直接在这里创作。'}</p>}</div>}
               {messages.filter((message) => message.role !== CREATIVE_MESSAGE_ROLE.TOOL
-                && (message.role !== CREATIVE_MESSAGE_ROLE.ASSISTANT || message.runId !== detailRunId)).map((message) =>
-                <article className={`assistant-message ${message.role.toLowerCase()}`} key={message.projectionKey}>
-                  <strong>{message.role === CREATIVE_MESSAGE_ROLE.USER ? '你' : '项目管理助手'}</strong>
-                  {message.role === CREATIVE_MESSAGE_ROLE.ASSISTANT ? <><AssistantMarkdown text={message.content || '本轮未生成回答。'} />
-                    <button type="button" className="message-execution-link" onClick={() => setLinkedRunId(message.runId)}>查看本轮执行</button></>
-                    : <p>{message.content}</p>}
-                </article>)}
+                && (message.role !== CREATIVE_MESSAGE_ROLE.ASSISTANT || message.runId !== detailRunId)).map((message) => {
+                if (message.role !== CREATIVE_MESSAGE_ROLE.ASSISTANT) return <article className="chat-user-turn" aria-label="你" key={message.projectionKey}>
+                  <p>{message.content}</p>
+                </article>
+                const expanded = historyRunId === message.runId
+                return <article className="chat-assistant-turn" key={message.projectionKey}>
+                  <AssistantTurnHeading>
+                    <button type="button" className="message-execution-link" aria-expanded={expanded}
+                      onClick={() => setHistoryRunId(expanded ? null : message.runId)}>{expanded ? '收起本轮过程' : '查看本轮过程'}</button>
+                  </AssistantTurnHeading>
+                  {expanded && <ConversationTurnHistory accessToken={accessToken} runId={message.runId} />}
+                  <div className="chat-reply-block"><AssistantMarkdown text={message.content || '本轮未生成回答。'} /></div>
+                </article>
+              })}
               {linkedRunId && conversationId && <button className="workspace-secondary" type="button" onClick={() => setLinkedRunId(null)}>返回当前轮</button>}
-              {detailRunId && <CreativeRunDetails key={detailRunId} accessToken={accessToken} runId={detailRunId}
+              {detailRunId && <article className={inlineRun ? 'chat-assistant-turn' : undefined}>
+                {inlineRun && <AssistantTurnHeading />}
+                <CreativeRunDetails key={detailRunId} accessToken={accessToken} runId={detailRunId}
                 assistantFallback={assistantFallback} originalInstruction={originalInstruction}
-                conversationView={Boolean(conversationId) && !linkedRunId} stopInComposer={!taskProjectId} onChanged={(run) => {
+                conversationView={inlineRun} stopInComposer={!taskProjectId} onChanged={(run) => {
                   if (linkedRunId) setLinkedSnapshot(run)
                   else if (selectedRef.current === conversationId && conversationId) {
+                    if (CREATIVE_TERMINAL_STATUSES.has(run.status)) setLastRunId(run.runId)
                     setActiveRun(CREATIVE_TERMINAL_STATUSES.has(run.status) ? null : run)
                     void refreshHistory(conversationId).catch((failure) => { if (selectedRef.current === conversationId) setError(failure.message) })
                   }
-                }} onRunChanged={showOperation} onRegenerate={setInstruction} />}
+                }} onRunChanged={showOperation} onRegenerate={setInstruction} />
+              </article>}
             </div>
             {!taskProjectId && <form className="task-composer" onSubmit={submit}>
               <div className="assistant-project-binding">
@@ -345,6 +359,11 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
       </section>
     </div>}
   </aside>
+}
+
+/** 会话中的助手回复与该轮工具过程共用署名。 */
+function AssistantTurnHeading({ children }) {
+  return <header className="chat-assistant-heading"><Bot size={17} aria-hidden="true" /><strong>项目管理助手</strong>{children}</header>
 }
 
 /** 侧边栏只显示项目和会话，空项目也能直接发起对话。 */

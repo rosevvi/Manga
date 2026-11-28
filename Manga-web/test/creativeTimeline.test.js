@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { timelineCards, loadTimelineSince, createSequenceBuffer, unprojectedRootText, taskActionSequences, orderedExecutionSections } from '../src/components/creativeTimeline.js'
+import { timelineCards, loadTimelineSince, createSequenceBuffer, unprojectedRootText, taskActionSequences, orderedExecutionSections, groupConversationThoughts } from '../src/components/creativeTimeline.js'
 import { imageRegenerationRequest } from '../src/components/changeSetPreview.js'
 
 const started = { id: 'r:1', sequence: 1, type: 'TOOL_STARTED', stepId: 's', ownerEpoch: 1, actionId: 'tool', status: 'RUNNING', startedAt: '2026-11-14T12:00:00' }
@@ -86,6 +86,21 @@ test('message watermarks remove projected text without mixing worker or provider
   ]
   assert.equal(unprojectedRootText(events, 'r', 1), '新增正文')
   assert.equal(unprojectedRootText(events, 'r', 4), '')
+})
+
+test('conversation groups consecutive thoughts without moving tool results or mixing attempts', () => {
+  const thought = { type: 'REASONING_DELTA', stepId: 'director', ownerEpoch: 1, replyId: 'model-reply' }
+  const items = [
+    { ...thought, id: 'first', resultSummary: '正在查询' },
+    { ...thought, id: 'next', resultSummary: '项目。' },
+    { ...started, id: 'tool' },
+    { ...thought, id: 'after-tool', resultSummary: '继续分析。' },
+    { ...thought, id: 'new-attempt', ownerEpoch: 2, resultSummary: '新尝试。' },
+  ]
+  const grouped = groupConversationThoughts(items)
+  assert.deepEqual(grouped.map(({ id }) => id), ['first', 'tool', 'after-tool', 'new-attempt'])
+  assert.equal(grouped[0].resultSummary, '正在查询项目。')
+  assert.equal(items[0].resultSummary, '正在查询')
 })
 
 test('collaboration appears between the director output before and after delegation', () => {
