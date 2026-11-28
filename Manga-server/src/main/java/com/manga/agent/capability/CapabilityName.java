@@ -21,6 +21,8 @@ public enum CapabilityName {
     GET_CHAPTER_CONTENT("get_chapter_content"),
     /** 读取项目或章节下的分镜镜头列表。 */
     LIST_STORYBOARD_SHOTS("list_storyboard_shots"),
+    /** 读取本次识别的正文及可复用目录。 */ READ_CHAPTER_ASSET_CONTEXT("read_chapter_asset_context"),
+    /** 事务性登记整章识别结果。 */ REGISTER_CHAPTER_ASSETS("register_chapter_assets"),
     /** 保存章节变更草稿，业务写入必须等待审批。 */
     PROPOSE_SCRIPT_CHANGE("propose_script_change"),
     /** 保存批量分镜草稿提案，业务写入必须等待审批。 */
@@ -63,8 +65,13 @@ public enum CapabilityName {
 
     /** Director 的完整工具上限，实际 Blueprint 再按请求权限缩小。 */
     public static Set<CapabilityName> directorCapabilities() {
-        return Arrays.stream(values()).filter(name -> name != SUBMIT_CREATIVE_STEP_RESULT)
+        return Arrays.stream(values()).filter(name -> name != SUBMIT_CREATIVE_STEP_RESULT && !chapterAssetCapabilities().contains(name))
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    /** 仅专用章节任务可以读取导入上下文和登记本章资产。 */
+    public static Set<CapabilityName> chapterAssetCapabilities() {
+        return Set.of(READ_CHAPTER_ASSET_CONTEXT, REGISTER_CHAPTER_ASSETS);
     }
 
     /** 返回剧本解析 Agent 所需的最小只读能力集合。 */

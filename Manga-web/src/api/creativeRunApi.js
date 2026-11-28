@@ -13,6 +13,11 @@ export function listProjectCreativeRuns(accessToken, projectId, beforeId) {
   return authorizedRequest(accessToken, `${CREATIVE_RUN_ENDPOINT}?${query}`)
 }
 
+/** 查询当前账号跨项目的后台任务是否仍在运行。 */
+export function hasRunningCreativeTasks(accessToken) {
+  return authorizedRequest(accessToken, `${CREATIVE_RUN_ENDPOINT}/activity`)
+}
+
 /** 创建会话型 Creative Run。 */
 export function createConversationRun(accessToken, request) {
   return authorizedRequest(accessToken, CREATIVE_RUN_ENDPOINT, {

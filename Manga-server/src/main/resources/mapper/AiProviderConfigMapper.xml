@@ -11,6 +11,7 @@
         <result property="providerType" column="provider_type" javaType="com.manga.common.enums.AiProviderType"/>
         <result property="baseUrl" column="base_url"/>
         <result property="modelType" column="model_type"/>
+        <result property="callTimeout" column="call_timeout"/>
         <result property="defaultModel" column="default_model"/>
         <result property="apiKeyCiphertext" column="api_key_ciphertext"/>
         <result property="apiKeyHint" column="api_key_hint"/>
@@ -30,7 +31,7 @@
     </resultMap>
 
     <select id="findAllOwnedBy" resultMap="aiProviderConfigResultMap">
-        SELECT id, owner_user_id, name, provider_type, base_url, default_model, model_type,
+        SELECT id, owner_user_id, name, provider_type, base_url, default_model, model_type, call_timeout,
                api_key_ciphertext, api_key_hint, proxy_type, proxy_host, proxy_port,
                proxy_username, proxy_password_ciphertext, proxy_password_hint,
                enabled, default_config, remark, created_at, updated_at, created_by, updated_by
@@ -40,7 +41,7 @@
     </select>
 
     <select id="findOwnedById" resultMap="aiProviderConfigResultMap">
-        SELECT id, owner_user_id, name, provider_type, base_url, default_model, model_type,
+        SELECT id, owner_user_id, name, provider_type, base_url, default_model, model_type, call_timeout,
                api_key_ciphertext, api_key_hint, proxy_type, proxy_host, proxy_port,
                proxy_username, proxy_password_ciphertext, proxy_password_hint,
                enabled, default_config, remark, created_at, updated_at, created_by, updated_by
@@ -50,7 +51,7 @@
     </select>
 
     <select id="findDefaultOwnedBy" resultMap="aiProviderConfigResultMap">
-        SELECT id, owner_user_id, name, provider_type, base_url, default_model, model_type,
+        SELECT id, owner_user_id, name, provider_type, base_url, default_model, model_type, call_timeout,
                api_key_ciphertext, api_key_hint, proxy_type, proxy_host, proxy_port,
                proxy_username, proxy_password_ciphertext, proxy_password_hint,
                enabled, default_config, remark, created_at, updated_at, created_by, updated_by
@@ -80,6 +81,7 @@
             base_url = #{config.baseUrl},
             default_model = #{config.defaultModel},
             model_type = #{config.modelType},
+            call_timeout = #{config.callTimeout},
             api_key_ciphertext = #{config.apiKeyCiphertext},
             api_key_hint = #{config.apiKeyHint},
             proxy_type = #{config.proxyType},

@@ -30,12 +30,12 @@ class ScriptTaskServiceTests {
     @Test
     void shouldSubmitImportFromMultipartFile(@TempDir Path tempDir) {
         MangaTaskRepository taskRepository = mock(MangaTaskRepository.class);
-        ProjectScriptService scriptService = mock(ProjectScriptService.class);
+        ScriptImportUnitService importUnits = mock(ScriptImportUnitService.class);
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class, RETURNS_DEEP_STUBS);
         Executor executor = runnable -> { };
         ScriptTaskService service = new ScriptTaskService(
                 taskRepository,
-                scriptService,
+                importUnits,
                 new ScriptTaskProperties(tempDir.toString(), 20_000_000L, 3),
                 new ObjectMapper(),
                 redisTemplate,
@@ -70,7 +70,7 @@ class ScriptTaskServiceTests {
     void shouldRejectUnsupportedScriptExtension(@TempDir Path tempDir) {
         ScriptTaskService service = new ScriptTaskService(
                 mock(MangaTaskRepository.class),
-                mock(ProjectScriptService.class),
+                mock(ScriptImportUnitService.class),
                 new ScriptTaskProperties(tempDir.toString(), 20_000_000L, 3),
                 new ObjectMapper(),
                 mock(StringRedisTemplate.class, RETURNS_DEEP_STUBS),

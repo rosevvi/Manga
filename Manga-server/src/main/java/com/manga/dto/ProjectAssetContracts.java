@@ -31,6 +31,10 @@ public final class ProjectAssetContracts {
             @Size(max = 300) String lightingDescription,
             @Size(max = 300) String materialDescription) {}
 
+    /** Agent 识别的一项资产。已存在的对象只建立章节引用。 */
+    public record RecognizedAsset(@NotNull ProjectAssetKind assetKind, @Positive Long existingAssetId,
+                                  @Valid @NotNull Fields fields) {}
+
     public record CreateAsset(@NotNull ProjectAssetKind assetKind, @Positive Long chapterId, @Valid @NotNull Fields fields) {}
 
     public record SaveVisual(

@@ -1,4 +1,4 @@
-import { Bot, ChevronDown, ChevronRight, Folder, Hand, MessageSquare, Plus, Send, ShieldAlert, ShieldCheck, Square, SquarePen, X } from 'lucide-react'
+import { ArrowLeft, Bot, ChevronDown, ChevronRight, Folder, Hand, ListTodo, MessageSquare, Plus, Send, ShieldAlert, ShieldCheck, Square, SquarePen, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cancelCreativeRun, createConversationRun } from '../api/creativeRunApi'
 import { getCreativeConversationHistory, listCreativeConversations } from '../api/creativeConversationApi'
@@ -9,6 +9,8 @@ import { OPEN_CREATIVE_TASK } from './creativeTaskEvents'
 import AssistantMarkdown, { AssistantThinking } from './AssistantMarkdown'
 import CreativeRunDetails from './CreativeRunDetails'
 import WorkspaceSelect from './WorkspaceSelect'
+import ProjectTaskConversation from './ProjectTaskConversation'
+import useCreativeTaskActivity from './useCreativeTaskActivity'
 import './manga-assistant.css'
 import './creative-workbench.css'
 
@@ -28,6 +30,8 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
   const [hasMore, setHasMore] = useState(false)
   const [conversationId, setConversationId] = useState(null)
   const [workspace, setWorkspace] = useState(undefined)
+  const [taskProjectId, setTaskProjectId] = useState(null)
+  const [activityVersion, setActivityVersion] = useState(0)
   const [lastRunId, setLastRunId] = useState(null)
   const [linkedRunId, setLinkedRunId] = useState(null)
   const [linkedSnapshot, setLinkedSnapshot] = useState(null)
@@ -47,6 +51,7 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
   const historyVersion = useRef(0)
   const dialogRef = useRef(null)
   const selectionKey = SELECTION_STORAGE_PREFIX + userId
+  const hasBackgroundTasks = useCreativeTaskActivity(accessToken, activityVersion)
   const conversation = conversations.find((item) => item.conversationId === conversationId)
   const linkedRun = linkedSnapshot?.runId === linkedRunId ? linkedSnapshot : null
   const workspaceId = linkedRun ? linkedRun.projectId
@@ -61,6 +66,7 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
     pagingMessages.current = false
     historyVersion.current += 1
     setConversationId(id)
+    setTaskProjectId(null)
     if (boundProject !== undefined) setWorkspace(boundProject)
     setLinkedRunId(null)
     setLastRunId(null)
@@ -68,9 +74,11 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
     setActiveRun(null)
     setNextBeforeId(null)
     setApprovalMode(APPROVAL_MODE.ASK)
+    setLoading(false)
     setError('')
     try {
       sessionStorage.removeItem(`${selectionKey}.operation`)
+      sessionStorage.removeItem(`${selectionKey}.projectTasks`)
       if (id) sessionStorage.setItem(selectionKey, id)
       else sessionStorage.removeItem(selectionKey)
     } catch { /* 浏览器禁用会话存储时仍可打开历史。 */ }
@@ -82,16 +90,26 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
     try { sessionStorage.setItem(`${selectionKey}.operation`, id) } catch { /* 仅保存执行引用。 */ }
   }, [selectionKey])
 
-  /** 页面上的生成和历史入口在助手内打开指定执行，不创建额外会话。 */
+  /** 定位同一个项目任务会话，保留页面直接打开的执行引用。 */
+  const openProjectTasks = useCallback((id, runId) => {
+    selectConversation(null, id)
+    setTaskProjectId(id)
+    try { sessionStorage.setItem(`${selectionKey}.projectTasks`, String(id)) } catch { /* 仍可通过项目目录恢复。 */ }
+    if (runId) showOperation(runId)
+  }, [selectConversation, selectionKey, showOperation])
+
   useEffect(() => {
     const show = ({ detail }) => {
-      selectConversation(null, detail?.projectId ?? undefined)
-      if (detail?.runId) showOperation(detail.runId)
+      if (detail?.projectId != null) openProjectTasks(detail.projectId, detail.runId)
+      else {
+        selectConversation(null)
+        if (detail?.runId) showOperation(detail.runId)
+      }
       setOpen(true)
     }
     window.addEventListener(OPEN_CREATIVE_TASK, show)
     return () => window.removeEventListener(OPEN_CREATIVE_TASK, show)
-  }, [selectConversation, showOperation])
+  }, [openProjectTasks, selectConversation, showOperation])
 
   const refreshList = useCallback(async (beforeId) => {
     const scope = scopeRef.current
@@ -117,12 +135,19 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
 
   const toggle = () => {
     if (!open && !selectedRef.current && !linkedRunId && workspace === undefined) {
+      let restored = false
       try {
         const operation = sessionStorage.getItem(`${selectionKey}.operation`)
+        const savedProject = sessionStorage.getItem(`${selectionKey}.projectTasks`)
         const saved = sessionStorage.getItem(selectionKey)
-        if (saved) selectConversation(saved)
-        if (operation) showOperation(operation)
+        if (savedProject) openProjectTasks(savedProject, operation)
+        else {
+          if (saved) selectConversation(saved)
+          if (operation) showOperation(operation)
+        }
+        restored = Boolean(savedProject || saved || operation)
       } catch { /* 会话仍可从侧边栏选择。 */ }
+      if (!restored && projectId) openProjectTasks(projectId)
     }
     setOpen(!open)
   }
@@ -200,6 +225,7 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
         permissionPolicy: workspaceId ? CREATIVE_PERMISSION.PROPOSE_CHANGES : CREATIVE_PERMISSION.READ_ONLY,
         autoApplyChanges, autoApproveRiskyChanges: autoApplyChanges && approvalMode === APPROVAL_MODE.FULL,
       })
+      setActivityVersion((value) => value + 1)
       if (scope !== scopeRef.current || selected !== selectedRef.current) return
       setInstruction('')
       if (selected !== run.conversationId) selectConversation(run.conversationId, run.projectId)
@@ -233,15 +259,19 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
   const stopping = executing && (stopRequested === focusedRun.runId || focusedRun.status === 'CANCEL_REQUESTED')
   if (!accessToken) return null
   return <aside className={`manga-assistant ${open ? 'open' : ''}`}>
-    <button className="assistant-toggle" type="button" onClick={toggle} aria-label="打开项目管理助手">{open ? <X size={20} /> : <Bot size={22} />}</button>
+    <button className="assistant-toggle" data-running={hasBackgroundTasks || undefined} type="button" onClick={toggle}
+      aria-expanded={open} aria-label={hasBackgroundTasks ? '打开项目管理助手，有后台任务运行中' : '打开项目管理助手'}>
+      {open ? <X size={20} /> : <Bot size={22} />}
+    </button>
     {open && <div className="task-center-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false) }}>
       <section className="task-center" role="dialog" aria-modal="true" aria-labelledby="task-center-title" tabIndex={-1} ref={dialogRef}>
         <header className="task-center-header"><div><span className="task-center-brand"><Bot size={20} /></span>
-          <div><h1 id="task-center-title">项目管理助手</h1><small>{conversation?.title || '新会话'}</small></div></div>
+          <div><h1 id="task-center-title">项目管理助手</h1><small>{taskProjectId ? '项目任务' : conversation?.title || '新会话'}</small></div></div>
           <button type="button" className="workbench-icon-button" aria-label="关闭助手" onClick={() => setOpen(false)}><X size={20} /></button></header>
         <div className="task-center-body">
           <nav className="task-center-sidebar" aria-label="项目会话">
             <ProjectConversationDirectory projects={projects} conversations={conversations} workspaceId={workspaceId}
+              taskProjectId={taskProjectId} onProjectTasks={openProjectTasks}
               conversationId={conversationId} disabled={submitting} onNew={newConversation}
               onSelect={(item) => selectConversation(item.conversationId, item.projectId)} />
             {hasMore && <button className="task-load-more" type="button" disabled={loading || !conversations.length} onClick={() => {
@@ -252,11 +282,15 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
           </nav>
           <main className="task-center-main">
             <div className="task-center-scroll assistant-output" aria-live="polite">
+              {taskProjectId && !linkedRunId && <ProjectTaskConversation
+                key={taskProjectId} accessToken={accessToken} projectId={taskProjectId} onSelect={showOperation} />}
+              {taskProjectId && linkedRunId && <button className="workspace-secondary project-task-back" type="button"
+                onClick={() => openProjectTasks(taskProjectId)}><ArrowLeft size={15} />返回项目任务</button>}
               {nextBeforeId && <button className="task-load-more" type="button" disabled={loading} onClick={() => {
                 setLoading(true)
                 void refreshHistory(conversationId, nextBeforeId).catch((failure) => setError(failure.message)).finally(() => setLoading(false))
               }}>加载更早消息</button>}
-              {!messages.length && !detailRunId && <div className="workbench-empty"><Bot size={36} /><h2>今天要创作什么？</h2>
+              {!taskProjectId && !messages.length && !detailRunId && <div className="workbench-empty"><Bot size={36} /><h2>今天要创作什么？</h2>
                 {submitting ? <AssistantThinking label="正在提交" /> : <p>{loading ? '正在恢复会话…' : '选择项目后，可以直接在这里创作。'}</p>}</div>}
               {messages.filter((message) => message.role !== CREATIVE_MESSAGE_ROLE.TOOL
                 && (message.role !== CREATIVE_MESSAGE_ROLE.ASSISTANT || message.runId !== detailRunId)).map((message) =>
@@ -269,7 +303,7 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
               {linkedRunId && conversationId && <button className="workspace-secondary" type="button" onClick={() => setLinkedRunId(null)}>返回当前轮</button>}
               {detailRunId && <CreativeRunDetails key={detailRunId} accessToken={accessToken} runId={detailRunId}
                 assistantFallback={assistantFallback} originalInstruction={originalInstruction}
-                conversationView={Boolean(conversationId) && !linkedRunId} stopInComposer onChanged={(run) => {
+                conversationView={Boolean(conversationId) && !linkedRunId} stopInComposer={!taskProjectId} onChanged={(run) => {
                   if (linkedRunId) setLinkedSnapshot(run)
                   else if (selectedRef.current === conversationId && conversationId) {
                     setActiveRun(CREATIVE_TERMINAL_STATUSES.has(run.status) ? null : run)
@@ -277,7 +311,7 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
                   }
                 }} onRunChanged={showOperation} onRegenerate={setInstruction} />}
             </div>
-            <form className="task-composer" onSubmit={submit}>
+            {!taskProjectId && <form className="task-composer" onSubmit={submit}>
               <div className="assistant-project-binding">
                 <WorkspaceSelect label="绑定项目" value={String(workspaceId ?? '')}
                   options={workspaceId ? workspaceOptions.map((item) => item.value ? item : { ...item, label: '解除项目绑定' }) : workspaceOptions}
@@ -304,7 +338,7 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
                   </div>
                 </div>
               </div>
-            </form>
+            </form>}
             {error && <div className="workspace-alert" role="alert">{error}</div>}
           </main>
         </div>
@@ -314,13 +348,16 @@ export default function MangaAssistant({ accessToken, userId, projectId, project
 }
 
 /** 侧边栏只显示项目和会话，空项目也能直接发起对话。 */
-function ProjectConversationDirectory({ projects, conversations, workspaceId, conversationId, disabled, onNew, onSelect }) {
+function ProjectConversationDirectory({ projects, conversations, workspaceId, taskProjectId, conversationId, disabled, onNew, onSelect, onProjectTasks }) {
   const [collapsed, setCollapsed] = useState({})
   const groups = new Map(projects.map((project) => [String(project.id), { ...project, conversations: [] }]))
   for (const conversation of conversations) {
     const key = String(conversation.projectId ?? '')
     if (!groups.has(key)) groups.set(key, { id: conversation.projectId, name: key ? `项目 #${key}` : '未绑定项目', conversations: [] })
     groups.get(key).conversations.push(conversation)
+  }
+  if (taskProjectId && !groups.has(String(taskProjectId))) {
+    groups.set(String(taskProjectId), { id: taskProjectId, name: `项目 #${taskProjectId}`, conversations: [] })
   }
   return <>
     <div className="assistant-directory-heading"><strong>项目</strong><button className="workbench-icon-button" type="button"
@@ -338,6 +375,11 @@ function ProjectConversationDirectory({ projects, conversations, workspaceId, co
           }}><Plus size={15} /></button>
         </div>
         {visible && <div className="task-directory assistant-project-conversations">
+          {group.id != null && <button type="button" disabled={disabled}
+            className={String(taskProjectId) === id ? 'selected' : ''}
+            onClick={() => onProjectTasks(group.id)}>
+            <ListTodo size={14} /><span><strong>项目任务</strong></span>
+          </button>}
           {group.conversations.map((item) => <button key={item.conversationId} type="button" disabled={disabled}
             className={conversationId === item.conversationId ? 'selected' : ''} onClick={() => onSelect(item)}>
             <MessageSquare size={13} /><span><strong>{item.title}</strong></span>

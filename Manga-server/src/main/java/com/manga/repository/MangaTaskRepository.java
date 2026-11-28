@@ -1,6 +1,7 @@
 package com.manga.repository;
 
 import com.manga.entity.MangaTask;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.manga.entity.MangaTaskUnit;
 import com.manga.mapper.MangaTaskMapper;
 import com.manga.mapper.MangaTaskUnitMapper;
@@ -24,6 +25,11 @@ public class MangaTaskRepository {
     public List<MangaTask> findByOwner(long ownerUserId) { return taskMapper.findByOwner(ownerUserId); }
     public List<MangaTask> findActive(long ownerUserId) { return taskMapper.findActive(ownerUserId); }
     public List<MangaTask> findRecoverable() { return taskMapper.findRecoverable(); }
+    /** 复查文件中的稳定序号，恢复时沿用先前提交的章节。 */
+    public Optional<MangaTaskUnit> findUnit(long taskId, int index) {
+        return Optional.ofNullable(unitMapper.selectOne(Wrappers.<MangaTaskUnit>lambdaQuery()
+                .eq(MangaTaskUnit::getTaskId, taskId).eq(MangaTaskUnit::getUnitIndex, index)));
+    }
     public List<MangaTaskUnit> findUnits(long taskId) { return unitMapper.findByTaskId(taskId); }
     public void update(MangaTask task) { taskMapper.updateProgress(task); }
     public void updateUnit(MangaTaskUnit unit) { unitMapper.updateById(unit); }

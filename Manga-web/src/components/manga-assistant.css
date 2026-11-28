@@ -1,4 +1,47 @@
 .manga-assistant { position: fixed; right: 24px; bottom: 24px; z-index: 80; font-family: Inter, sans-serif; }
-.assistant-toggle { margin-left: auto; width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid #6f42c1; border-radius: 50%; color: #fff; background: #7c3aed; box-shadow: 0 12px 35px #0008; cursor: pointer; }
+.assistant-toggle { position: relative; margin-left: auto; width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid #6f42c1; border-radius: 50%; color: #fff; background: #7c3aed; box-shadow: 0 12px 35px #0008; cursor: pointer; }
+.assistant-toggle[data-running]::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  padding: 2px;
+  background: conic-gradient(from 30deg, #7c3aed28 22%, #9854f0 64%, #efc4ff 96%, #7c3aed28);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+  animation: assistant-task-orbit 1.45s linear infinite;
+}
+@keyframes assistant-task-orbit {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .assistant-toggle[data-running]::after { animation: none; }
+}
+
+.project-task-history h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; font-size: 18px; }
+.project-task-history h2 svg { color: var(--creative-accent); }
+.project-task-history ul { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.project-task-entry {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--creative-line);
+  border-radius: 9px;
+  background: var(--creative-panel);
+  color: var(--creative-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.project-task-entry:hover, .project-task-entry:focus-visible { border-color: var(--creative-accent); }
+.project-task-entry strong, .project-task-entry time { display: block; overflow-wrap: anywhere; }
+.project-task-entry time { margin-top: 4px; color: var(--creative-muted); font-size: 11px; }
+.project-task-entry .task-status { color: var(--creative-accent); font-size: 12px; }
+.project-task-entry .task-status.failed { color: var(--creative-danger); }
+.project-task-entry .task-status.completed { color: var(--creative-success); }
+.project-task-back { margin-bottom: 14px; }
 .assistant-message strong { font-size: 11px; color: #a78bfa; }
 .assistant-message p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -48,6 +48,7 @@ public class AgentProfileManagementService {
             AgentProfile builtIn = builtIns.require(key);
             AgentModelSelection selection = key == AgentProfileKey.MANGA_DIRECTOR || key == AgentProfileKey.SCRIPT_PARSER
                     ? AgentModelSelection.USER_SELECTABLE : AgentModelSelection.INHERIT_PARENT;
+            if (key == AgentProfileKey.CHAPTER_ASSET_EXTRACTOR) selection = AgentModelSelection.USER_DEFAULT;
             AgentProfileDefinition definition = new AgentProfileDefinition(AgentProfileContracts.SCHEMA_VERSION, key,
                     builtIn.displayName(), builtIn.description(), builtIn.systemPrompt(), builtIn.allowedCapabilities(),
                     builtIn.permissionPolicy(), builtIn.maxTurns(), new AgentModelPolicy(selection, Set.of(), Set.of()),
@@ -168,7 +169,9 @@ public class AgentProfileManagementService {
 
     /** 仅暴露可供管理员选择的现有业务能力，不允许配置平台内部结果提交工具。 */
     public List<AgentProfileApi.CapabilityOption> capabilities() {
-        return capabilities.descriptors(CapabilityName.directorCapabilities()).stream().map(value ->
+        var names = java.util.EnumSet.copyOf(CapabilityName.directorCapabilities());
+        names.addAll(CapabilityName.chapterAssetCapabilities());
+        return capabilities.descriptors(names).stream().map(value ->
                 new AgentProfileApi.CapabilityOption(value.name(), value.description(), value.requiredPermission(), value.schemaSha256())).toList();
     }
 

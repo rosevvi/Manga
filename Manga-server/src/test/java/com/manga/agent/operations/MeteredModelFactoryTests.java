@@ -83,7 +83,7 @@ class MeteredModelFactoryTests {
         call.setStatus(ModelCallStatus.STARTED);
         when(usage.begin(any(), any())).thenReturn(call);
         RuntimeOperationsProperties properties = new RuntimeOperationsProperties(4, 60, 3, Duration.ofSeconds(30),
-                Duration.ofMinutes(2), Duration.ofMinutes(5), Duration.ofMinutes(2), Duration.ofDays(30), 10000);
+                Duration.ofMinutes(2), Duration.ofDays(30), 10000);
         var factory = new MeteredModelFactory(usage, Schedulers.immediate(), timer, properties);
         var context = new AgentRuntimeContext(1L, null, null, "run", "step", "session", "owner", 1L,
                 Instant.now().plusSeconds(600), AgentPermissionPolicy.READ_ONLY);

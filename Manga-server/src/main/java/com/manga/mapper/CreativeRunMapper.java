@@ -25,6 +25,8 @@ public interface CreativeRunMapper extends BaseMapper<CreativeRun> {
             @Param("beforeId") Long beforeId, @Param("limit") int limit);
     /** 查询最新未结束的手动生成任务，不受历史游标限制。 */
     CreativeRun findActiveManual(@Param("userId") long userId, @Param("projectId") Long projectId);
+    /** 查询用户是否有正在执行、排队或等待生成供应商的任务。 */
+    boolean hasRunningTask(@Param("userId") long userId);
     /** 按业务目标读取最新手动任务，可限定终态。 */
     CreativeRun findLatestManualForTarget(@Param("userId") long userId, @Param("projectId") long projectId,
             @Param("targetId") long targetId, @Param("operationType") CreativeOperationType operationType,

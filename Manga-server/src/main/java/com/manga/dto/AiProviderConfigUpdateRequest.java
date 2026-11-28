@@ -3,6 +3,7 @@ package com.manga.dto;
 import com.manga.common.enums.AiProviderType;
 import com.manga.common.enums.AiModelType;
 import com.manga.common.enums.AiProxyType;
+import com.manga.common.enums.ModelCallTimeout;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Max;
@@ -31,6 +32,8 @@ public record AiProviderConfigUpdateRequest(
         String defaultModel,
         /** 此配置适用的模型用途。 */
         AiModelType modelType,
+        /** 文本模型单次调用总时限。 */
+        ModelCallTimeout callTimeout,
         /** AI 服务 API Key 明文，仅在请求处理中短暂使用。 */
         @Size(max = AI_API_KEY_MAX_LENGTH, message = AI_API_KEY_TOO_LONG)
         String apiKey,

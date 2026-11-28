@@ -79,6 +79,12 @@ public class CreativeRunController {
         return ApiResponse.success(page);
     }
 
+    /** 为悬浮入口返回当前用户是否有后台任务运行。 */
+    @GetMapping("/activity")
+    public ApiResponse<Boolean> activity() {
+        return ApiResponse.success(manualRunQueryService.hasRunningTask(SecurityUtils.requireCurrentUserId()));
+    }
+
     /** 创建会话或手动触发的 Creative Run，并返回已持久化状态快照。 */
     @Operation(summary = "创建 Creative Run", description = "支持助手会话和页面手动操作，requestId 用于启动幂等。")
     @PostMapping

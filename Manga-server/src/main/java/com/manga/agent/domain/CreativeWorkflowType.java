@@ -11,6 +11,9 @@ public enum CreativeWorkflowType {
     /** 只读剧本解析工作流。 */
     SCRIPT_PARSE,
 
+    /** 识别章节资产并加入项目目录。 */
+    CHAPTER_ASSETS,
+
     /** 针对指定章节生成分镜的工作流。 */
     CHAPTER_STORYBOARD,
     /** 生成章节提案并等待人工批准。 */
@@ -26,6 +29,7 @@ public enum CreativeWorkflowType {
     public static CreativeWorkflowType fromOperation(CreativeOperationType operationType) {
         return switch (operationType) {
             case ASSISTANT_CHAT -> ASSISTANT_CHAT;
+            case EXTRACT_CHAPTER_ASSETS -> CHAPTER_ASSETS;
             case PARSE_SCRIPT -> SCRIPT_PARSE;
             case GENERATE_CHAPTER_STORYBOARD -> CHAPTER_STORYBOARD;
             case GENERATE_SCRIPT_CHAPTER -> SCRIPT_CHAPTER;

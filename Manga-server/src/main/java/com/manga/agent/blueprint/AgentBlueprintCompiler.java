@@ -1,6 +1,7 @@
 package com.manga.agent.blueprint;
 
 import com.manga.agent.capability.CapabilityDescriptor;
+import com.manga.agent.profile.AgentProfileKey;
 import com.manga.agent.capability.CapabilityRegistry;
 import com.manga.agent.config.CreativeAgentProperties;
 import com.manga.agent.domain.AgentPermissionPolicy;
@@ -72,7 +73,9 @@ public class AgentBlueprintCompiler {
     private CompiledAgentBlueprint compileResolved(AgentProfile profile, AgentBlueprintCompileRequest request, boolean sandbox, int turns) {
         requirePermission(profile, request.permissionPolicy());
         AgentExecutionPolicy policy = profile.executionPolicy();
-        if (!sandbox && !AgentProfilePolicySupport.rootSelectable(profile)) throw new BusinessException(AgentProfileResponseCode.UNAVAILABLE);
+        boolean chapterImport = request.profileKey() == AgentProfileKey.CHAPTER_ASSET_EXTRACTOR
+                && request.profileId() == null && profile.key() == request.profileKey();
+        if (!sandbox && !chapterImport && !AgentProfilePolicySupport.rootSelectable(profile)) throw new BusinessException(AgentProfileResponseCode.UNAVAILABLE);
         if (Objects.nonNull(policy) && policy.model().selection() == AgentModelSelection.USER_DEFAULT
                 && Objects.nonNull(request.modelConfigId())) throw new BusinessException(AgentProfileResponseCode.INVALID);
         ModelSnapshot model = modelSnapshot(requireModelConfig(request));
@@ -121,7 +124,7 @@ public class AgentBlueprintCompiler {
                 config.getBaseUrl(),
                 config.getDefaultModel(),
                 modelFingerprint.fingerprint(config),
-                properties.contextWindow()
+                properties.contextWindow(), config.getCallTimeout()
         );
     }
 

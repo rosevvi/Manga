@@ -40,6 +40,12 @@
         <result property="updatedBy" column="updated_by"/>
     </resultMap>
 
+    <update id="freezeBlueprint">
+        UPDATE manga_creative_step SET blueprint_snapshot_json = #{snapshot}, blueprint_fingerprint = #{fingerprint}, state_session_id = #{sessionId},
+               updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE step_id = #{stepId} AND blueprint_snapshot_json IS NULL
+    </update>
+
     <select id="findByStepId" resultMap="creativeStepResultMap">
         SELECT id, step_id, run_id, parent_step_id, step_type, status, schedule_version,
                owner_instance_id, owner_epoch, lease_until, attempt_no, max_attempts,

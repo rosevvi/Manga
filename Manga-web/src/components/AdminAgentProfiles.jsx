@@ -5,7 +5,7 @@ import { listAdminAgents, getAdminAgent, getAgentVersion, getAgentCapabilities, 
 import { getAiProviderConfigs } from '../api/aiProviderApi'
 import { getCreativeConversationHistory } from '../api/creativeConversationApi'
 import { cancelCreativeRun } from '../api/creativeRunApi'
-import { AGENT_VERSION_STATUS, AGENT_AUDIT_PAGE_SIZE, AGENT_ROLE_LABEL, AGENT_MODEL_SELECTION_LABEL,
+import { AGENT_VERSION_STATUS, AGENT_AUDIT_PAGE_SIZE, AGENT_ROLE_LABEL, IMPORT_ASSET_TOOLS, AGENT_MODEL_SELECTION_LABEL,
   AGENT_BUDGET_LABEL, AGENT_ACTION_LABEL, newAgentDefinition } from '../constants/agentProfile'
 import { APPROVAL_POLL_MS } from '../constants/changeSet'
 import { compareAgentDefinitions } from './agentProfileComparison'
@@ -171,16 +171,17 @@ export default function AdminAgentProfiles({ accessToken, projects = [] }) {
             <div className="agent-admin-fields">
               <label>名称<input required maxLength={120} value={definition.displayName} onChange={(event) => update('displayName', event.target.value)} /></label>
               <label>固定角色族<select value={definition.role} disabled={detail?.profile.builtIn && !creating} onChange={(event) => { const role = event.target.value; update('role', role); update('permissionPolicy', 'READ_ONLY'); update('capabilities', newAgentDefinition().capabilities); if (role === 'manga_director' && definition.model.selection === 'INHERIT_PARENT') update('model', { ...definition.model, selection: 'USER_SELECTABLE' }) }}>
-                {Object.entries(AGENT_ROLE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label>业务权限<select value={definition.permissionPolicy} onChange={(event) => { const policy = event.target.value; update('permissionPolicy', policy); if (policy === 'READ_ONLY') update('capabilities', definition.capabilities.filter((name) => options.find((item) => item.name === name)?.requiredPermission === 'READ_ONLY')) }}>
-                <option value="READ_ONLY">只读</option>{definition.role === 'manga_director' && <option value="PROPOSE_CHANGES">可提交审批提案</option>}</select></label>
+                {Object.entries(AGENT_ROLE_LABEL).filter(([value]) => value !== 'chapter_asset_extractor' || definition.role === value).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label>业务权限<select disabled={definition.role === 'chapter_asset_extractor'} value={definition.permissionPolicy} onChange={(event) => { const policy = event.target.value; update('permissionPolicy', policy); if (policy === 'READ_ONLY') update('capabilities', definition.capabilities.filter((name) => options.find((item) => item.name === name)?.requiredPermission === 'READ_ONLY')) }}>
+                <option value="READ_ONLY">只读</option>{definition.role === 'chapter_asset_extractor' && <option value="AUTOMATION">自动登记章节资产</option>}{definition.role === 'manga_director' && <option value="PROPOSE_CHANGES">可提交审批提案</option>}</select></label>
               <label>推理轮数上限<input required type="number" min="1" max="32" value={definition.maxTurns} onChange={(event) => update('maxTurns', Number(event.target.value))} /></label>
             </div>
             <label>职责说明<textarea required rows="2" maxLength={2000} value={definition.description} onChange={(event) => update('description', event.target.value)} /></label>
             <label>系统提示词<textarea required rows="10" maxLength={24000} value={definition.systemPrompt} onChange={(event) => update('systemPrompt', event.target.value)} /></label>
-            <section><h3>能力白名单</h3><div className="agent-capabilities">{options.filter((item) => definition.role === 'manga_director' || newAgentDefinition().capabilities.includes(item.name) || item.name === 'list_storyboard_shots')
-              .map((item) => <label key={item.name}><input type="checkbox" checked={definition.capabilities.includes(item.name)} onChange={(event) => update('capabilities', event.target.checked ? [...definition.capabilities, item.name] : definition.capabilities.filter((name) => name !== item.name))} /><span>{item.name}<small>{item.description}</small></span></label>)}</div></section>
-            <section><h3>模型策略</h3><label>选择方式<select value={definition.model.selection} onChange={(event) => update('model', { ...definition.model, selection: event.target.value })}>
+            <section><h3>能力白名单</h3><div className="agent-capabilities">{options.filter((item) => IMPORT_ASSET_TOOLS.has(item.name) ? definition.role === 'chapter_asset_extractor' :
+              definition.role !== 'chapter_asset_extractor' && (definition.role === 'manga_director' || newAgentDefinition().capabilities.includes(item.name) || item.name === 'list_storyboard_shots'))
+              .map((item) => <label key={item.name}><input type="checkbox" disabled={definition.role === 'chapter_asset_extractor'} checked={definition.capabilities.includes(item.name)} onChange={(event) => update('capabilities', event.target.checked ? [...definition.capabilities, item.name] : definition.capabilities.filter((name) => name !== item.name))} /><span>{item.name}<small>{item.description}</small></span></label>)}</div></section>
+            <section><h3>模型策略</h3><label>选择方式<select disabled={definition.role === 'chapter_asset_extractor'} value={definition.model.selection} onChange={(event) => update('model', { ...definition.model, selection: event.target.value })}>
               {Object.entries(AGENT_MODEL_SELECTION_LABEL).filter(([value]) => definition.role !== 'manga_director' || value !== 'INHERIT_PARENT').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <div className="agent-capabilities">{providers.map((provider) => <label key={provider}><input type="checkbox" checked={definition.model.providers.includes(provider)} onChange={(event) => update('model', { ...definition.model,
                 providers: event.target.checked ? [...definition.model.providers, provider] : definition.model.providers.filter((value) => value !== provider) })} />{provider}</label>)}</div>

@@ -8,7 +8,9 @@ export const AGENT_PROFILE_NAV = 'agent-profiles'
 export const AGENT_AUDIT_PAGE_SIZE = 50
 /** 固定业务角色族；新增专业定义不需要新增角色。 */
 export const AGENT_ROLE_LABEL = Object.freeze({ manga_director: '创作导演', script_parser: '分析专家',
-  script_writer: '剧本编剧', storyboard_director: '分镜导演', continuity_reviewer: '连续性评审师' })
+  chapter_asset_extractor: '章节资产识别师', script_writer: '剧本编剧', storyboard_director: '分镜导演', continuity_reviewer: '连续性评审师' })
+/** 章节资产识别能力绑定导入任务。 */
+export const IMPORT_ASSET_TOOLS = new Set(['read_chapter_asset_context', 'register_chapter_assets'])
 /** 管理员可配置的模型选择策略。 */
 export const AGENT_MODEL_SELECTION_LABEL = Object.freeze({ USER_DEFAULT: '用户默认模型', USER_SELECTABLE: '用户可选模型', INHERIT_PARENT: '仅继承父模型（Worker）' })
 /** 可配置预算字段与显示名。 */

@@ -151,6 +151,18 @@
           AND status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED')
         ORDER BY id DESC LIMIT 1
     </select>
+    <select id="hasRunningTask" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM manga_creative_run r
+            WHERE r.user_id = #{userId} AND (
+                r.status IN ('QUEUED', 'ACTIVE', 'CANCEL_REQUESTED')
+                OR (r.status = 'WAITING' AND EXISTS (
+                    SELECT 1 FROM manga_creative_step s WHERE s.run_id = r.run_id
+                        AND s.status = 'WAITING_JOB'
+                ))
+            )
+        )
+    </select>
     <select id="findLatestManualForTarget" resultMap="creativeRunResultMap">
         SELECT id, run_id, status, finished_at, error_message
         FROM manga_creative_run

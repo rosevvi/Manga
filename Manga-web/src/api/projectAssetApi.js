@@ -14,6 +14,11 @@ export function listChapterAssets(token, projectId, chapterId) {
   return authorizedRequest(token, chapterAssetsPath(projectId, chapterId))
 }
 
+/** 获取导入章节时自动创建的识别任务。 */
+export function getChapterExtraction(token, projectId, chapterId) {
+  return authorizedRequest(token, `${chapterAssetsPath(projectId, chapterId)}/extraction`)
+}
+
 export function createProjectAsset(token, projectId, asset) {
   return authorizedRequest(token, assetsPath(projectId), json('POST', asset))
 }

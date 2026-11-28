@@ -38,6 +38,9 @@ public class CreativeRunRepository {
         return Optional.ofNullable(mapper.findActiveManual(userId, projectId));
     }
 
+    /** 为悬浮入口查询跨项目运行状态，所有状态均限定在当前账号。 */
+    public boolean hasRunningTask(long userId) { return mapper.hasRunningTask(userId); }
+
     /** 返回指定用户、项目和操作目标下最新的手动任务。 */
     public Optional<CreativeRun> findLatestManualForTarget(long userId, long projectId, long targetId,
             CreativeOperationType operationType, CreativeRunStatus status) {

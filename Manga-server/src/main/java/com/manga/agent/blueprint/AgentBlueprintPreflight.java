@@ -40,8 +40,11 @@ public class AgentBlueprintPreflight {
                     .toList();
             // 权限和精确白名单已经冻结；发布、禁用和回滚不能撤销已有规格。
             Set<CapabilityName> allowed = allowedCapabilities(blueprint);
-            AgentPermissionPolicy ceiling = blueprint.profileKey() == AgentProfileKey.MANGA_DIRECTOR
-                    ? AgentPermissionPolicy.PROPOSE_CHANGES : AgentPermissionPolicy.READ_ONLY;
+            AgentPermissionPolicy ceiling = switch (blueprint.profileKey()) {
+                case MANGA_DIRECTOR -> AgentPermissionPolicy.PROPOSE_CHANGES;
+                case CHAPTER_ASSET_EXTRACTOR -> AgentPermissionPolicy.AUTOMATION;
+                default -> AgentPermissionPolicy.READ_ONLY;
+            };
             boolean matches = ceiling.allows(blueprint.permissionPolicy())
                     && allowed.containsAll(blueprint.capabilities().stream().map(CapabilityManifest::name).toList())
                     && blueprint.capabilities().stream().allMatch(capability -> blueprint.permissionPolicy().allows(capability.requiredPermission()))
@@ -65,6 +68,7 @@ public class AgentBlueprintPreflight {
         if (Objects.nonNull(blueprint.executionPolicy()) && blueprint.executionPolicy().sandbox()) {
             return CapabilityName.phaseTwoReadOnlyCapabilities();
         }
+        if (blueprint.profileKey() == AgentProfileKey.CHAPTER_ASSET_EXTRACTOR) return CapabilityName.chapterAssetCapabilities();
         if (blueprint.profileKey() == AgentProfileKey.MANGA_DIRECTOR) return CapabilityName.directorCapabilities();
         var allowed = EnumSet.copyOf(CapabilityName.phaseTwoReadOnlyCapabilities());
         allowed.add(CapabilityName.READ_DELEGATED_RESULT);

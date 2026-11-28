@@ -35,6 +35,11 @@ public class CreativeStepRepository {
         return mapper.resumeApproval(stepId, sessionId, result, maxAttempts, actor) == 1;
     }
 
+    /** 调用方已持有 Run 锁，只写首次确定的执行规格，避免覆盖续租字段。 */
+    public void freezeBlueprint(String stepId, String snapshot, String fingerprint, String sessionId, String actor) {
+        mapper.freezeBlueprint(stepId, snapshot, fingerprint, sessionId, actor);
+    }
+
     /** 创建 Step 并回填数据库主键。 */
     public CreativeStep create(CreativeStep step) {
         mapper.insert(step);

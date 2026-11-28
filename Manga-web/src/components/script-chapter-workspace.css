@@ -28,6 +28,24 @@
 .chapter-overview-title h2 { margin: 0 0 4px; font-size: clamp(17px, 1.75cqi, 24px); overflow-wrap: anywhere; }
 .chapter-overview-title time { color: var(--creative-muted); font-size: 11px; }
 
+.chapter-extraction { margin-bottom: 12px; }
+.chapter-extraction .chapter-extraction-details {
+  border-color: var(--creative-line-strong, #60458d);
+  background: var(--creative-panel);
+}
+.chapter-extraction .chapter-extraction-details[data-failed] {
+  color: #ffadbe;
+  border-color: #93455f;
+  background: #3d1c2c;
+}
+.chapter-extraction .chapter-extraction-details:hover { border-color: currentColor; }
+.chapter-extraction-note {
+  margin: 6px 0 0;
+  color: var(--creative-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .chapter-card {
   min-width: 0;
   padding: 11px;

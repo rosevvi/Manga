@@ -204,6 +204,7 @@ public class RunAdmissionService {
                 .stepId(identifierGenerator.nextStepId())
                 .runId(run.getRunId())
                 .stepType(Objects.isNull(agentStep) ? switch (command.operationType()) {
+                    case EXTRACT_CHAPTER_ASSETS -> CreativeStepType.AGENT_INVOCATION;
                     case GENERATE_SHOT_VIDEO -> CreativeStepType.VIDEO_PROPOSAL;
                     case GENERATE_ASSET_IMAGE -> CreativeStepType.ASSET_IMAGE_PROPOSAL;
                     default -> CreativeStepType.ROOT_WORKFLOW;
@@ -274,6 +275,18 @@ public class RunAdmissionService {
         if (Objects.nonNull(command.agentSelection()) && (command.operationType() != CreativeOperationType.ASSISTANT_CHAT
                 || command.agentSelection().sandbox() || Objects.nonNull(command.agentSelection().version()))) {
             throw new BusinessException(AgentProfileResponseCode.INVALID);
+        }
+        if (command.operationType() == CreativeOperationType.EXTRACT_CHAPTER_ASSETS) {
+            if (command.permissionPolicy() != AgentPermissionPolicy.AUTOMATION) {
+                throw new BusinessException(CreativeRuntimeResponseCode.TARGET_RESOURCE_INVALID, HttpStatus.BAD_REQUEST);
+            }
+            var latest = runRepository.findLatestManualForTarget(command.userId(), projectId,
+                    command.target().resourceId(), command.operationType(), null);
+            if (latest.filter(run -> !run.getStatus().isTerminal()).isPresent()) {
+                throw new BusinessException(CreativeRuntimeResponseCode.ACTIVE_RUN_CONFLICT, HttpStatus.CONFLICT);
+            }
+            // 章节与任务一起提交。模型未配置时由执行器记录失败，原文仍可使用。
+            return null;
         }
         CompiledAgentBlueprint compiled = blueprintCompiler.compile(new AgentBlueprintCompileRequest(
                 command.userId(),
@@ -379,7 +392,7 @@ public class RunAdmissionService {
                 .status(CreativeRunStatus.QUEUED)
                 .activeConversationId(Objects.isNull(conversation) ? null : conversation.getConversationId())
                 .ownerEpoch(0L)
-                .deadlineAt(now.plus(properties.runTimeout()))
+                .deadlineAt(now.plus(properties.executionTimeout(command.operationType())))
                 .nextSequence(1L)
                 .projectedThroughSequence(0L)
                 .stateGeneration(Objects.isNull(conversation) ? 1L : conversation.getStateGeneration())

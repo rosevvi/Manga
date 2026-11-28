@@ -42,7 +42,8 @@ public class ListAgentProfilesCapability implements MangaAgentCapability {
         catch (IOException | IllegalArgumentException invalid) { throw new BusinessException(AgentProfileResponseCode.INVALID); }
         if (Objects.isNull(query) || (Objects.nonNull(query.afterProfileId())
                 && !query.afterProfileId().matches(AgentProfileContracts.KEY_PATTERN))) throw new BusinessException(AgentProfileResponseCode.INVALID);
-        var selected = catalog.list().stream().filter(profile -> profile.role() != AgentProfileKey.MANGA_DIRECTOR)
+        var selected = catalog.list().stream().filter(profile -> profile.role() != AgentProfileKey.MANGA_DIRECTOR
+                        && profile.role() != AgentProfileKey.CHAPTER_ASSET_EXTRACTOR)
                 .filter(profile -> Objects.isNull(query.role()) || profile.role() == query.role())
                 .filter(profile -> Objects.isNull(query.afterProfileId()) || profile.profileId().compareTo(query.afterProfileId()) > 0)
                 .sorted(Comparator.comparing(profile -> profile.profileId()))

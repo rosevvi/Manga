@@ -18,6 +18,8 @@ import com.manga.agent.changeset.ChangeSetConstants;
 import com.manga.agent.config.CreativeExecutionProperties;
 import com.manga.agent.config.CreativeJournalProperties;
 import com.manga.agent.domain.CreativeErrorCode;
+import com.manga.agent.domain.CreativeOperationType;
+import com.manga.common.enums.ProjectAssetError;
 import com.manga.agent.domain.CreativeRuntimeMessages;
 import com.manga.agent.domain.CreativeStepInput;
 import com.manga.agent.domain.CreativeStepType;
@@ -66,6 +68,7 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
     private final CreativeStepResultService results;
     private final CreativeRunBudgetService budgets;
     private final CreativeReviewGate reviewGate;
+    private final ChapterAssetBlueprintPreparation assetPreparation;
 
     public AgentCreativeStepExecutor(
             AgentBlueprintCodec blueprintCodec,
@@ -80,7 +83,7 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
             ObjectMapper objectMapper,
             ChangeSetApprovalService approvals,
             CreativeDelegationService delegation, CreativeGraphService graph, CreativeStepResultService results,
-            CreativeRunBudgetService budgets, CreativeReviewGate reviewGate) {
+            CreativeRunBudgetService budgets, CreativeReviewGate reviewGate, ChapterAssetBlueprintPreparation assetPreparation) {
         this.blueprintCodec = blueprintCodec;
         this.journalScheduler = journalScheduler;
         this.streamTimer = streamTimer;
@@ -97,6 +100,7 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
         this.results = results;
         this.budgets = budgets;
         this.reviewGate = reviewGate;
+        this.assetPreparation = assetPreparation;
     }
 
     /** 返回持久化 Agent 调用步骤类型。 */
@@ -116,14 +120,16 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
 
     /** 心跳覆盖预检、预算、Kernel 获取、模型流和终态提交。 */
     private void executeOwned(ClaimedCreativeStep step, CreativeStepLeaseHeartbeat heartbeat) {
-        AgentBlueprint blueprint = restoreBlueprint(step);
+        CreativeStepInput input = readInput(step.inputJson());
+        boolean extracting = input.operationType() == CreativeOperationType.EXTRACT_CHAPTER_ASSETS;
+        AgentBlueprint blueprint = extracting && step.blueprintSnapshotJson() == null
+                ? assetPreparation.freeze(step) : restoreBlueprint(step);
         // 上次执行可能在草稿落库后进程退出；此时直接开放审批，不再次调用模型。
         if (approvals.hasDraft(step.stepId()) && approvals.suspendIfProposed(step)) return;
         if (delegation.hasDraft(step.runId(), step.stepId()) && graph.suspendIfDelegated(step)) return;
         String submitted = results.submitted(step.stepId());
         if (Objects.nonNull(submitted)) { lifecycleService.complete(step, submitted); return; }
         boolean worker = results.isWorker(step);
-        CreativeStepInput input = readInput(step.inputJson());
         budgets.reserve(step, blueprint);
         AgentRuntimeContext context = runtimeContext(step);
         StringBuilder content = new StringBuilder();
@@ -156,6 +162,13 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
             lifecycleService.acknowledgeCancellation(step);
             return;
         }
+        if (extracting) {
+            String receipt = results.submitted(step.stepId());
+            if (receipt == null) throw new AgentRuntimeException(CreativeErrorCode.STEP_RESULT_REQUIRED,
+                    ProjectAssetError.EXTRACTION_NOT_SUBMITTED.message());
+            lifecycleService.complete(step, receipt);
+            return;
+        }
         if (worker) {
             String result = results.submitted(step.stepId());
             if (Objects.isNull(result)) throw new AgentRuntimeException(CreativeErrorCode.STEP_RESULT_REQUIRED, CollaborationMessages.RESULT_REQUIRED);
@@ -169,7 +182,8 @@ public class AgentCreativeStepExecutor implements CreativeStepExecutor {
 
     /** 只有会提交检查点的工具才查数据库，读取工具结束不再触发三次额外查询。 */
     private boolean checkpointSubmitted(ClaimedCreativeStep step, String toolName) {
-        if (CapabilityName.SUBMIT_CREATIVE_STEP_RESULT.code().equals(toolName)) {
+        if (CapabilityName.SUBMIT_CREATIVE_STEP_RESULT.code().equals(toolName)
+                || CapabilityName.REGISTER_CHAPTER_ASSETS.code().equals(toolName)) {
             return Objects.nonNull(results.submitted(step.stepId()));
         }
         if (CapabilityName.DELEGATE_CREATIVE_PLAN.code().equals(toolName)) {

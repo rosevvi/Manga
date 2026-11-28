@@ -327,7 +327,7 @@ public class GenerationJobService {
         if (run.getStatus().isTerminal() || run.getStatus() == CreativeRunStatus.CANCEL_REQUESTED) return;
         String sessionId = run.getOperationType().usesManualMediaProposal() ? null : identifiers.nextStateSessionId();
         if (!steps.resumeJob(job.getStepId(), sessionId, codec.write(summary(job)), ChangeSetConstants.RESUME_MAX_ATTEMPTS, actor())) return;
-        run.setDeadlineAt(LocalDateTime.now().plus(runtime.runTimeout())); run.setUpdatedBy(actor()); runs.update(run);
+        run.setDeadlineAt(LocalDateTime.now().plus(runtime.executionTimeout(run.getOperationType()))); run.setUpdatedBy(actor()); runs.update(run);
         if (Objects.nonNull(sessionId)) sessions.register(run, sessionId);
         CreativeStep step = steps.findByStepId(job.getStepId()).orElseThrow();
         dispatch.create(CreativeDispatchOutbox.builder().stepId(step.getStepId()).scheduleVersion(step.getScheduleVersion())

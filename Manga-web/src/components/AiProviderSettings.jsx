@@ -38,12 +38,19 @@ import './project-module.css'
 const DEFAULT_PROVIDER = AI_PROVIDER_OPTIONS[0]
 const MODEL_TYPE_LABEL = { TEXT: '文本模型', IMAGE: '图片模型', VIDEO: '视频模型' }
 
+const MODEL_CALL_TIMEOUTS = [
+  ['MINUTES_5', '5'], ['MINUTES_15', '15'], ['MINUTES_30', '30'],
+  ['MINUTES_60', '60'], ['HOURS_2', '2h'], ['UNLIMITED', 'unlimited'],
+]
+const DEFAULT_MODEL_CALL_TIMEOUT = 'MINUTES_30'
+
 const EMPTY_FORM = Object.freeze({
   name: '',
   providerType: DEFAULT_PROVIDER.value,
   baseUrl: DEFAULT_PROVIDER.baseUrl,
   defaultModel: DEFAULT_PROVIDER.model,
   modelType: 'TEXT',
+  callTimeout: DEFAULT_MODEL_CALL_TIMEOUT,
   apiKey: '',
   proxyType: 'NONE',
   proxyHost: '',
@@ -173,6 +180,7 @@ function AiProviderSettings({ accessToken, isGuest }) {
       baseUrl: config.baseUrl,
       defaultModel: config.defaultModel ?? '',
       modelType: config.modelType ?? 'TEXT',
+      callTimeout: config.callTimeout ?? DEFAULT_MODEL_CALL_TIMEOUT,
       apiKey: '',
       proxyType: config.proxyType ?? 'NONE',
       proxyHost: config.proxyHost ?? '',
@@ -537,6 +545,16 @@ function AiProviderSettings({ accessToken, isGuest }) {
                   onChange={(event) => updateForm('defaultModel', event.target.value)}
                   placeholder={suggestedModel(providerLookup.get(form.providerType), form.modelType) || translate('aiConfig.modelPlaceholder')} />
               </label>
+              {form.modelType === 'TEXT' && <div className="workspace-field field-wide">
+                <span>{translate('aiConfig.callTimeout')}</span>
+                <AiSelectMenu label={translate('aiConfig.callTimeout')} value={form.callTimeout}
+                  options={MODEL_CALL_TIMEOUTS.map(([value, key]) => ({
+                    value, label: ['2h', 'unlimited'].includes(key)
+                      ? translate(`aiConfig.callTimeout.${key}`) : translate('aiConfig.callTimeout.minutes', { count: key }),
+                  }))}
+                  onChange={(value) => updateForm('callTimeout', value)} />
+                {form.callTimeout === 'UNLIMITED' && <small>{translate('aiConfig.callTimeout.hint')}</small>}
+              </div>}
               <label className="workspace-field">
                 <span>{translate('aiConfig.field.apiKey')}</span>
                 <div className="ai-secret-input">
@@ -666,6 +684,7 @@ function configPayload(form) {
     name: form.name,
     providerType: form.providerType,
     modelType: form.modelType,
+    callTimeout: form.modelType === 'TEXT' ? form.callTimeout : null,
     baseUrl: form.baseUrl,
     defaultModel: form.defaultModel,
     apiKey: form.apiKey,

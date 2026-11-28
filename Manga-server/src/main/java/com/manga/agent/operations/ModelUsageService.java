@@ -4,10 +4,10 @@ import com.manga.agent.blueprint.AgentBlueprint;
 import com.manga.agent.capability.AgentRuntimeContext;
 import com.manga.agent.collaboration.CollaborationGuard;
 import com.manga.agent.domain.CreativeErrorCode;
-import com.manga.agent.domain.CreativeOperationType;
 import com.manga.agent.domain.SystemActor;
 import com.manga.agent.harness.AgentRuntimeException;
 import com.manga.entity.ModelCallLedger;
+import com.manga.common.enums.ModelCallTimeout;
 import com.manga.repository.CreativeRunRepository;
 import com.manga.repository.CreativeStepRepository;
 import com.manga.repository.RuntimeOperationsRepository;
@@ -66,8 +66,8 @@ public class ModelUsageService {
         call.setModelName(blueprint.model().modelName()); call.setBlueprintFingerprint(blueprint.fingerprint());
         call.setStatus(ModelCallStatus.STARTED); call.setUsageReported(false);
         call.setStartedAt(now);
-        Instant timeout = Instant.now().plus(run.getOperationType() == CreativeOperationType.GENERATE_CHAPTER_STORYBOARD
-                ? properties.storyboardCallTimeout() : properties.callTimeout());
+        Duration limit = ModelCallTimeout.resolve(blueprint.model().callTimeout()).duration();
+        Instant timeout = limit.isZero() ? context.deadline() : now.toInstant(ZoneOffset.UTC).plus(limit);
         call.setExpiresAt(LocalDateTime.ofInstant(timeout.isBefore(context.deadline()) ? timeout : context.deadline(), ZoneOffset.UTC));
         call.setCreatedBy(actor); call.setUpdatedBy(actor); repository.create(call);
         return call;

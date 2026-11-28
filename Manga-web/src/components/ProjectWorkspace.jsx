@@ -120,8 +120,11 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
       })
       setChapter(result); setTitle(result.title || ''); setText(result.rawContent || ''); setConflict(false)
     } else {
-      await importProjectChapter(accessToken, projectId, { title, rawContent: text, sourceType: 'MANUAL' })
+      const imported = await importProjectChapter(accessToken, projectId, { title, rawContent: text, sourceType: 'MANUAL' })
       setTitle(''); setText(''); setShowImport(false)
+      await loadWorkspace()
+      await onNavigateChapter(imported.id)
+      return
     }
     await loadWorkspace()
   })
@@ -131,6 +134,7 @@ export default function ProjectWorkspace({ accessToken, projectId, initialStage 
     if (!file) return
     void execute(async () => {
       await importProjectScript(accessToken, projectId, file, file.name.toLowerCase().endsWith('.md') ? 'MARKDOWN' : 'TXT')
+      if (!dirty) setShowImport(false)
       await loadWorkspace()
     })
   }

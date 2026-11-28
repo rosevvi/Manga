@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.manga.common.enums.AiProviderType;
 import com.manga.common.enums.AiModelType;
 import com.manga.common.enums.AiProxyType;
+import com.manga.common.enums.ModelCallTimeout;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -37,6 +38,8 @@ public class AiProviderConfig {
     private String defaultModel;
     /** 模型用途，默认配置按用途隔离。 */
     private AiModelType modelType;
+    /** 文本模型单次调用总时限。 */
+    private ModelCallTimeout callTimeout;
     /** AES-GCM 加密后的 API Key 密文。 */
     @ToString.Exclude
     private String apiKeyCiphertext;

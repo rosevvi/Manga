@@ -28,6 +28,10 @@ public class CreativeManualRunQueryService {
                 rows.size() > PAGE_SIZE ? page.getLast().getId() : null,
                 runs.findActiveManual(userId, projectId).map(this::item).orElse(null));
     }
+    /** 查询助手对话和页面任务的后台运行状态。 */
+    @Transactional(readOnly = true)
+    public boolean hasRunningTask(long userId) { return runs.hasRunningTask(userId); }
+
     /** 只公开选择任务所需的稳定字段。 */
     private CreativeManualRunPage.Item item(CreativeRun run) {
         return new CreativeManualRunPage.Item(run.getId(), run.getRunId(), run.getOperationType(),

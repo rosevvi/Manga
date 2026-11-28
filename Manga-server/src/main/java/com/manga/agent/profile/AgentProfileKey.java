@@ -16,6 +16,7 @@ public enum AgentProfileKey {
 
     /** 负责读取项目剧本并输出结构化解析报告的专业 Agent。 */
     SCRIPT_PARSER("script_parser"),
+    /** 导入章节时登记可复用的资产。 */ CHAPTER_ASSET_EXTRACTOR("chapter_asset_extractor"),
     /** 产出章节候选草稿的只读 Worker。 */ SCRIPT_WRITER("script_writer"),
     /** 产出分镜候选草稿的只读 Worker。 */ STORYBOARD_DIRECTOR("storyboard_director"),
     /** 审核上游候选内容连贯性的只读 Worker。 */ CONTINUITY_REVIEWER("continuity_reviewer");

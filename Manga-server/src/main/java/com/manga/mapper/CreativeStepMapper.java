@@ -24,6 +24,10 @@ public interface CreativeStepMapper extends BaseMapper<CreativeStep> {
     int resumeApproval(@Param("stepId") String stepId, @Param("sessionId") String sessionId,
             @Param("result") String result, @Param("maxAttempts") int maxAttempts, @Param("actor") String actor);
 
+    /** 持有 Run 锁时为首次执行的导入任务补齐模型快照。 */
+    int freezeBlueprint(@Param("stepId") String stepId, @Param("snapshot") String snapshot,
+            @Param("fingerprint") String fingerprint, @Param("sessionId") String sessionId, @Param("actor") String actor);
+
     /** 按稳定标识查询 Step。 */
     CreativeStep findByStepId(@Param("stepId") String stepId);
 

@@ -230,8 +230,14 @@ class MangaApplicationTests {
         mockMvc.perform(put(path).header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"%s","providerType":"DEEPSEEK","modelType":"TEXT","baseUrl":"https://example.test",
-                                 "defaultModel":"test-model","apiKey":null,"proxyType":"NONE","enabled":true,"defaultConfig":false}
-                                """.formatted(name))).andExpect(status().isOk());
+                                 "defaultModel":"test-model","apiKey":null,"proxyType":"NONE","enabled":true,"defaultConfig":false,
+                                 "callTimeout":"HOURS_2"}
+                                """.formatted(name))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.callTimeout").value("HOURS_2"));
+        mockMvc.perform(get("/api/v1/ai-provider-configs").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.id == " + configId + ")].callTimeout",
+                        org.hamcrest.Matchers.contains("HOURS_2")));
         String ciphertext = jdbcTemplate.queryForObject("SELECT api_key_ciphertext FROM manga_ai_provider_config WHERE id = ?", String.class, configId);
         assertThat(secretCipher.decrypt(ciphertext)).isEqualTo(testSecret);
     }

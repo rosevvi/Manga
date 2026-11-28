@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manga.agent.changeset.ChangeSetConstants;
 import com.manga.agent.changeset.ChangeSetResponseCode;
 import com.manga.agent.changeset.ScriptChangeSet;
+import com.manga.agent.application.ChapterImported;
+import org.springframework.context.ApplicationEventPublisher;
 import com.manga.common.enums.ProjectWorkflowStage;
 import com.manga.common.enums.ScriptChapterParseStatus;
 import com.manga.common.exception.BusinessException;
@@ -50,6 +52,7 @@ public class ProjectScriptService {
     private final ProjectWorkflowService workflowService;
     private final ObjectMapper objectMapper;
     private final ProjectRevisionService revisionService;
+    private final ApplicationEventPublisher events;
 
     /** 查询剧本元数据和章节摘要，不返回正文。 */
     public ProjectScriptResponse find(long projectId) {
@@ -96,6 +99,8 @@ public class ProjectScriptService {
         ProjectScript script = requireScript(projectId, true);
         ProjectScriptChapter chapter = createChapterEntity(script, title, synopsis, rawContent, sourceType,
                 nextSortOrder(script.getId()), ScriptChapterParseStatus.COMPLETED);
+        refreshChapterCount(script);
+        events.publishEvent(new ChapterImported(projectId, chapter.getId(), SecurityUtils.requireCurrentUserId()));
         workflowService.advanceTo(projectId, ProjectWorkflowStage.STORYBOARD, SecurityUtils.requireCurrentUsername());
         return toChapterResponse(chapter, chapterNumber(script.getId(), chapter.getId()));
     }
@@ -159,14 +164,15 @@ public class ProjectScriptService {
         ProjectScriptChapter chapter = createChapterEntity(script, title, synopsis, rawContent, sourceType, sortOrder,
                 ScriptChapterParseStatus.COMPLETED, actor);
         refreshChapterCount(script);
+        events.publishEvent(new ChapterImported(projectId, chapter.getId(), ownerUserId));
         return chapter;
     }
 
     /** 返回插入章节的稳定排序值，并为后续章节预留空间。 */
     @Transactional
-    public int prepareInsertOrder(long projectId, Long afterChapterId, int amount, long ownerUserId) {
-        revisionService.edit(projectId, ownerUserId, null, SecurityUtils.requireCurrentUsername());
-        ProjectScript script = ensureScriptForOwner(projectId, ownerUserId, SecurityUtils.requireCurrentUsername());
+    public int prepareInsertOrder(long projectId, Long afterChapterId, int amount, long ownerUserId, String actor) {
+        revisionService.lock(projectId, ownerUserId);
+        ProjectScript script = ensureScriptForOwner(projectId, ownerUserId, actor);
         int sortOrder = 1;
         if (afterChapterId != null) {
             ProjectScriptChapter after = chapterRepository.findByIdAndScript(afterChapterId, script.getId())
@@ -175,7 +181,7 @@ public class ProjectScriptService {
         } else {
             sortOrder = nextSortOrder(script.getId());
         }
-        if (amount > 0) chapterRepository.shiftSortOrders(script.getId(), sortOrder, amount);
+        if (afterChapterId != null && amount > 0) chapterRepository.shiftSortOrders(script.getId(), sortOrder, amount);
         return sortOrder;
     }
 

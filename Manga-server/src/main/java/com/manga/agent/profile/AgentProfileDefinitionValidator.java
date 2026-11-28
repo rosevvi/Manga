@@ -27,10 +27,14 @@ public class AgentProfileDefinitionValidator {
         if (!key.matches(AgentProfileContracts.KEY_PATTERN)) invalid();
         if (builtIn && definition.role() != AgentProfileKey.fromCode(key)) invalid();
         boolean director = definition.role() == AgentProfileKey.MANGA_DIRECTOR;
-        if ((!director && definition.permissionPolicy() != AgentPermissionPolicy.READ_ONLY)
+        boolean extractor = definition.role() == AgentProfileKey.CHAPTER_ASSET_EXTRACTOR;
+        if (extractor && (!builtIn || definition.permissionPolicy() != AgentPermissionPolicy.AUTOMATION
+                || definition.model().selection() != AgentModelSelection.USER_DEFAULT
+                || !definition.capabilities().equals(CapabilityName.chapterAssetCapabilities()))) invalid();
+        if ((!director && !extractor && definition.permissionPolicy() != AgentPermissionPolicy.READ_ONLY)
                 || (director && !AgentPermissionPolicy.PROPOSE_CHANGES.allows(definition.permissionPolicy()))
                 || definition.budget().maxReservedTurns() < definition.maxTurns() + 1) invalid();
-        Set<CapabilityName> allowed = director ? CapabilityName.directorCapabilities() : CapabilityName.phaseTwoReadOnlyCapabilities();
+        Set<CapabilityName> allowed = extractor ? CapabilityName.chapterAssetCapabilities() : director ? CapabilityName.directorCapabilities() : CapabilityName.phaseTwoReadOnlyCapabilities();
         if (!allowed.containsAll(definition.capabilities())) invalid();
         for (var name : definition.capabilities()) {
             var descriptor = capabilities.require(name).descriptor();

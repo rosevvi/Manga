@@ -1,6 +1,6 @@
 /** 与持久化协作图协议保持一致的角色显示名。 */
 export const AGENT_PROFILE_LABEL = Object.freeze({
-  manga_director: '创作导演', script_parser: '剧本解析师', script_writer: '剧本编剧',
+  manga_director: '创作导演', script_parser: '剧本解析师', chapter_asset_extractor: '章节资产识别师', script_writer: '剧本编剧',
   storyboard_director: '分镜导演', continuity_reviewer: '连续性评审师',
 })
 /** 步骤状态文案，不通过内部 Agent 输出猜测进度。 */

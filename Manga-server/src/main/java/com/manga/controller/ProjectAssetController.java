@@ -1,6 +1,7 @@
 package com.manga.controller;
 
 import com.manga.common.api.ApiResponse;
+import com.manga.agent.application.ChapterAssetExtraction;
 import com.manga.common.security.SecurityUtils;
 import com.manga.dto.ProjectAssetContracts.*;
 import com.manga.dto.StoryboardImageSnapshot;
@@ -20,6 +21,13 @@ import java.util.List;
 @Slf4j
 public class ProjectAssetController {
     private final ProjectAssetService assets;
+    private final ChapterAssetExtraction extraction;
+
+    /** 查看导入识别进度与错误，旧章节可以没有任务。 */
+    @GetMapping("/script/chapters/{chapterId}/assets/extraction")
+    public ApiResponse<ChapterAssetExtraction.Attempt> extraction(@PathVariable long projectId, @PathVariable long chapterId) {
+        return ApiResponse.success(extraction.latest(projectId, chapterId, userId()));
+    }
 
     /** 查询项目内可复用的资产。 */
     @GetMapping("/assets")

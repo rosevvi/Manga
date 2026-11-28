@@ -1,6 +1,9 @@
 package com.manga.agent.config;
 
+import com.manga.agent.domain.CreativeOperationType;
+import com.manga.agent.profile.AgentOperationBinding;
 import jakarta.validation.constraints.Min;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -21,6 +24,12 @@ public record CreativeRuntimeProperties(
         /** 当前事件 Envelope Schema 版本。 */
         @Min(1) int eventSchemaVersion,
         /** 单次 Run 从受理到终止允许占用的最长时间。 */
-        @NotNull Duration runTimeout
+        @NotNull Duration runTimeout,
+        /** Agent Run 从受理到终止的整体执行期限。 */
+        @DefaultValue("4h") @NotNull Duration agentRunTimeout
 ) {
+    /** 按是否使用文本调用选择 Run 的执行期限。 */
+    public Duration executionTimeout(CreativeOperationType operation) {
+        return AgentOperationBinding.find(operation).isPresent() ? agentRunTimeout : runTimeout;
+    }
 }

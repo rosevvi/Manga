@@ -11,6 +11,9 @@ public enum CreativeOperationType {
     /** 读取项目剧本并生成结构化的专业解析报告。 */
     PARSE_SCRIPT,
 
+    /** 导入后识别并登记本章资产。 */
+    EXTRACT_CHAPTER_ASSETS,
+
     /** 为指定剧本章节生成分镜方案。 */
     GENERATE_CHAPTER_STORYBOARD,
     /** 为项目生成待审批的新章节提案。 */

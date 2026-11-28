@@ -80,7 +80,7 @@ class RunAdmissionServiceAgentTests {
                 outboxRepository,
                 eventService,
                 projectService,
-                new CreativeRuntimeProperties("engine-v2", "workflow-v2", 1, Duration.ofMinutes(30)),
+                new CreativeRuntimeProperties("engine-v2", "workflow-v2", 1, Duration.ofMinutes(30), Duration.ofHours(4)),
                 identifierGenerator,
                 dispatcher,
                 blueprintCompiler,

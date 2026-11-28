@@ -6,6 +6,7 @@ import com.manga.agent.blueprint.AgentBlueprintCodec;
 import com.manga.repository.CreativeGraphRepository;
 import com.manga.agent.config.CreativeExecutionProperties;
 import com.manga.agent.domain.CreativeEventType;
+import com.manga.agent.domain.CreativeOperationType;
 import com.manga.agent.domain.CreativeRunStatus;
 import com.manga.agent.domain.CreativeStepStatus;
 import com.manga.agent.domain.SystemActor;
@@ -105,6 +106,7 @@ public class CreativeStepClaimService {
                         : blueprintCodec.deserialize(step.getBlueprintSnapshotJson()).permissionPolicy(),
                 step.getBlueprintSnapshotJson(),
                 step.getBlueprintFingerprint(),
-                step.getStateSessionId());
+                step.getStateSessionId() == null && run.getOperationType() == CreativeOperationType.EXTRACT_CHAPTER_ASSETS
+                        ? "import-" + step.getStepId() : step.getStateSessionId());
     }
 }

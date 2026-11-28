@@ -50,6 +50,10 @@ public class BuiltInAgentProfileSource implements AgentProfileSource {
                 properties.scriptParserMaxTurns()
         );
         register(indexed, scriptParser);
+        register(indexed, new AgentProfile(AgentProfileKey.CHAPTER_ASSET_EXTRACTOR, 1, "章节资产识别师",
+                "识别导入章节中的角色、场景和道具，并将其加入项目和章节。",
+                readPrompt(resourceLoader, "classpath:agent/profiles/chapter-asset-extractor.md"),
+                CapabilityName.chapterAssetCapabilities(), AgentPermissionPolicy.AUTOMATION, properties.scriptParserMaxTurns()));
         registerWorker(indexed, AgentProfileKey.SCRIPT_WRITER, "剧本编剧", StepResultKind.SCRIPT_DRAFT, collaboration);
         registerWorker(indexed, AgentProfileKey.STORYBOARD_DIRECTOR, "分镜导演", StepResultKind.STORYBOARD_DRAFT, collaboration);
         registerWorker(indexed, AgentProfileKey.CONTINUITY_REVIEWER, "连续性评审师", StepResultKind.REVIEW, collaboration);

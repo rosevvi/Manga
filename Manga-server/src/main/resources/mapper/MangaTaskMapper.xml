@@ -40,7 +40,7 @@
         ORDER BY created_at
     </select>
     <update id="updateProgress">
-        UPDATE manga_task SET status=#{task.status}, completed_units=#{task.completedUnits}, failed_units=#{task.failedUnits},
+        UPDATE manga_task SET status=#{task.status}, total_units=#{task.totalUnits}, completed_units=#{task.completedUnits}, failed_units=#{task.failedUnits},
         current_unit=#{task.currentUnit}, last_error=#{task.lastError}, attempt_count=#{task.attemptCount},
         started_at=#{task.startedAt}, finished_at=#{task.finishedAt}, updated_by=#{task.updatedBy}
         WHERE id=#{task.id} AND owner_user_id=#{task.ownerUserId}

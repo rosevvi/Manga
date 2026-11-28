@@ -11,6 +11,7 @@ import com.manga.common.enums.AiProviderConfigResponseCode;
 import com.manga.common.enums.AiProviderType;
 import com.manga.common.enums.AiModelType;
 import com.manga.common.enums.AiProxyType;
+import com.manga.common.enums.ModelCallTimeout;
 import com.manga.common.exception.BusinessException;
 import com.manga.common.security.SecurityUtils;
 import com.manga.dto.AiProviderConnectionTestRequest;
@@ -114,6 +115,7 @@ public class AiProviderConfigService {
                 .baseUrl(normalizeBaseUrl(request.baseUrl()))
                 .defaultModel(normalize(request.defaultModel()))
                 .modelType(modelType)
+                .callTimeout(ModelCallTimeout.resolve(request.callTimeout()))
                 .apiKeyCiphertext(apiKey == null ? null : secretCipher.encrypt(apiKey))
                 .apiKeyHint(maskSecret(apiKey))
                 .proxyType(proxyFields.proxyType())
@@ -174,6 +176,7 @@ public class AiProviderConfigService {
                 .baseUrl(normalizeBaseUrl(request.baseUrl()))
                 .defaultModel(normalize(request.defaultModel()))
                 .modelType(modelType)
+                .callTimeout(ModelCallTimeout.resolve(request.callTimeout() == null ? current.getCallTimeout() : request.callTimeout()))
                 .apiKeyCiphertext(newApiKey == null ? current.getApiKeyCiphertext() : secretCipher.encrypt(newApiKey))
                 .apiKeyHint(newApiKey == null ? current.getApiKeyHint() : maskSecret(newApiKey))
                 .proxyType(proxyFields.proxyType())
@@ -480,7 +483,8 @@ public class AiProviderConfigService {
     private AiProviderConfigResponse toResponse(AiProviderConfig config) {
         return new AiProviderConfigResponse(
                 config.getId(), config.getName(), config.getProviderType(), config.getBaseUrl(),
-                config.getDefaultModel(), config.getModelType(), config.getApiKeyCiphertext() != null, config.getApiKeyHint(),
+                config.getDefaultModel(), config.getModelType(), ModelCallTimeout.resolve(config.getCallTimeout()),
+                config.getApiKeyCiphertext() != null, config.getApiKeyHint(),
                 config.getProviderType().label(), config.getProviderType().description(),
                 config.getProviderType().recommendedModel(), config.getProviderType().apiKeyRequired(),
                 config.getProviderType().capabilities(),

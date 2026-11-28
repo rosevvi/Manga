@@ -70,7 +70,7 @@ public class MeteredModelFactory {
                                         : Flux.error(new TimeoutException()))
                                 .timeout(properties.idleTimeout(), Flux.error(new AgentRuntimeException(
                                         CreativeErrorCode.MODEL_IDLE_TIMEOUT, CreativeExecutionFailure.IDLE)), streamTimer)
-                                .takeUntilOther(deadline(call))
+                                .takeUntilOther(callDeadline(call, context))
                                 .doOnNext(response -> {
                                     if (first.compareAndSet(false, true)) log.info("Model first data callId={} stepId={} epoch={} durationMs={}",
                                             call.getCallId(), context.stepId(), context.ownerEpoch(),
@@ -102,8 +102,9 @@ public class MeteredModelFactory {
         return Mono.fromRunnable(() -> usage.finish(call, status, failure)).subscribeOn(scheduler).then();
     }
 
-    /** 使用 Manga 定时器精确中断，普通阻塞 Scheduler 不承担定时能力。 */
-    private Mono<Void> deadline(ModelCallLedger call) {
+    /** 只有独立的单次时限更早时才设置计时器，Run 期限由 Harness 执行。 */
+    private Mono<Void> callDeadline(ModelCallLedger call, AgentRuntimeContext context) {
+        if (!call.getExpiresAt().toInstant(ZoneOffset.UTC).isBefore(context.deadline())) return Mono.never();
         Duration remaining = Duration.between(LocalDateTime.now(ZoneOffset.UTC), call.getExpiresAt());
         return Mono.delay(remaining.isNegative() ? Duration.ZERO : remaining, streamTimer)
                 .flatMap(ignored -> Mono.error(new AgentRuntimeException(CreativeErrorCode.MODEL_TIMEOUT, CreativeExecutionFailure.TIMEOUT)));

@@ -254,7 +254,7 @@ public class ChangeSetApprovalService {
         if (!steps.resumeApproval(proposal.getStepId(), sessionId, proposal.getResultJson(), ChangeSetConstants.RESUME_MAX_ATTEMPTS, actor)) {
             throw new BusinessException(ChangeSetResponseCode.STATE_CONFLICT, HttpStatus.CONFLICT);
         }
-        run.setDeadlineAt(LocalDateTime.now().plus(runtimeProperties.runTimeout()));
+        run.setDeadlineAt(LocalDateTime.now().plus(runtimeProperties.executionTimeout(run.getOperationType())));
         run.setUpdatedBy(actor);
         runs.update(run);
         if (Objects.nonNull(sessionId)) sessions.register(run, sessionId);

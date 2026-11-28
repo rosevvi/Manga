@@ -12,7 +12,7 @@ import com.manga.dto.ProjectScriptImportRequest;
 import com.manga.dto.TaskResponse;
 import com.manga.entity.MangaTask;
 import com.manga.entity.MangaTaskUnit;
-import com.manga.entity.ProjectScriptChapter;
+import org.springframework.dao.DataAccessException;
 import com.manga.repository.MangaTaskRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +21,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -53,11 +55,15 @@ import static com.manga.common.constant.MediaUploadConstants.*;
 @Slf4j
 public class ScriptTaskService {
 
-    private static final Pattern CHAPTER_PATTERN = Pattern.compile("(?m)^\\s*(?:第\\s*[0-9一二三四五六七八九十百千]+\\s*[章节]|Chapter\\s+\\d+|第一幕|第二幕|第三幕).*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CHAPTER_PATTERN = Pattern.compile(
+            "(?m)^\\h*(?:#{1,6}\\h+)?((?:第\\h*[0-9零〇一二三四五六七八九十百千万两]+\\h*[章节幕]|Chapter\\h+\\d+).*)$",
+            Pattern.CASE_INSENSITIVE);
+    private static final String CHAPTER_LIST_SUFFIX = ".chapters.json";
+    private static final String SCRIPT_TEXT_SUFFIX = ".script.txt";
     private static final Set<String> SUPPORTED_SCRIPT_EXTENSIONS = Set.of("txt", "md");
 
     private final MangaTaskRepository taskRepository;
-    private final ProjectScriptService scriptService;
+    private final ScriptImportUnitService importUnits;
     private final ScriptTaskProperties properties;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redisTemplate;
@@ -138,23 +144,27 @@ public class ScriptTaskService {
         cacheProgress(task);
         try {
             String payload = Files.readString(Paths.get(task.getSourceReference()), StandardCharsets.UTF_8);
-            List<ProjectScriptImportRequest.Chapter> chapters = parseChapters(payload);
+            List<ProjectScriptImportRequest.Chapter> chapters = parseChapters(payload, task.getSourceReference());
             task.setTotalUnits(chapters.size());
             taskRepository.update(task);
             cacheProgress(task);
-            int sortOrder = scriptService.prepareInsertOrder(task.getProjectId(), task.getAfterChapterId(), chapters.size(), ownerUserId);
+            Long afterChapterId = task.getAfterChapterId();
+            task.setCompletedUnits(0);
+            task.setFailedUnits(0);
             for (int index = 0; index < chapters.size(); index++) {
                 ProjectScriptImportRequest.Chapter input = chapters.get(index);
                 task.setCurrentUnit(input.title());
                 taskRepository.update(task);
                 cacheProgress(task);
                 try {
-                    ProjectScriptChapter chapter = scriptService.createTaskChapter(task.getProjectId(), input.title(),
-                            input.synopsis(), input.rawContent(), task.getSourceContentType(), sortOrder++, ownerUserId, actor);
-                    taskRepository.createUnit(MangaTaskUnit.builder().taskId(taskId)
-                            .unitIndex(index).chapterId(chapter.getId()).chapterTitle(input.title())
-                            .status(TaskStatus.COMPLETED).startedAt(LocalDateTime.now()).finishedAt(LocalDateTime.now()).build());
-                    task.setCompletedUnits(task.getCompletedUnits() + 1);
+                    MangaTaskUnit unit = importUnits.importUnit(task, index, input, afterChapterId);
+                    if (unit.getStatus() == TaskStatus.COMPLETED) {
+                        if (unit.getChapterId() != null) afterChapterId = unit.getChapterId();
+                        task.setCompletedUnits(task.getCompletedUnits() + 1);
+                    } else {
+                        task.setFailedUnits(task.getFailedUnits() + 1);
+                        task.setLastError(unit.getErrorMessage());
+                    }
                 } catch (RuntimeException exception) {
                     task.setFailedUnits(task.getFailedUnits() + 1);
                     task.setLastError(exception.getMessage());
@@ -192,7 +202,7 @@ public class ScriptTaskService {
             int totalUnits, long ownerUserId, String actor) throws IOException {
         Path directory = Paths.get(properties.inputDirectory()).toAbsolutePath().normalize();
         Files.createDirectories(directory);
-        Path file = Files.createTempFile(directory, "script-task-", ".txt");
+        Path file = Files.createTempFile(directory, "script-task-", totalUnits > 0 ? CHAPTER_LIST_SUFFIX : SCRIPT_TEXT_SUFFIX);
         boolean committed = false;
         try {
             Files.writeString(file, payload, StandardCharsets.UTF_8);
@@ -203,8 +213,14 @@ public class ScriptTaskService {
                     .sourceContentType(sourceType).afterChapterId(afterChapterId)
                     .totalUnits(totalUnits).completedUnits(0).failedUnits(0)
                     .attemptCount(0).createdBy(actor).updatedBy(actor).build());
-            executor.execute(() -> execute(task.getId(), ownerUserId, actor));
             cacheProgress(task);
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override public void afterCommit() { ScriptTaskService.this.resume(task); }
+                });
+            } else {
+                resume(task);
+            }
             committed = true;
             return toResponse(task);
         } finally {
@@ -214,15 +230,23 @@ public class ScriptTaskService {
         }
     }
 
-    private List<ProjectScriptImportRequest.Chapter> parseChapters(String payload) throws IOException {
-        if (payload.trim().startsWith("[")) {
+    private List<ProjectScriptImportRequest.Chapter> parseChapters(String payload, String sourceReference) throws IOException {
+        if (sourceReference.endsWith(CHAPTER_LIST_SUFFIX)) {
             return objectMapper.readValue(payload, new TypeReference<>() {});
+        }
+        // 旧任务统一使用 .txt，同时支持旧章节数组和以方括号开头的舞台说明。
+        if (!sourceReference.endsWith(SCRIPT_TEXT_SUFFIX) && payload.stripLeading().startsWith("[")) {
+            try {
+                return objectMapper.readValue(payload, new TypeReference<>() {});
+            } catch (com.fasterxml.jackson.core.JsonProcessingException plainText) {
+                log.debug("Parsing legacy script input as plain text");
+            }
         }
         String[] pieces = CHAPTER_PATTERN.split(payload);
         if (pieces.length <= 1) {
             return List.of(new ProjectScriptImportRequest.Chapter("未命名章节", null, payload));
         }
-        String[] headers = CHAPTER_PATTERN.matcher(payload).results().map(match -> match.group()).toArray(String[]::new);
+        String[] headers = CHAPTER_PATTERN.matcher(payload).results().map(match -> match.group(1)).toArray(String[]::new);
         List<ProjectScriptImportRequest.Chapter> chapters = new ArrayList<>();
         for (int index = 1; index < pieces.length; index++) {
             String content = pieces[index].trim();
@@ -297,6 +321,14 @@ public class ScriptTaskService {
     }
 
     private void cacheProgress(MangaTask task) {
+        try {
+            updateProgressCache(task);
+        } catch (DataAccessException failure) {
+            log.debug("Script import progress cache unavailable taskId={}", task.getId());
+        }
+    }
+
+    private void updateProgressCache(MangaTask task) {
         String key = "manga:task:" + task.getId();
         redisTemplate.opsForHash().put(key, "status", task.getStatus().name());
         redisTemplate.opsForHash().put(key, "completedUnits", String.valueOf(task.getCompletedUnits()));

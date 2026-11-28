@@ -271,10 +271,6 @@ manga:
       failure-threshold: 3
       # 熔断冷却，结束后仅放行一个探测调用。
       circuit-cooldown: 30s
-      # 单次模型请求最长时间，取本值和 Run 剩余时间的较小值。
-      call-timeout: 2m
-      # 分镜及协作步骤单次模型调用总时限，持续输出不会重置。
-      storyboard-call-timeout: ${MANGA_STORYBOARD_MODEL_TIMEOUT:5m}
       # 按供应商数据重置，数据库写入耗时不算供应商静默。
       idle-timeout: ${MANGA_MODEL_IDLE_TIMEOUT:2m}
       # 恢复扫描间隔；不会重新发送已失联的供应商请求。
@@ -379,6 +375,8 @@ manga:
       event-schema-version: 1
       # 单次 Run 从受理到结束的最长允许时长，用于生成 deadline_at。
       run-timeout: ${MANGA_CREATIVE_RUN_TIMEOUT:30m}
+      # Agent Run 的整体期限需要覆盖较长单次模型调用和后续工具执行。
+      agent-run-timeout: ${MANGA_CREATIVE_AGENT_RUN_TIMEOUT:4h}
 
 management:
   endpoints:

@@ -60,8 +60,8 @@
 
 | 设置 | 默认值 | 含义 |
 | --- | --- | --- |
-| `manga.creative.operations.call-timeout` | 2m | 普通操作单次模型调用总时限 |
-| `MANGA_STORYBOARD_MODEL_TIMEOUT` | 5m | 章节分镜及所属协作步骤单次模型调用总时限 |
+| 文本模型配置 `callTimeout` | 30 分钟 | 单次调用总时限，可选 5、15、30、60 分钟、2 小时或不限制 |
+| `MANGA_CREATIVE_AGENT_RUN_TIMEOUT` | 4 小时 | Agent Run 的整体执行期限 |
 | `MANGA_MODEL_IDLE_TIMEOUT` | 2m | 连续未收到供应商响应数据的最长时间 |
 
 持续输出不会延长总时限。无响应计时位于模型响应入口，文本数据库写入在下游隔离队列中执行。SDK 的执行选项同时设置调用时限与 `maxAttempts=1`。

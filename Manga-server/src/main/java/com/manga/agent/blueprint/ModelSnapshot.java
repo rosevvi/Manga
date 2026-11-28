@@ -1,6 +1,8 @@
 package com.manga.agent.blueprint;
 
 import com.manga.common.enums.AiProviderType;
+import com.manga.common.enums.ModelCallTimeout;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
  * 固化不含密钥的模型路由信息和安全指纹。
@@ -11,6 +13,12 @@ public record ModelSnapshot(
         /** 模型服务基础地址。 */ String baseUrl,
         /** 模型编码。 */ String modelName,
         /** 包含密钥密文摘要但不暴露密钥的配置指纹。 */ String securityFingerprint,
-        /** Blueprint 编译时采用的上下文窗口大小。 */ int contextWindow
+        /** Blueprint 编译时采用的上下文窗口大小。 */ int contextWindow,
+        /** 新 Blueprint 冻结模型配置的时限，旧快照保留原指纹。 */
+        @JsonInclude(JsonInclude.Include.NON_NULL) ModelCallTimeout callTimeout
 ) {
+    public ModelSnapshot(long configId, AiProviderType providerType, String baseUrl, String modelName,
+            String securityFingerprint, int contextWindow) {
+        this(configId, providerType, baseUrl, modelName, securityFingerprint, contextWindow, null);
+    }
 }

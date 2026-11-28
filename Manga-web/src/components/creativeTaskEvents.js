@@ -1,5 +1,6 @@
 /** 页面手动任务与助手共用任务中心，不存储运行正文。 */
 export const OPEN_CREATIVE_TASK = 'manga:open-creative-task'
+export const CHAPTER_EXTRACTION_STARTED = 'manga:chapter-extraction-started'
 
 /** 定位一个已持久化任务；未指定 Run 时打开任务列表。 */
 export function openCreativeTask(runId, projectId) {
@@ -14,7 +15,7 @@ export const RUN_STATUS_LABEL = Object.freeze({
 })
 
 export function creativeTaskName(run) {
-  const names = { ASSISTANT_CHAT: '漫剧创作对话', PARSE_SCRIPT: '剧本解析', GENERATE_SCRIPT_CHAPTER: '生成章节',
+  const names = { ASSISTANT_CHAT: '漫剧创作对话', PARSE_SCRIPT: '剧本解析', EXTRACT_CHAPTER_ASSETS: '识别章节资产', GENERATE_SCRIPT_CHAPTER: '生成章节',
     GENERATE_CHAPTER_STORYBOARD: '生成章节分镜', GENERATE_SHOT_IMAGE: '生成镜头图片', GENERATE_SHOT_VIDEO: '生成镜头视频',
     GENERATE_ASSET_IMAGE: '生成资产图片' }
   return `${names[run?.operationType] || '创作任务'}${run?.targetId ? ` · #${run.targetId}` : ''}`

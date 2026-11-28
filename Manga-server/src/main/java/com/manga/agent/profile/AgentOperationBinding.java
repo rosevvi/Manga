@@ -15,6 +15,8 @@ public enum AgentOperationBinding {
 
     /** 将手动剧本解析操作绑定到只读解析 Profile，并要求目标为剧本。 */
     SCRIPT_PARSE(CreativeOperationType.PARSE_SCRIPT, AgentProfileKey.SCRIPT_PARSER, CreativeResourceType.SCRIPT),
+    /** 导入和手动重试共用同一个章节目标。 */
+    CHAPTER_ASSETS(CreativeOperationType.EXTRACT_CHAPTER_ASSETS, AgentProfileKey.CHAPTER_ASSET_EXTRACTOR, CreativeResourceType.CHAPTER),
     /** 手动为章节生成待审批分镜，不直接写镜头表。 */
     STORYBOARD_PROPOSAL(CreativeOperationType.GENERATE_CHAPTER_STORYBOARD, AgentProfileKey.MANGA_DIRECTOR, CreativeResourceType.CHAPTER),
     /** 手动创建章节提案；改写既有章节也可通过会话提出。 */

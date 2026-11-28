@@ -3,6 +3,7 @@ package com.manga.dto;
 import com.manga.common.enums.AiProviderType;
 import com.manga.common.enums.AiModelType;
 import com.manga.common.enums.AiProxyType;
+import com.manga.common.enums.ModelCallTimeout;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,6 +22,8 @@ public record AiProviderConfigResponse(
         String defaultModel,
         /** 此配置适用的模型用途。 */
         AiModelType modelType,
+        /** 文本模型单次调用总时限。 */
+        ModelCallTimeout callTimeout,
         /** 是否已经保存 API Key。 */
         boolean hasApiKey,
         /** API Key 脱敏摘要。 */

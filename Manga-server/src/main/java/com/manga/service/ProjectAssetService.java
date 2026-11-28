@@ -11,6 +11,11 @@ import com.manga.dto.ProjectAssetContracts.Asset;
 import com.manga.dto.ProjectAssetContracts.AssetSummary;
 import com.manga.dto.ProjectAssetContracts.CreateAsset;
 import com.manga.dto.ProjectAssetContracts.Fields;
+import com.manga.dto.ProjectAssetContracts.RecognizedAsset;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
+import java.text.Normalizer;
 import com.manga.dto.ProjectAssetContracts.SaveVisual;
 import com.manga.dto.ProjectAssetContracts.ShotAssetImage;
 import com.manga.dto.ProjectAssetContracts.Visual;
@@ -86,14 +91,61 @@ public class ProjectAssetService {
     public long create(long projectId, long userId, CreateAsset request) {
         revisions.lock(projectId, userId);
         if (request.chapterId() != null) revisions.chapter(projectId, request.chapterId());
-        ProjectAsset asset = new ProjectAsset();
-        asset.setProjectId(projectId);
-        asset.setAssetKind(request.assetKind());
-        asset.setCreatedBy(CreativeActor.user(userId));
-        applyFields(asset, request.fields(), userId);
-        repository.insertAsset(asset);
+        ProjectAsset asset = insertAsset(projectId, userId, request.assetKind(), request.fields());
         if (request.chapterId() != null) link(request.chapterId(), asset.getId(), userId);
         return asset.getId();
+    }
+
+    private ProjectAsset insertAsset(long projectId, long userId, ProjectAssetKind kind, Fields fields) {
+        ProjectAsset asset = new ProjectAsset();
+        asset.setProjectId(projectId);
+        asset.setAssetKind(kind);
+        asset.setCreatedBy(CreativeActor.user(userId));
+        applyFields(asset, fields, userId);
+        repository.insertAsset(asset);
+        return asset;
+    }
+
+    /** 与手工编辑共用项目行锁，在多章并发识别时复用同名同类资产，保留人工资料。 */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public int registerRecognized(long projectId, long chapterId, long userId, List<RecognizedAsset> recognized) {
+        revisions.lock(projectId, userId);
+        revisions.chapter(projectId, chapterId);
+        var byName = new HashMap<AssetName, List<ProjectAsset>>();
+        var byId = new HashMap<Long, ProjectAsset>();
+        for (var asset : repository.findProject(projectId)) {
+            byId.put(asset.getId(), asset);
+            byName.computeIfAbsent(assetName(asset.getAssetKind(), asset.getDisplayName()), key -> new ArrayList<>()).add(asset);
+        }
+        var linked = new HashSet<>(repository.chapterAssetIds(chapterId));
+        var additions = new ArrayList<ScriptChapterAssetRef>();
+        var recognizedIds = new HashSet<Long>();
+        for (RecognizedAsset item : recognized) {
+            AssetName key = assetName(item.assetKind(), item.fields().displayName());
+            var matches = byName.getOrDefault(key, List.of());
+            ProjectAsset asset;
+            if (item.existingAssetId() != null) {
+                asset = byId.get(item.existingAssetId());
+                if (asset == null || asset.getAssetKind() != item.assetKind()) throw new BusinessException(ProjectAssetError.INVALID_MATCH);
+            } else if (matches.isEmpty()) {
+                asset = insertAsset(projectId, userId, item.assetKind(), item.fields());
+                byName.put(key, List.of(asset));
+            } else if (matches.size() == 1) {
+                asset = matches.getFirst();
+            } else {
+                throw new BusinessException(ProjectAssetError.INVALID_MATCH);
+            }
+            recognizedIds.add(asset.getId());
+            if (linked.add(asset.getId())) additions.add(chapterLink(chapterId, asset.getId(), userId));
+        }
+        repository.linkAll(additions);
+        return recognizedIds.size();
+    }
+
+    private record AssetName(ProjectAssetKind kind, String name) {}
+
+    private static AssetName assetName(ProjectAssetKind kind, String name) {
+        return new AssetName(kind, Normalizer.normalize(name.strip(), Normalizer.Form.NFKC).toLowerCase(Locale.ROOT));
     }
 
     /** 更新一份项目资产，所有引用它的章节看到相同资料。 */
@@ -282,12 +334,16 @@ public class ProjectAssetService {
     }
 
     private void link(long chapterId, long assetId, long userId) {
+        repository.link(chapterLink(chapterId, assetId, userId));
+    }
+
+    private ScriptChapterAssetRef chapterLink(long chapterId, long assetId, long userId) {
         var relation = new ScriptChapterAssetRef();
         relation.setChapterId(chapterId);
         relation.setProjectAssetId(assetId);
         relation.setCreatedBy(CreativeActor.user(userId));
         relation.setUpdatedBy(relation.getCreatedBy());
-        repository.link(relation);
+        return relation;
     }
 
     private Map<Long, CreativeArtifact> artifactMap(List<Long> ids) {

@@ -53,7 +53,7 @@ class CreativeEventServiceTests {
                 eventRepository,
                 signals,
                 new ObjectMapper(),
-                new CreativeRuntimeProperties("durable-v1", "v1", 1, Duration.ofMinutes(30)),
+                new CreativeRuntimeProperties("durable-v1", "v1", 1, Duration.ofMinutes(30), Duration.ofHours(4)),
                 mock(AgentStateSessionService.class), mock(ApplicationEventPublisher.class),
                 mock(CreativeMessageProjectionRepository.class));
         TransactionSynchronizationManager.setActualTransactionActive(true);

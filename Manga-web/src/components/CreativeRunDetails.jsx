@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Clock3, Square } from 'lucide-react'
 import { cancelCreativeRun, createManualRun, createConversationRun } from '../api/creativeRunApi'
 import { CHANGE_SET_KIND, CREATIVE_TERMINAL_STATUSES } from '../constants/changeSet'
-import { CREATIVE_TRIGGER } from '../constants/creative'
+import { CREATIVE_OPERATION, CREATIVE_TRIGGER } from '../constants/creative'
 import { AGENT_PROFILE_LABEL, CREATIVE_STEP_STATUS_LABEL } from '../constants/collaboration'
-import { RUN_STATUS_LABEL, creativeTaskName } from './creativeTaskEvents'
+import { CHAPTER_EXTRACTION_STARTED, RUN_STATUS_LABEL, creativeTaskName } from './creativeTaskEvents'
 import CreativeChangeSetPanel from './CreativeChangeSetPanel'
 import GenerationJobsPanel from './GenerationJobsPanel'
 import CreativeExecutionTimeline from './CreativeExecutionTimeline'
@@ -47,7 +47,8 @@ export default function CreativeRunDetails({ accessToken, runId, assistantFallba
     setBusy(true)
     try {
       const conversational = run.triggerSource === CREATIVE_TRIGGER.CONVERSATION
-      const prompt = proposal?.kind === CHANGE_SET_KIND.VIDEO_GENERATION ? JSON.stringify(proposal.proposed)
+      const prompt = run.operationType === CREATIVE_OPERATION.EXTRACT_CHAPTER_ASSETS ? '重新识别当前章节资产并登记。'
+        : proposal?.kind === CHANGE_SET_KIND.VIDEO_GENERATION ? JSON.stringify(proposal.proposed)
         : proposal?.kind === CHANGE_SET_KIND.IMAGE_GENERATION && proposal.proposed.shotId != null ? imageProposalInstruction(proposal.proposed)
           : proposal ? regenerationInstruction(proposal) : conversational ? originalInstruction
             : `重新执行${creativeTaskName(run)}。读取当前目标的最新内容，生成提案并等待审批。`
@@ -57,6 +58,11 @@ export default function CreativeRunDetails({ accessToken, runId, assistantFallba
         operationType: run.operationType, target: { resourceType: run.targetType, resourceId: run.targetId },
         conversationId: run.conversationId, permissionPolicy: run.permissionPolicy, instruction: prompt }
       const next = conversational ? await createConversationRun(accessToken, request) : await createManualRun(accessToken, request)
+      if (run.operationType === CREATIVE_OPERATION.EXTRACT_CHAPTER_ASSETS) {
+        window.dispatchEvent(new CustomEvent(CHAPTER_EXTRACTION_STARTED, {
+          detail: { projectId: run.projectId, chapterId: run.targetId },
+        }))
+      }
       callbacks.current.onRunChanged?.(next.runId)
     } catch (failure) { setError(failure.message) }
     finally { setBusy(false) }
@@ -71,7 +77,7 @@ export default function CreativeRunDetails({ accessToken, runId, assistantFallba
   const { approval, media } = taskActionSequences(events)
   const canRetry = ['FAILED', 'CANCELLED'].includes(run?.status)
     && (run.triggerSource === CREATIVE_TRIGGER.CONVERSATION && originalInstruction?.trim() && callbacks.current.onRegenerate
-      || run.triggerSource === CREATIVE_TRIGGER.MANUAL && ['PARSE_SCRIPT', 'GENERATE_SCRIPT_CHAPTER', 'GENERATE_CHAPTER_STORYBOARD'].includes(run.operationType))
+      || run.triggerSource === CREATIVE_TRIGGER.MANUAL && ['PARSE_SCRIPT', 'GENERATE_SCRIPT_CHAPTER', 'GENERATE_CHAPTER_STORYBOARD', CREATIVE_OPERATION.EXTRACT_CHAPTER_ASSETS].includes(run.operationType))
   return <section className="task-detail" data-event-sequence={appliedSequence}>
     {!conversationView && <header className="task-detail-header"><div><h2>{creativeTaskName(run)}</h2><p><span className={`task-status ${run?.status?.toLowerCase()}`}>{stage || '正在恢复任务…'}</span><span><Clock3 size={12} /> {elapsed} 秒</span></p>
       <small>最后活动 {last?.occurredAt?.replace('T', ' ') || '等待执行记录'}</small></div>

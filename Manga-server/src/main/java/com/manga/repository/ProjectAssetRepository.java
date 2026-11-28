@@ -46,6 +46,17 @@ public class ProjectAssetRepository {
                 .eq(ProjectAsset::getProjectId, projectId).in(ProjectAsset::getId, ids).orderByAsc(ProjectAsset::getId));
     }
 
+    /** 一次读取当前章的引用，批量登记只追加缺少的关系。 */
+    public List<Long> chapterAssetIds(long chapterId) {
+        return chapters.selectList(Wrappers.<ScriptChapterAssetRef>lambdaQuery()
+                .select(ScriptChapterAssetRef::getProjectAssetId).eq(ScriptChapterAssetRef::getChapterId, chapterId))
+                .stream().map(ScriptChapterAssetRef::getProjectAssetId).toList();
+    }
+
+    public void linkAll(List<ScriptChapterAssetRef> links) {
+        if (!links.isEmpty()) chapters.insert(links);
+    }
+
     public void insertAsset(ProjectAsset asset) { assets.insert(asset); }
     public void updateAsset(ProjectAsset asset) { assets.updateById(asset); }
 

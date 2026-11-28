@@ -8,6 +8,7 @@ import { CREATIVE_OPERATION, CREATIVE_PERMISSION, CREATIVE_RESOURCE } from '../c
 import { useLanguage } from '../i18n/LanguageContext'
 import { CHAPTER_ASSET_CATEGORY } from '../constants/project'
 import ChapterAssetImage from './ChapterAssetImage'
+import ChapterAssetExtractionStatus from './ChapterAssetExtractionStatus'
 import ChapterAssetEditor from './ChapterAssetEditor'
 import { openCreativeTask } from './creativeTaskEvents'
 import ScriptAssetDrawer from './ScriptAssetDrawer'
@@ -122,6 +123,7 @@ export default function ScriptChapterWorkspace({ chapter, project, projectId, ac
         <button type="button" className="workspace-secondary" onClick={onOpenSource}><FileText size={15} aria-hidden="true" />查看原文</button>
       </header>
 
+      <ChapterAssetExtractionStatus accessToken={accessToken} projectId={projectId} chapterId={chapter.id} onComplete={refresh} />
       <section className="chapter-card chapter-summary">
         <h3 className="chapter-card-title"><BookOpen size={16} aria-hidden="true" />章节概要</h3>
         <div className="chapter-summary-body">

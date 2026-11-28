@@ -111,7 +111,7 @@ class AgentCreativeStepExecutorTests {
                 scheduler,
                 Schedulers.immediate(), streamTimer,
                 objectMapper, approvals, mock(CreativeDelegationService.class), graph,
-                mock(CreativeStepResultService.class), budgets, mock(CreativeReviewGate.class));
+                mock(CreativeStepResultService.class), budgets, mock(CreativeReviewGate.class), mock(ChapterAssetBlueprintPreparation.class));
 
         executor.execute(claimed);
 
